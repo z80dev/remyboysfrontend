@@ -7,7 +7,7 @@ function AccountDetails({ account, disconnect }) {
     <fieldset>
     <div className="account-details">
       <b>Connected Wallet</b>
-      <p>Addresses: {JSON.stringify(account.addresses)}</p>
+      <p>Address: {account.address}</p>
       <p>Chain ID: {account.chainId}</p>
       <button type="button" onClick={() => disconnect()}>
         Disconnect
