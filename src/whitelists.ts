@@ -22,7 +22,7 @@ export const whitelists = [
         name: "Cigawrette Packs Holders"
     },
     {
-        name: "Farcaster Users"
+        name: "Farcaster Giveaway"
     },
     {
         name: "Yayo Corp Holders"

@@ -37,8 +37,8 @@ function ConnectButtons({ connectors, connect, error }) {
     <div className="connect-buttons">
       <fieldset>
         <legend>Connect Wallet</legend>
-      <div id="connect-prompt">Select wallet to connect</div>
-      <div id="connect-subprompt">If on mobile, choose WalletConnect</div>
+        <div id="connect-prompt">Select wallet to connect</div>
+        <div id="connect-subprompt">If on mobile, choose WalletConnect</div>
         {connectors.map((connector) => (
           <button
             key={connector.uid}
@@ -97,14 +97,20 @@ function App() {
               {chainId === 8453 && (
                 <fieldset>
                   <legend>Whitelist Checker</legend>
-                  {whitelists.map((whitelist, index) => (
-                    <div key={whitelist.name} className="fieldset-row">
-                      {whitelist.name}: {result.data && result.data[index] ? result.data[index].toString() : '0'} spots
-                    </div>
-                  ))}
-                  <div className="fieldset-row whitelist-spots">
-                    <b>Total spots</b>: {result.data?.reduce((a, b) => a + b, BigInt(0)).toString()}
-                  </div>
+                  <ul className="tree-view has-collapse-button has-connector has-container">
+                    <details open>
+                      <summary>
+                        <b>Total spots</b>: {result.data?.reduce((a, b) => a + b, BigInt(0)).toString()}
+                      </summary>
+                      <ul>
+                        {whitelists.map((whitelist, index) => (
+                          <li key={whitelist.name}>
+                            {whitelist.name}: {result.data && result.data[index] ? result.data[index].toString() : '0'} spots
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </ul>
                 </fieldset>
               )}
             </div>
