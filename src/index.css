@@ -48,6 +48,24 @@
   margin-top: 10px;
 }
 
+.fieldset-title {
+  margin-bottom: 10px;
+}
+
+.fieldset-row {
+  margin-bottom: 5px;
+}
+
+#connect-prompt {
+  margin: 10px 0;
+  font-size: 1.5em;
+}
+
+#connect-subprompt {
+  margin: 10px 0;
+}
+
+
 .error-message {
   color: red;
   margin-top: 10px;

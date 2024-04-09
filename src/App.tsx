@@ -2,18 +2,20 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { useSwitchChain, useChainId } from 'wagmi'
 import { useReadContract } from 'wagmi'
+import { whitelists } from './whitelists.ts'
+
 function AccountDetails({ account, disconnect }) {
   return (
     <fieldset>
-    <div className="account-details">
-      <b>Wallet</b>
-      <p>Address: {account.address}</p>
-      <p>Chain ID: {account.chainId}</p>
-      <button type="button" onClick={() => disconnect()}>
-        Disconnect
-      </button>
-    </div>
-      </fieldset>
+      <legend>Account Details</legend>
+      <div className="account-details">
+        <p>Address: {account.address}</p>
+        <p>Chain ID: {account.chainId}</p>
+        <button type="button" onClick={() => disconnect()}>
+          Disconnect
+        </button>
+      </div>
+    </fieldset>
   )
 }
 
@@ -32,17 +34,20 @@ function SwitchChainButton({ chains, switchChain }) {
 function ConnectButtons({ connectors, connect, error }) {
   return (
     <div className="connect-buttons">
-      <h3>Connect</h3>
-      {connectors.map((connector) => (
-        <button
-          key={connector.uid}
-          onClick={() => connect({ connector })}
-          type="button"
-        >
-          {connector.name}
-        </button>
-      ))}
-      <div className="error-message">{error?.message}</div>
+      <fieldset>
+        <legend>Connect Wallet</legend>
+      <div id="connect-prompt">Select wallet to connect</div>
+      <div id="connect-subprompt">If on mobile, choose WalletConnect</div>
+        {connectors.map((connector) => (
+          <button
+            key={connector.uid}
+            onClick={() => connect({ connector })}
+            type="button"
+          >
+            {connector.name}
+          </button>
+        ))}
+      </fieldset>
     </div>
   )
 }
@@ -90,10 +95,15 @@ function App() {
               )}
               {chainId === 8453 && (
                 <fieldset>
-                  <div className="fieldset-title"><b>Whitelist Checker</b></div>
-                <div className="fieldset-row whitelist-spots">
-                  You have {result.data?.reduce((a, b) => a + b).toString()} whitelist spots
-                </div>
+                  <legend>Whitelist Checker</legend>
+                  {whitelists.map((whitelist, index) => (
+                    <div key={whitelist.name} className="fieldset-row">
+                      {whitelist.name}: {result.data && result.data[index] ? result.data[index].toString() : '0'} spots
+                    </div>
+                  ))}
+                  <div className="fieldset-row whitelist-spots">
+                    <b>Total spots</b>: {result.data?.reduce((a, b) => a + b, BigInt(0)).toString()}
+                  </div>
                 </fieldset>
               )}
             </div>
