@@ -19,3 +19,37 @@
 /*     color: #181818; */
 /*   } */
 /* } */
+
+.app {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.window {
+  max-width: 600px;
+  width: 100%;
+}
+
+.window-body {
+  padding: 20px;
+}
+
+.connect-buttons,
+.switch-chain {
+  margin-bottom: 20px;
+}
+
+.account-details{
+  margin: 10px 0;
+}
+
+.whitelist-spots {
+  margin-top: 10px;
+}
+
+.error-message {
+  color: red;
+  margin-top: 10px;
+}
+

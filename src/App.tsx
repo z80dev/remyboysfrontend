@@ -1,29 +1,26 @@
+// @ts-nocheck
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { useSwitchChain, useChainId } from 'wagmi'
 import { useReadContract } from 'wagmi'
-
-/* global BigInt */
-
-function AccountDetails({ account, disconnect }: { account: any, disconnect: any }) {
+function AccountDetails({ account, disconnect }) {
   return (
-    <>
-      <h3>Connected Wallet</h3>
-      status: {account.status}
-      <br />
-      addresses: {JSON.stringify(account.addresses)}
-      <br />
-      chainId: {account.chainId}
+    <fieldset>
+    <div className="account-details">
+      <b>Connected Wallet</b>
+      <p>Addresses: {JSON.stringify(account.addresses)}</p>
+      <p>Chain ID: {account.chainId}</p>
       <button type="button" onClick={() => disconnect()}>
         Disconnect
       </button>
-    </>
+    </div>
+      </fieldset>
   )
 }
 
-function SwitchChainButton({ chains, switchChain }: { chains: any, switchChain: any }) {
+function SwitchChainButton({ chains, switchChain }) {
   return (
-    <div>
-      {chains.filter((chain: any) => chain.id === 8453).map((chain: any) => (
+    <div className="switch-chain">
+      {chains.filter((chain) => chain.id === 8453).map((chain) => (
         <button key={chain.id} onClick={() => switchChain({ chainId: chain.id })}>
           Switch to {chain.name}
         </button>
@@ -32,11 +29,11 @@ function SwitchChainButton({ chains, switchChain }: { chains: any, switchChain: 
   )
 }
 
-function ConnectButtons({ connectors, connect, error }: { connectors: any, connect: any, error: any }) {
+function ConnectButtons({ connectors, connect, error }) {
   return (
-    <div>
+    <div className="connect-buttons">
       <h3>Connect</h3>
-      {connectors.map((connector: any) => (
+      {connectors.map((connector) => (
         <button
           key={connector.uid}
           onClick={() => connect({ connector })}
@@ -45,7 +42,7 @@ function ConnectButtons({ connectors, connect, error }: { connectors: any, conne
           {connector.name}
         </button>
       ))}
-      <div>{error?.message}</div>
+      <div className="error-message">{error?.message}</div>
     </div>
   )
 }
@@ -74,42 +71,40 @@ function App() {
   })
 
   return (
-    <>
-      <div>
-        <div className="window window-active" style={{ maxWidth: "600px" }}>
-          <div className="title-bar">
-            <div className="title-bar-text">Based Remy Boys</div>
-            <div className="title-bar-controls">
-              <button aria-label="Minimize"></button>
-              <button aria-label="Maximize"></button>
-              <button aria-label="Close"></button>
-            </div>
+    <div className="app">
+      <div className="window">
+        <div className="title-bar">
+          <div className="title-bar-text">Based Remy Boys</div>
+          <div className="title-bar-controls">
+            <button aria-label="Minimize"></button>
+            <button aria-label="Maximize"></button>
+            <button aria-label="Close"></button>
           </div>
-          <div className="window-body has-space">
-            <div>
-              {account.status === 'connected' && (
-                <>
-                  <AccountDetails account={account} disconnect={disconnect} />
-                  {chainId !== 8453 && (
-                    // @ts-ignore
-                    <SwitchChainButton chains={chains} chainId={chainId} switchChain={switchChain} />
-                  )}
-                  {chainId === 8453 && (
-                    <div>
-                      You have {result.data?.reduce((a, b) => a + b).toString()} whitelist spots
-                    </div>
-                  )}
-                </>
-              )}
-              {account.status === 'disconnected' && (
-                <ConnectButtons connectors={connectors} connect={connect} error={error} />
-              )}
-            </div>
-          </div>
-          <StatusBar status={status} error={error} />
         </div>
+        <div className="window-body">
+          {account.status === 'connected' && (
+            <div className="connected-content">
+              <AccountDetails account={account} disconnect={disconnect} />
+              {chainId !== 8453 && (
+                <SwitchChainButton chains={chains} switchChain={switchChain} />
+              )}
+              {chainId === 8453 && (
+                <fieldset>
+                  <div className="fieldset-title"><b>Whitelist Checker</b></div>
+                <div className="fieldset-row whitelist-spots">
+                  You have {result.data?.reduce((a, b) => a + b).toString()} whitelist spots
+                </div>
+                </fieldset>
+              )}
+            </div>
+          )}
+          {account.status === 'disconnected' && (
+            <ConnectButtons connectors={connectors} connect={connect} error={error} />
+          )}
+        </div>
+        <StatusBar status={status} error={error} />
       </div>
-    </>
+    </div>
   )
 }
 
