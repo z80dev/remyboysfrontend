@@ -1,11 +1,10 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { useSwitchChain, useChainId } from 'wagmi'
 import { useReadContract } from 'wagmi'
-import { abi as whitelistAbi } from './whitelistAbi.ts'
 
 /* global BigInt */
 
-function AccountDetails({ account, disconnect }) {
+function AccountDetails({ account, disconnect }: { account: any, disconnect: any }) {
   return (
     <>
       <h3>Connected Wallet</h3>
@@ -21,10 +20,10 @@ function AccountDetails({ account, disconnect }) {
   )
 }
 
-function SwitchChainButton({ chains, chainId, switchChain }) {
+function SwitchChainButton({ chains, switchChain }: { chains: any, switchChain: any }) {
   return (
     <div>
-      {chains.filter((chain) => chain.id === 8453).map((chain) => (
+      {chains.filter((chain: any) => chain.id === 8453).map((chain: any) => (
         <button key={chain.id} onClick={() => switchChain({ chainId: chain.id })}>
           Switch to {chain.name}
         </button>
@@ -33,11 +32,11 @@ function SwitchChainButton({ chains, chainId, switchChain }) {
   )
 }
 
-function ConnectButtons({ connectors, connect, error }) {
+function ConnectButtons({ connectors, connect, error }: { connectors: any, connect: any, error: any }) {
   return (
     <div>
-      <h2>Connect</h2>
-      {connectors.map((connector) => (
+      <h3>Connect</h3>
+      {connectors.map((connector: any) => (
         <button
           key={connector.uid}
           onClick={() => connect({ connector })}
@@ -51,7 +50,7 @@ function ConnectButtons({ connectors, connect, error }) {
   )
 }
 
-function StatusBar({ status, error }) {
+function StatusBar({ status, error }: { status: any, error: any }) {
   return (
     <div className="status-bar">
       <p className="status-bar-field">Press F1 for help</p>
@@ -92,6 +91,7 @@ function App() {
                 <>
                   <AccountDetails account={account} disconnect={disconnect} />
                   {chainId !== 8453 && (
+                    // @ts-ignore
                     <SwitchChainButton chains={chains} chainId={chainId} switchChain={switchChain} />
                   )}
                   {chainId === 8453 && (
