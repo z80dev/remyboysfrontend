@@ -3,6 +3,7 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { useSwitchChain, useChainId } from 'wagmi'
 import { useReadContract } from 'wagmi'
 import { whitelists } from './whitelists.ts'
+import PikaGif from './PikaGif.tsx'
 
 function AccountDetails({ account, disconnect }) {
   return (
@@ -111,6 +112,7 @@ function App() {
           {account.status === 'disconnected' && (
             <ConnectButtons connectors={connectors} connect={connect} error={error} />
           )}
+          <PikaGif />
         </div>
         <StatusBar status={status} error={error} />
       </div>

@@ -71,3 +71,21 @@
   margin-top: 10px;
 }
 
+body {
+  background-color: #0078d7;
+  background-image: linear-gradient(45deg, #0078d7, #00bcf2);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  /* color: #fff; */
+}
+
+.retro-gif {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.retro-gif img {
+  max-width: 100%;
+  height: auto;
+}

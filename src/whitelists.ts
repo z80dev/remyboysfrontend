@@ -23,5 +23,8 @@ export const whitelists = [
     },
     {
         name: "Farcaster Users"
+    },
+    {
+        name: "Yayo Corp Holders"
     }
 ]
