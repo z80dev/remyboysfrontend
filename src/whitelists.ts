@@ -33,4 +33,7 @@ export const whitelists = [
     {
         name: "Milady Rave Holders"
     },
+    {
+        name: "Retardio Holders"
+    }
 ]
