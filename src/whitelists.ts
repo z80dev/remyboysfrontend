@@ -26,5 +26,11 @@ export const whitelists = [
     },
     {
         name: "Yayo Corp Holders"
-    }
+    },
+    {
+        name: "Kawamii Holders"
+    },
+    {
+        name: "Milady Rave Holders"
+    },
 ]
