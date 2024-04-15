@@ -38,5 +38,8 @@ export const whitelists = [
     },
     {
         name: "BRB: SORRY 4 THE WAIT Minters"
+    },
+    {
+        name: "Remiliangels Holders"
     }
 ]
