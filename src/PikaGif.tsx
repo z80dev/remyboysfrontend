@@ -1,9 +1,9 @@
-const PikaGif = () => {
-  const gifUrl = 'https://i.redd.it/q0dd3k02unqb1.gif';
+import sample from './assets/sample.webp';
 
+const PikaGif = () => {
   return (
     <div className="retro-gif">
-      <img src={gifUrl} alt="Retro GIF" />
+      <img src={sample} alt="Retro GIF" />
     </div>
   );
 };

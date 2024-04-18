@@ -88,6 +88,7 @@ function App() {
           </div>
         </div>
         <div className="window-body">
+          <PikaGif />
           {account.status === 'connected' && (
             <div className="connected-content">
               <AccountDetails account={account} disconnect={disconnect} />
@@ -118,7 +119,6 @@ function App() {
           {account.status === 'disconnected' && (
             <ConnectButtons connectors={connectors} connect={connect} error={error} />
           )}
-          <PikaGif />
         </div>
         <StatusBar status={status} error={error} />
       </div>
