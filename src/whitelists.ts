@@ -47,5 +47,8 @@ export const whitelists = [
     },
     {
         name: "Cyber War Holders"
+    },
+    {
+        name: "Mint Testers"
     }
 ]
