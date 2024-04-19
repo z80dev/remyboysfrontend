@@ -77,10 +77,10 @@ function MintFieldset({ account }) {
       <p>Minting is {mintOpen.data ? 'open' : 'closed'}</p>
       {!mintOpen.data && <p>Minting will begin at 3pm ET</p>}
       <div className="mint-progress">
-        <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="50">
-      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 50) * 100}%` }} />
+        <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="4444">
+      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 4444) * 100}%` }} />
         </div>
-        <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 50</p>
+        <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 4444</p>
       </div>
       <div className="mint-fieldset">
         <div className="mint-amount">
