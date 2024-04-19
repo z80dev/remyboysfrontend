@@ -69,7 +69,7 @@ function MintFieldset({ account }) {
       <legend>Mint {collectionName.data}</legend>
       <div className="mint-progress">
         <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="4444">
-      <div style={{ width: `${(collectionTotalSupply.data.toString() / 4444) * 100}%` }} />
+      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 4444) * 100}%` }} />
         </div>
         <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 4444</p>
       </div>
