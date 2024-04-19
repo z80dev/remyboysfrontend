@@ -35,6 +35,13 @@ function MintFieldset({ account }) {
     account: account,
   })
 
+  const mintOpen = useReadContract({
+    abi: VendorAbi,
+    address: addresses.Vendor,
+    functionName: 'mint_open',
+    args: [],
+  })
+
   const handleIncrement = () => {
     setMintAmount((prevAmount) => prevAmount + 1);
   };
@@ -67,6 +74,8 @@ function MintFieldset({ account }) {
   return (
     <fieldset>
       <legend>Mint {collectionName.data}</legend>
+      <p>Minting is {mintOpen.data ? 'open' : 'closed'}</p>
+      {!mintOpen.data && <p>Minting will begin at 3pm ET</p>}
       <div className="mint-progress">
         <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="50">
       <div style={{ width: `${(collectionTotalSupply.data?.toString() / 50) * 100}%` }} />
@@ -89,17 +98,8 @@ function MintFieldset({ account }) {
           </button>
         </div>
         <p>Cost: {formatEther(mintCost.data ?? 0)} ETH</p>
-        <button type="button" onClick={() => {
+        <button type="button" disabled={!mintOpen.data} onClick={() => {
           // return early if totalSupply is 50
-          if (collectionTotalSupply.data === 50n) {
-            console.log('collection is full')
-            return
-          }
-          console.log('minting', mintAmount, 'NFTs')
-          console.log('mintCost', mintCost.data)
-          console.log('account', account)
-          console.log('abi', VendorAbi)
-          console.log('address', addresses.Vendor)
           writeContract({
             abi: VendorAbi,
             address: addresses.Vendor,
@@ -176,7 +176,7 @@ const VendorAbi = [
   // { "stateMutability": "nonpayable", "type": "function", "name": "close_mint", "inputs": [], "outputs": [] },
   { "stateMutability": "view", "type": "function", "name": "quote_mint", "inputs": [{ "name": "amt", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }] },
   { "stateMutability": "payable", "type": "function", "name": "mint_nft", "inputs": [{ "name": "amt", "type": "uint256" }], "outputs": [] },
-  // { "stateMutability": "view", "type": "function", "name": "mint_open", "inputs": [], "outputs": [{ "name": "", "type": "bool" }] }
+  { "stateMutability": "view", "type": "function", "name": "mint_open", "inputs": [], "outputs": [{ "name": "", "type": "bool" }] }
 ]
 
 const NFTAbi = [

@@ -1,7 +1,7 @@
 const addresses = {
-    NFT: '0x961c8A568bB5A9A07F7500a9B85fb5A539a70e26',
-    Vendor: '0xcaA624c4B4E0117040DF86e760CC4d5e2bAf86a1',
-    Whitelist: '0xA7a20Ec48114Fa7C31E559B48277eE8B523f2081'
+    NFT: '0x3e9e529E32aD2821BDBFDA348C2F9dA94b43976c',
+    Vendor: '0x9d30Dbf69AB4c9558864aE2551f9B85a9bd054Eb',
+    Whitelist: '0x964287f5ED2B6b99eaE83bf190ac9B735347Ada2'
 } as const
 
 export default addresses
