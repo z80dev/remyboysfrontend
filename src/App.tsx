@@ -68,10 +68,10 @@ function MintFieldset({ account }) {
     <fieldset>
       <legend>Mint {collectionName.data}</legend>
       <div className="mint-progress">
-        <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="4444">
-      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 4444) * 100}%` }} />
+        <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="50">
+      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 50) * 100}%` }} />
         </div>
-        <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 4444</p>
+        <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 50</p>
       </div>
       <div className="mint-fieldset">
         <div className="mint-amount">
@@ -90,6 +90,11 @@ function MintFieldset({ account }) {
         </div>
         <p>Cost: {formatEther(mintCost.data ?? 0)} ETH</p>
         <button type="button" onClick={() => {
+          // return early if totalSupply is 50
+          if (collectionTotalSupply.data === 50n) {
+            console.log('collection is full')
+            return
+          }
           console.log('minting', mintAmount, 'NFTs')
           console.log('mintCost', mintCost.data)
           console.log('account', account)
