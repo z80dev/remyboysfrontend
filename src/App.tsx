@@ -114,6 +114,8 @@ function App() {
           {account.status === 'disconnected' && (
             <ConnectButtons connectors={connectors} connect={connect} error={error} />
           )}
+        <a className="socialLink" href="https://x.com/basedremyboys">Twitter</a>|
+        <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>
         </div>
         <StatusBar status={status} error={error} />
       </div>

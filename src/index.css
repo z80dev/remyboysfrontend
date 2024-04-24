@@ -93,3 +93,7 @@ body {
 .modbutton {
   min-width: 0px;
 }
+
+.socialLink {
+  margin: 0 5px;
+}
