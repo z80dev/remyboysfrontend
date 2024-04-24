@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useReadContract, useWriteContract } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { NFTAbi, VendorAbi } from '../Abis.ts'
 
 // NFT address and Vendor addresses are strings passed as props
