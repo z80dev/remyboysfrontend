@@ -115,7 +115,8 @@ function App() {
             <ConnectButtons connectors={connectors} connect={connect} error={error} />
           )}
         <a className="socialLink" href="https://x.com/basedremyboys">Twitter</a>|
-        <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>
+        <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>|
+        <a className="socialLink" href="https://opensea.io/collection/remy-boys">OpenSea</a>
         </div>
         <StatusBar status={status} error={error} />
       </div>
