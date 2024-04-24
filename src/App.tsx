@@ -117,6 +117,7 @@ function App() {
         <a className="socialLink" href="https://x.com/basedremyboys">Twitter</a>|
         <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>|
         <a className="socialLink" href="https://opensea.io/collection/remy-boys">OpenSea</a>
+        <a className="socialLink" href="https://t.me/+0he27MlVgxU2OTQx">Telegram</a>|
         </div>
         <StatusBar status={status} error={error} />
       </div>
