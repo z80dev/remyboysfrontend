@@ -7,118 +7,24 @@ import PikaGif from './PikaGif.tsx'
 import { useState } from 'react';
 import addresses from './addresses.ts'
 import { formatEther } from 'viem'
-
-function MintFieldset({ account }) {
-
-  const [mintAmount, setMintAmount] = useState(1);
-  const { writeContract } = useWriteContract()
-
-  const collectionName = useReadContract({
-    abi: NFTAbi,
-    address: addresses.NFT,
-    functionName: 'name',
-    args: [],
-  })
-
-  const collectionTotalSupply = useReadContract({
-    abi: NFTAbi,
-    address: addresses.NFT,
-    functionName: 'totalSupply',
-    args: [],
-  })
-
-  const mintCost = useReadContract({
-    abi: VendorAbi,
-    address: addresses.Vendor,
-    functionName: 'quote_mint',
-    args: [mintAmount],
-    account: account,
-  })
-
-  const mintOpen = useReadContract({
-    abi: VendorAbi,
-    address: addresses.Vendor,
-    functionName: 'mint_open',
-    args: [],
-  })
-
-  const handleIncrement = () => {
-    setMintAmount((prevAmount) => prevAmount + 1);
-  };
-
-  const handleDecrement = () => {
-    if (mintAmount > 1) {
-      setMintAmount((prevAmount) => prevAmount - 1);
-    }
-  };
-
-  const handleInputChange = (event) => {
-    const value = parseInt(event.target.value, 10);
-    if (!isNaN(value) && value >= 1) {
-      setMintAmount(value);
-    }
-  };
-
-  const handleMintClick = () => {
-    console.log('minting', mintAmount, 'NFTs')
-    writeContract({
-      abi: VendorAbi,
-      address: addresses.Vendor,
-      functionName: 'mint_nft',
-      args: [mintAmount],
-      account: account,
-      value: mintCost.data
-    })
-  }
-
-  return (
-    <fieldset>
-      <legend>Mint {collectionName.data}</legend>
-      <p>Minting is {mintOpen.data ? 'open' : 'closed'}</p>
-      {!mintOpen.data && <p>Minting will begin at 3pm ET</p>}
-      <div className="mint-progress">
-        <div role="progressbar" aria-valuenow={collectionTotalSupply.data?.toString() ?? "0"} aria-valuemin="0" aria-valuemax="4444">
-      <div style={{ width: `${(collectionTotalSupply.data?.toString() / 4444) * 100}%` }} />
-        </div>
-        <p>Mint Progress: {collectionTotalSupply.data?.toString() ?? 0} / 4444</p>
-      </div>
-      <div className="mint-fieldset">
-        <div className="mint-amount">
-          <button className="modbutton" type="button" onClick={handleDecrement}>
-            -
-          </button>
-          <input
-            type="text"
-            className="mint-input"
-            value={mintAmount}
-            onChange={handleInputChange}
-          />
-          <button type="button" className="modbutton" onClick={handleIncrement}>
-            +
-          </button>
-        </div>
-        <p>Cost: {formatEther(mintCost.data ?? 0)} ETH</p>
-        <button type="button" disabled={!mintOpen.data} onClick={() => {
-          // return early if totalSupply is 50
-          writeContract({
-            abi: VendorAbi,
-            address: addresses.Vendor,
-            functionName: 'mint_nft',
-            args: [mintAmount],
-            value: mintCost.data
-          })
-        }}>Mint</button>
-      </div>
-    </fieldset>
-  )
-}
+import MintFieldset from './components/MintFieldset.tsx'
+import { NFTAbi, VendorAbi } from './Abis.ts'
 
 function AccountDetails({ account, disconnect }) {
+  // get account NFT balance
+  const nftBalance = useReadContract({
+    abi: NFTAbi,
+    address: addresses.NFT,
+    functionName: 'balanceOf',
+    args: [account.address],
+  })
+  console.log(nftBalance.data)
   return (
     <fieldset>
       <legend>Account Details</legend>
       <div className="account-details">
         <p>Address: {account.address}</p>
+        <p>Balance: {nftBalance.data?.toString() ?? 0}</p>
         <button type="button" onClick={() => disconnect()}>
           Disconnect
         </button>
@@ -170,64 +76,6 @@ function StatusBar({ status, error }: { status: any, error: any }) {
   )
 }
 
-const VendorAbi = [
-  // { "stateMutability": "nonpayable", "type": "constructor", "inputs": [{ "name": "_whitelist_manager", "type": "address" }, { "name": "_nft", "type": "address" }], "outputs": [] },
-  // { "stateMutability": "nonpayable", "type": "function", "name": "open_mint", "inputs": [], "outputs": [] },
-  // { "stateMutability": "nonpayable", "type": "function", "name": "close_mint", "inputs": [], "outputs": [] },
-  { "stateMutability": "view", "type": "function", "name": "quote_mint", "inputs": [{ "name": "amt", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }] },
-  { "stateMutability": "payable", "type": "function", "name": "mint_nft", "inputs": [{ "name": "amt", "type": "uint256" }], "outputs": [] },
-  { "stateMutability": "view", "type": "function", "name": "mint_open", "inputs": [], "outputs": [{ "name": "", "type": "bool" }] }
-]
-
-const NFTAbi = [
-  {
-    "inputs": [],
-    "stateMutability": "view",
-    "type": "function",
-    "name": "name",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ]
-  },
-  {
-    "inputs": [],
-    "stateMutability": "view",
-    "type": "function",
-    "name": "totalSupply",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function",
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-]
-
-
 function App() {
   const { chains, switchChain } = useSwitchChain()
   const account = useAccount()
@@ -260,25 +108,6 @@ function App() {
               <AccountDetails account={account} disconnect={disconnect} />
               {chainId !== 8453 && (
                 <SwitchChainButton chains={chains} switchChain={switchChain} />
-              )}
-              {chainId === 8453 && (
-                <fieldset>
-                  <legend>Whitelist Checker</legend>
-                  <ul className="tree-view has-collapse-button has-connector has-container">
-                    <details open>
-                      <summary>
-                        <b>Total spots</b>: {result.data?.reduce((a, b) => a + b, BigInt(0)).toString()}
-                      </summary>
-                      <ul>
-                        {whitelists.map((whitelist, index) => (
-                          <li key={whitelist.name}>
-                            {whitelist.name}: {result.data && result.data[index] ? result.data[index].toString() : '0'} spots
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </ul>
-                </fieldset>
               )}
             </div>
           )}
