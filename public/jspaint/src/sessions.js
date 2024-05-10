@@ -4,7 +4,7 @@
 /* global $app, $canvas_area, localize, magnification, main_canvas, main_ctx, redos, undos */
 import { $DialogWindow } from "./$ToolWindow.js";
 // import { localize } from "./app-localization.js";
-import { change_url_param, get_uris, load_image_from_uri, open_from_image_info, redo, reset_file, show_error_message, show_resource_load_error_message, undo, undoable, update_title } from "./functions.js";
+import { change_url_param, get_uris, load_image_from_uri, open_from_image_info, redo, reset_file, show_error_message, show_resource_load_error_message, undo, undoable, update_title, zoomToView } from "./functions.js";
 import { $G, debounce, get_help_folder_icon, image_data_match, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { storage_quota_exceeded } from "./manage-storage.js";
 import { showMessageBox } from "./msgbox.js";
@@ -152,6 +152,7 @@ class LocalSession {
 			else if (uri) {
 				load_image_from_uri(uri).then((info) => {
 					open_from_image_info(info, null, null, true, true);
+                    zoomToView();
 				}, (error) => {
 					show_error_message("Failed to open image from local storage.", error);
 				});
@@ -989,6 +990,7 @@ const update_session_from_location_hash = () => {
 
 		load_image_from_uri(url).then((info) => {
 			open_from_image_info(info, null, null, true, true);
+            zoomToView();
 		}, show_resource_load_error_message);
 
 	} else {

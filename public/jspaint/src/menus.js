@@ -18,6 +18,18 @@ const looksLikeChrome = !!(window.chrome && (window.chrome.loadTimes || window.c
 // NOTE: Microsoft Edge includes window.chrome.app
 // (also this browser detection logic could likely use some more nuance)
 
+const zoomToView = () => {
+	const rect = $canvas_area[0].getBoundingClientRect();
+	const margin = 30; // leave a margin so scrollbars won't appear
+	let mag = Math.min(
+		(rect.width - margin) / main_canvas.width,
+		(rect.height - margin) / main_canvas.height,
+	);
+	// round to an integer percent for the View > Zoom > Custom... dialog, which shows non-integers as invalid
+	mag = Math.floor(100 * mag) / 100;
+	set_magnification(mag);
+};
+
 const menus = {
 	[localize("&File")]: [
 		{
@@ -502,15 +514,7 @@ const menus = {
 					],
 					description: localize("Zooms the picture to fit within the view."),
 					action: () => {
-						const rect = $canvas_area[0].getBoundingClientRect();
-						const margin = 30; // leave a margin so scrollbars won't appear
-						let mag = Math.min(
-							(rect.width - margin) / main_canvas.width,
-							(rect.height - margin) / main_canvas.height,
-						);
-						// round to an integer percent for the View > Zoom > Custom... dialog, which shows non-integers as invalid
-						mag = Math.floor(100 * mag) / 100;
-						set_magnification(mag);
+						zoomToView();
 					},
 				},
 				{

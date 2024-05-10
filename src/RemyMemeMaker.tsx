@@ -5,7 +5,8 @@ import { AppWindowWithTitleBar } from './Window.tsx';
 export function RemyMemeMaker() {
   const [isJSPaintOpen, setIsJSPaintOpen] = useState(false);
   const iframeRef = useRef(null);
-    const [imageUrl, setImageUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [selectedOption, setSelectedOption] = useState('empty');
 
   const handleOpenJSPaint = () => {
     setIsJSPaintOpen(true);
@@ -20,49 +21,56 @@ export function RemyMemeMaker() {
     }
   };
 
-  useEffect(() => {
-    if (isJSPaintOpen && iframeRef.current) {
-      const jspaint = iframeRef.current.contentWindow;
-
-      const zoomToWindow = () => {
-        if (jspaint.loaded) {
-          jspaint.zoomToWindow();
-        } else {
-          setTimeout(zoomToWindow, 100);
-        }
-      };
-
-      zoomToWindow();
-    }
-  }, [isJSPaintOpen]);
-
-  const loadUrl = imageUrl ? `#load:${encodeURIComponent(imageUrl)}` : '#load:https://basedremyboys.club/images/white_square.png';
+  const loadUrl =
+    selectedOption === 'url' && imageUrl
+      ? `#load:${encodeURIComponent(imageUrl)}`
+      : '#load:https://basedremyboys.club/images/white_square.png';
 
   return (
     <div>
       <p>Remy Meme Maker is the easiest way to create on-chain memes on Base</p>
-      <div>
-        <label htmlFor="imageUrlInput">Image URL (optional):</label>
+      <div className="field-row" style={{ marginBottom: '10px' }}>
         <input
-          type="text"
-          id="imageUrlInput"
-          placeholder="Enter image URL (optional)"
-          value={imageUrl || ''}
-          onChange={(e) => setImageUrl(e.target.value)}
+          id="emptyCanvas"
+          type="radio"
+          name="canvasOption"
+          value="empty"
+          checked={selectedOption === 'empty'}
+          onChange={(e) => setSelectedOption(e.target.value)}
         />
+        <label htmlFor="emptyCanvas">Empty Canvas</label>
       </div>
-      <button onClick={handleOpenJSPaint}>Launch Remy Meme Maker</button>
-
+      <div className="field-row" style={{ marginBottom: '10px' }}>
+        <input
+          id="urlImage"
+          type="radio"
+          name="canvasOption"
+          value="url"
+          checked={selectedOption === 'url'}
+          onChange={(e) => setSelectedOption(e.target.value)}
+        />
+        <label htmlFor="urlImage">Load Image from URL</label>
+      </div>
+      {selectedOption === 'url' && (
+        <div style={{ marginBottom: '10px' }}>
+          <label htmlFor="imageUrlInput">Image URL:</label>
+          <input
+            type="text"
+            id="imageUrlInput"
+            placeholder="Enter image URL"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            style={{ marginLeft: '5px' }}
+          />
+        </div>
+      )}
+      <button onClick={handleOpenJSPaint} style={{ marginTop: '10px' }}>
+        Launch Remy Meme Maker
+      </button>
       {isJSPaintOpen && (
         <div className="overlay">
           <AppWindowWithTitleBar onClose={handleCloseJSPaint} bodyClassName="nopad" title="Remy Meme Maker">
-            <iframe
-              src={`/jspaint/index.html${loadUrl}`}
-              id="jspaint-iframe"
-              width="100%"
-              height="100%"
-              ref={iframeRef}
-            ></iframe>
+            <iframe src={`/jspaint/index.html${loadUrl}`} id="jspaint-iframe" width="100%" height="100%" ref={iframeRef}></iframe>
           </AppWindowWithTitleBar>
         </div>
       )}
