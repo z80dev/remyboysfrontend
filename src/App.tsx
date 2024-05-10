@@ -4,34 +4,19 @@ import { useSwitchChain, useChainId, useWriteContract } from 'wagmi'
 import { useReadContract } from 'wagmi'
 import { whitelists } from './whitelists.ts'
 import PikaGif from './PikaGif.tsx'
-import { useState } from 'react';
+import React, { useState } from 'react';
+import Draggable from 'react-draggable';
 import addresses from './addresses.ts'
 import { formatEther } from 'viem'
 import MintFieldset from './components/MintFieldset.tsx'
 import { NFTAbi, VendorAbi } from './Abis.ts'
+import { TabGroup, Tab } from './Tabs.tsx'
+import { useSignMessage } from 'wagmi';
+import { SolanaAddressVerification } from './SolanaAddressVerification.tsx'
+import { AccountDetails } from './AccountDetails.tsx'
+import { RemyMemeMaker } from './RemyMemeMaker.tsx'
+import { AppWindowWithTitleBar } from './Window.tsx'
 
-function AccountDetails({ account, disconnect }) {
-  // get account NFT balance
-  const nftBalance = useReadContract({
-    abi: NFTAbi,
-    address: addresses.NFT,
-    functionName: 'balanceOf',
-    args: [account.address],
-  })
-  console.log(nftBalance.data)
-  return (
-    <fieldset>
-      <legend>Account Details</legend>
-      <div className="account-details">
-        <p>Address: {account.address}</p>
-        <p>Balance: {nftBalance.data?.toString() ?? 0}</p>
-        <button type="button" onClick={() => disconnect()}>
-          Disconnect
-        </button>
-      </div>
-    </fieldset>
-  )
-}
 
 function SwitchChainButton({ chains, switchChain }) {
   return (
@@ -66,14 +51,19 @@ function ConnectButtons({ connectors, connect, error }) {
   )
 }
 
-function StatusBar({ status, error }: { status: any, error: any }) {
+function FooterLinks() {
   return (
-    <div className="status-bar">
-      <p className="status-bar-field">Press F1 for help</p>
-      <p className="status-bar-field">Wallet Status: {status}</p>
-      <p className="status-bar-field">Error: {error?.message ?? "None"}</p>
-    </div>
-  )
+    <div className="footer-links">
+      <a className="socialLink" href="https://x.com/basedremyboys">Twitter</a>|
+      <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>|
+      <a className="socialLink" href="https://opensea.io/collection/remy-boys">OpenSea</a>|
+      <a className="socialLink" href="https://magiceden.io/collections/base/0x3e9e529e32ad2821bdbfda348c2f9da94b43976c">MagicEden</a>|
+      <a className="socialLink" href="https://t.me/+0he27MlVgxU2OTQx">Telegram</a>
+    </div>)
+}
+
+function AccountManager({ account }) {
+  const { chains, switchChain } = useSwitchChain()
 }
 
 function App() {
@@ -82,46 +72,35 @@ function App() {
   const chainId = useChainId()
   const { connectors, connect, status, error } = useConnect()
   const { disconnect } = useDisconnect()
-  const result = useReadContract({
-    abi: [{ stateMutability: "payable", type: "constructor", inputs: [], outputs: [] }, { stateMutability: "view", type: "function", name: "check_whitelist", inputs: [{ name: "i", type: "uint256" }, { name: "addr", type: "address" }], outputs: [{ name: "", type: "uint256" }] }, { stateMutability: "view", type: "function", name: "check_whitelists", inputs: [{ name: "addr", type: "address" }], outputs: [{ name: "", type: "uint256[]" }] }, { stateMutability: "nonpayable", type: "function", name: "set_manager", inputs: [{ name: "new_manager", type: "address" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "set_spender", inputs: [{ name: "new_spender", type: "address" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "add_whitelist", inputs: [{ name: "typ", type: "uint256" }, { name: "limit", type: "uint256" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "set_whitelist_limit", inputs: [{ name: "i", type: "uint256" }, { name: "limit", type: "uint256" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "set_whitelist_limit_for_address", inputs: [{ name: "whitelist_id", type: "uint256" }, { name: "addr", type: "address" }, { name: "limit", type: "uint256" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "whitelist_addresses", inputs: [{ name: "i", type: "uint256" }, { name: "addrs", type: "address[]" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "whitelist_addresses", inputs: [{ name: "i", type: "uint256" }, { name: "addrs", type: "address[]" }, { name: "limit", type: "uint256" }], outputs: [] }, { stateMutability: "nonpayable", type: "function", name: "spend_whitelists", inputs: [{ name: "addr", type: "address" }, { name: "amounts", type: "uint256[]" }], outputs: [] }, { stateMutability: "view", type: "function", name: "manager", inputs: [], outputs: [{ name: "", type: "address" }] }, { stateMutability: "view", type: "function", name: "spender", inputs: [], outputs: [{ name: "", type: "address" }] }, { stateMutability: "view", type: "function", name: "whitelists", inputs: [{ name: "arg0", type: "uint256" }], outputs: [{ name: "", type: "tuple", components: [{ name: "typ", type: "uint256" }, { name: "limit", type: "uint256" }] }] }],
-    address: addresses.Whitelist,
-    functionName: 'check_whitelists',
-    args: [account.address ?? "0x0000"],
-  })
 
   return (
     <div className="app">
-      <div className="window">
-        <div className="title-bar">
-          <div className="title-bar-text">Based Remy Boys</div>
-          <div className="title-bar-controls">
-            <button aria-label="Minimize"></button>
-            <button aria-label="Maximize"></button>
-            <button aria-label="Close"></button>
+      <AppWindowWithTitleBar status={status} error={error}>
+        <PikaGif />
+        {account.status === 'connected' && (
+          <div className="connected-content">
+            <AccountDetails account={account} disconnect={disconnect} />
+            {chainId !== 8453 && (
+              <SwitchChainButton chains={chains} switchChain={switchChain} />
+            )}
           </div>
-        </div>
-        <div className="window-body">
-          <PikaGif />
-          <MintFieldset account={account} />
-          {account.status === 'connected' && (
-            <div className="connected-content">
-              <AccountDetails account={account} disconnect={disconnect} />
-              {chainId !== 8453 && (
-                <SwitchChainButton chains={chains} switchChain={switchChain} />
-              )}
-            </div>
-          )}
-          {account.status === 'disconnected' && (
-            <ConnectButtons connectors={connectors} connect={connect} error={error} />
-          )}
-        <a className="socialLink" href="https://x.com/basedremyboys">Twitter</a>|
-        <a className="socialLink" href="https://discord.gg/remyboys">Discord</a>|
-        <a className="socialLink" href="https://opensea.io/collection/remy-boys">OpenSea</a>|
-        <a className="socialLink" href="https://magiceden.io/collections/base/0x3e9e529e32ad2821bdbfda348c2f9da94b43976c">MagicEden</a>|
-        <a className="socialLink" href="https://t.me/+0he27MlVgxU2OTQx">Telegram</a>
-        </div>
-        <StatusBar status={status} error={error} />
-      </div>
+        )}
+        {account.status === 'disconnected' && (
+          <ConnectButtons connectors={connectors} connect={connect} error={error} />
+        )}
+        <TabGroup>
+          <Tab label="Mint">
+            <MintFieldset account={account} />
+          </Tab>
+          <Tab label="Remy Meme Maker">
+            <RemyMemeMaker />
+          </Tab>
+          <Tab label="Solana Verification" disabled={true}>
+            <SolanaAddressVerification />
+          </Tab>
+        </TabGroup>
+        <FooterLinks />
+      </AppWindowWithTitleBar>
     </div>
   )
 }
