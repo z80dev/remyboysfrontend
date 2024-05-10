@@ -121,3 +121,13 @@ body {
   padding: 0;
   height: 95%;
 }
+
+menu[role=tablist] button[aria-selected=true] {
+    background: #fff;
+    border-bottom: 0;
+    box-shadow: none;
+    margin: -2px 0 1px -3px;
+    padding-bottom: 4px;
+    position: relative;
+    z-index: 2;
+}
