@@ -42,7 +42,7 @@ export function RemyMemeMaker() {
             {isJSPaintOpen && (
                 <div className="overlay">
                     <AppWindowWithTitleBar onClose={handleCloseJSPaint} bodyClassName="nopad" title="Remy Meme Maker">
-                        <iframe src="/jspaint/index.html#load:https://basedremyboys.club/jspaint/white_square.png" id="jspaint-iframe" width="100%" height="100%"></iframe>
+                        <iframe src="/jspaint/index.html#load:https://basedremyboys.club/images/white_square.png" id="jspaint-iframe" width="100%" height="100%"></iframe>
                     </AppWindowWithTitleBar>
                 </div>
             )}
