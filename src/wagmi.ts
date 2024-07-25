@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi'
-import { mainnet, base } from 'wagmi/chains'
+import { mainnet, base, baseSepolia, localhost } from 'wagmi/chains'
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors'
 
 export const config = createConfig({
@@ -10,8 +10,10 @@ export const config = createConfig({
     walletConnect({ projectId: import.meta.env.VITE_WC_PROJECT_ID }),
   ],
   transports: {
-    [base.id]: http(),
+    [base.id]: http("http://localhost:8545"),
+    [baseSepolia.id]: http(),
     [mainnet.id]: http(),
+    [localhost.id]: http(),
   },
 })
 

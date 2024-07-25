@@ -1,21 +1,23 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import Draggable from 'react-draggable';
+import { useAccount } from 'wagmi';
 
 
-function StatusBar({ status, error }: { status: any, error: any }) {
+function StatusBar({ address, status, error }: { address: any, status: any, error: any }) {
     return (
         <div className="status-bar">
-            <p className="status-bar-field">Press F1 for help</p>
+            <p className="status-bar-field">Wallet Address: {address}</p>
             <p className="status-bar-field">Wallet Status: {status}</p>
             <p className="status-bar-field">Error: {error?.message ?? "None"}</p>
         </div>
     )
 }
 
-export function AppWindowWithTitleBar({ children, status, error, onClose, className = '', bodyClassName = '',
+export function AppWindowWithTitleBar({ children, status, error, onClose, onMinimize, className = '', bodyClassName = '',
     title = 'Based Remy Boys' }) {
     const [isMaximized, setIsMaximized] = useState(false);
+    const account = useAccount();
 
     const handleMaximize = () => {
         setIsMaximized(!isMaximized);
@@ -23,7 +25,7 @@ export function AppWindowWithTitleBar({ children, status, error, onClose, classN
 
     // only show statusbar if status or error is present
     let showStatusBar = status || error;
-    let statusBar = showStatusBar ? <StatusBar status={status} error={error} /> : null;
+    let statusBar = showStatusBar ? <StatusBar address={account.address?.toString()} status={status} error={error} /> : null;
 
     return (
         <Draggable

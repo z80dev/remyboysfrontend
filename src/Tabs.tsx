@@ -1,11 +1,14 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 
-const TabGroup = ({ children }) => {
+const TabGroup = ({ children, onHandleTabClick }) => {
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabClick = (index) => {
     setActiveTab(index);
+    if (onHandleTabClick) {
+      onHandleTabClick(index);
+    }
   };
 
   return (

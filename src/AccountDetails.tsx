@@ -1,28 +1,45 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import { useReadContract } from 'wagmi'
+import { useSwitchChain, useChainId, useWriteContract } from 'wagmi'
 import { NFTAbi } from './Abis.ts'
 import addresses from './addresses.ts'
+import contractAddresses from './contractAddresses.json'
 
-export const AccountDetails: React.FC = ({ account, disconnect }) => {
+function SwitchChainButton({ chains, switchChain }) {
+  return (
+    <div className="switch-chain">
+      {chains.map((chain) => (
+        <button className="switch-chain-button" key={chain.id} onClick={() => switchChain({ chainId: chain.id })}>
+          Switch to {chain.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export const AccountDetails: React.FC = ({ account, disconnect, networkButtons }) => {
   // get account NFT balance
   const nftBalance = useReadContract({
     abi: NFTAbi,
-    address: addresses.NFT,
+    address: contractAddresses['nft'],
     functionName: 'balanceOf',
     args: [account.address],
   })
-  console.log(nftBalance.data)
+  const { chains, switchChain } = useSwitchChain()
   return (
+    <div className="account-details">
     <fieldset>
       <legend>Account Details</legend>
       <div className="account-details">
         <p>Address: {account.address}</p>
         <p>Balance: {nftBalance.data?.toString() ?? 0}</p>
+        <SwitchChainButton chains={chains} switchChain={switchChain} />
         <button type="button" onClick={() => disconnect()}>
           Disconnect
         </button>
       </div>
     </fieldset>
+    </div>
   )
 }
