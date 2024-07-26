@@ -43,6 +43,10 @@ function App() {
   const { disconnect } = useDisconnect()
   const [showRemyVault, setShowRemyVault] = useState(false)
 
+  const remyVaultLabel = (
+    <div className='announcement'>Remy Vault</div>
+  )
+
   return (
     <div className="app">
       {!showRemyVault &&
@@ -60,12 +64,12 @@ function App() {
           <Tab label="Mint">
             <MintFieldset account={account} />
           </Tab>
-          <Tab label="Remy Meme Maker">
-            <RemyMemeMaker />
-          </Tab>
-          <Tab label="Remy Vault">
+          <Tab label={remyVaultLabel}>
             <p>Remy Vault lets you buy and sell Remy Boys from a large liquidity pool.</p>
             <button onClick={() => setShowRemyVault(true)}>Open Remy Vault</button>
+          </Tab>
+          <Tab label="Remy Meme Maker">
+            <RemyMemeMaker />
           </Tab>
           <Tab label="Solana Verification" disabled={true}>
             <SolanaAddressVerification />

@@ -3,7 +3,7 @@ import { mainnet, base, baseSepolia, localhost } from 'wagmi/chains'
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors'
 
 export const config = createConfig({
-  chains: [base, mainnet],
+  chains: [base],
   connectors: [
     injected(),
     coinbaseWallet({ appName: 'Create Wagmi' }),
@@ -12,7 +12,6 @@ export const config = createConfig({
   transports: {
     [base.id]: http("http://localhost:8545"),
     [baseSepolia.id]: http(),
-    [mainnet.id]: http(),
     [localhost.id]: http(),
   },
 })

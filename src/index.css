@@ -99,6 +99,11 @@ body {
   height: 90%;
 }
 
+.window-dialog {
+  width: 90%;
+  height: 20%;
+}
+
 .nopad {
   padding: 0;
   height: 95%;
@@ -128,7 +133,7 @@ menu[role=tablist] button[aria-selected=true] {
 
 .tradingGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
 }
 
@@ -152,4 +157,90 @@ menu[role=tablist] button[aria-selected=true] {
 
 button {
   margin-right: 10px;
+}
+
+blockquote {
+  margin: 0;
+  padding: 10px 10px 10px 0;
+  background-color: #dfdfdf;
+}
+
+blockquote ul {
+  padding-left: 30px;
+}
+
+li {
+  margin-top: 5px;
+  margin-bottom: 15px;
+}
+
+.remy-price-bubble {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  width: 500px;
+}
+
+.marquee-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+.marquee-content {
+  display: inline-block;
+  white-space: nowrap;
+  animation:
+    marquee 15s linear infinite,
+    rainbow-text 5s linear infinite;
+}
+
+.announcement {
+  animation: rainbow-text 5s linear infinite;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes rainbow-text {
+  0% { color: red; }
+  14% { color: orange; }
+  28% { color: black; }
+  42% { color: green; }
+  57% { color: blue; }
+  71% { color: indigo; }
+  85% { color: violet; }
+  100% { color: red; }
+}
+
+.unstake-buttons {
+  margin-top: 10px;
+}
+
+.nft-unstake {
+}
+
+.divider {
+  margin: 10px 0;
+  border-top: 1px solid #AAA;
+}
+
+.red-text {
+  color: red;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.mr-1 {
+  margin-right: 0.2rem;
+}
+
+.mt-1 {
+  margin-top: 1rem;
 }

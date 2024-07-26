@@ -281,7 +281,61 @@ export const useConvertTokenAmountToShares = (tokenAmount) => {
     });
 }
 
+export const useWithdrawTokensFromERC4626 = (tokens: bigint, owner) => {
+    const { writeContract } = useWriteContract();
+
+    const withdrawTokens = useCallback(() => {
+        return writeContract({
+            abi: ERC4626ABI,
+            address: contractAddresses['erc4626'] as `0x${string}`,
+            functionName: 'withdraw',
+            args: [tokens, owner, owner],
+        });
+    }, [tokens, writeContract]);
+
+    return withdrawTokens;
+}
+
+export const useRedeemSharesFromERC4626 = (shares: bigint, owner) => {
+    const { writeContract } = useWriteContract();
+
+    const redeemShares = useCallback(() => {
+        return writeContract({
+            abi: ERC4626ABI,
+            address: contractAddresses['erc4626'] as `0x${string}`,
+            functionName: 'redeem',
+            args: [shares, owner, owner],
+        });
+    }, [shares, writeContract]);
+
+    return redeemShares;
+}
+
 export const useConvertNftCountToShares = (nftCount) => {
     const tokenAmount = BigInt(nftCount) * BigInt(1000) * BigInt(10) ** BigInt(18);
     return useConvertTokenAmountToShares(tokenAmount);
+}
+
+export const useRouterIsNFTApprovedForAll = (owner) => {
+    return useReadContract({
+        abi: NFTAbi,
+        address: contractAddresses['nft'] as `0x${string}`,
+        functionName: 'isApprovedForAll',
+        args: [owner, contractAddresses['remy_router']],
+    });
+}
+
+export const useApproveNFTForRouter = () => {
+    const { writeContract } = useWriteContract();
+
+    const approveNFTForRouter = useCallback(() => {
+        return writeContract({
+            abi: NFTAbi,
+            address: contractAddresses['nft'] as `0x${string}`,
+            functionName: 'setApprovalForAll',
+            args: [contractAddresses['remy_router'], true],
+        });
+    }, [writeContract]);
+
+    return approveNFTForRouter;
 }

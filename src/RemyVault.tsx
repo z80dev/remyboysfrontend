@@ -7,7 +7,7 @@ import contractAddresses from './contractAddresses.json'
 import { useRemyRouter } from './remyRouter.ts'
 import { RemyRouterABI, UniV2RouterABI } from './Abis.ts'
 import { parseEther, formatEther } from 'viem'
-import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useERC20Balance, usePreviewRedeem, useUnlockedStake, useStakeLock, useStakeInventory, useApproveRouterForStakingToken, useRouterStakingTokenAllowance, useConvertNftCountToShares, useUnstakeInventory } from './tradingHooks.ts'
+import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useERC20Balance, usePreviewRedeem, useUnlockedStake, useStakeLock, useStakeInventory, useApproveRouterForStakingToken, useRouterStakingTokenAllowance, useConvertNftCountToShares, useUnstakeInventory, useRedeemSharesFromERC4626, useRouterIsNFTApprovedForAll, useApproveNFTForRouter } from './tradingHooks.ts'
 import { TabGroup, Tab } from './Tabs.tsx'
 import { useNFTBalance, useOwnedNFTTokenIDs } from './nftHooks.ts'
 import { useBlock } from 'wagmi'
@@ -50,7 +50,7 @@ function RemyVaultGrid({ ids, selectedList, toggleSelect, borderStyle }) {
                         alt={` #${id}`}
                         style={{
                             width: '200px', height: '200px',
-                            border: selectedList.includes(id) ? borderLineStyle : 'none'
+                            border: selectedList.includes(id) ? borderLineStyle : 'none',
                         }}
                     />
                     <p className="centerText">#{id}</p>
@@ -69,8 +69,13 @@ export function RemyVaultStaking() {
     const inventoryStakingAddress = contractAddresses['erc4626'];
     const stakedSharesBalance = useERC20Balance(inventoryStakingAddress, account);
     const unlockedBalance = useUnlockedStake(account.address);
+    const redeemShares = useRedeemSharesFromERC4626(unlockedBalance.data ?? 0, account.address);
+    const [showDialog, setShowDialog] = useState(false);
 
     const routerStakingAllowance = useRouterStakingTokenAllowance(account.address).data ?? 0;
+
+    const routerIsNFTApprovedForAll = useRouterIsNFTApprovedForAll(account.address).data ?? false;
+    const approveNFTForRouter = useApproveNFTForRouter();
 
     const userNftBalance = useNFTBalance(account.address);
     const userOwnedTokenIDs = useOwnedNFTTokenIDs(account.address, userNftBalance.data ?? 0);
@@ -97,7 +102,7 @@ export function RemyVaultStaking() {
         }
     }
 
-    const formattedStakedBalance = formatEther(stakedSharesBalance.data ?? 0);
+    const formattedStakedBalance = formatEther2(stakedSharesBalance.data ?? 0);
     const redeemableAmount = usePreviewRedeem(stakedSharesBalance.data ?? 0);
     const unlockedRedeemableAmount = usePreviewRedeem(unlockedBalance.data ?? 0);
 
@@ -142,25 +147,36 @@ export function RemyVaultStaking() {
     const block: UseBlockReturnType = useBlock();
 
     const needsApproval = (selectedForUnstaking.length > 0) && (routerStakingAllowance < requiredSharesForSelectedToUnstake.data ?? 0);
-    const hasEnoughShares = (unlockedBalance.data ?? 0) >= (requiredSharesForSelectedToUnstake.data ?? 0);
+    const hasEnoughShares = !needsApproval && (unlockedBalance.data ?? 0) >= (requiredSharesForSelectedToUnstake.data ?? 0);
+    const hasUnlockedShares = (unlockedBalance.data ?? 0) > 0;
 
     const unstakeInventory = useUnstakeInventory(account.address, selectedForUnstaking, additionalUnstakeArgs);
 
     return (
         <div className="remy-vault">
             <fieldset>
-                <legend>Stake NFTs</legend>
-                <p><b>Owned Vault Shares</b>: {formattedStakedBalance} Shares ({formatEther(unlockedRedeemableAmount.data ?? 0)} Tokens)</p>
-                <p><b>Unlocked Shares Redeemable for</b>: {redeemableAmountInNfts} NFTs</p>
+                <legend>Stake/Unstake NFTs</legend>
+                <p><b>Owned Vault Shares</b>: {formattedStakedBalance} Shares ({formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens)</p>
                 <div className="tradingGrid">
                     <div className="trade-button">
-                        <p>Selected for Staking: {selectedForStaking.length}</p>
-                        <button onClick={stakeInventory}>Stake</button>
+                        <div><p><b>NFTs Selected for Staking:</b> {selectedForStaking.length}</p></div>
+                        <div>
+                          <span className='red-text bold mr-1'>*Warning*:</span>
+                          <span>Only stake what you consider to be <b>floor</b> NFTs. Staked NFTs are made available for trading by other users. There is <b>no guarantee</b> you will be able to unstake for the same NFTs.</span>
+                        </div>
+                        <div className='unstake-buttons mt-1'>
+                            <button onClick={approveNFTForRouter} disabled={routerIsNFTApprovedForAll}>Approve</button>
+                            <button onClick={stakeInventory} disabled={!routerIsNFTApprovedForAll}>Stake</button>
+                        </div>
                     </div>
                     <div className="trade-button">
-                        <p>Selected for Unstaking: {selectedForUnstaking.length}</p>
-                        <button disabled={!needsApproval} onClick={approveRouterForStakingToken}>Approve</button>
-                        <button disabled={!hasEnoughShares} onClick={unstakeInventory}>Unstake</button>
+                        <div><p><b>NFTs Selected for Unstaking:</b> {selectedForUnstaking.length}</p></div>
+                        <div><p><b>Unlocked Shares Redeemable for</b>: {redeemableAmountInNfts} NFTs</p></div>
+                        <div className='unstake-buttons nft-unstake'><button disabled={!needsApproval} onClick={approveRouterForStakingToken}>Approve</button>
+                        <button disabled={!hasEnoughShares} onClick={unstakeInventory}>Unstake as NFTs</button></div>
+                        <div className='divider'></div>
+                        <div><p><b>Unlocked Shares Redeemable for</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} $REMY</p></div>
+                        <div className='unstake-buttons'><button disabled={!hasUnlockedShares} onClick={redeemShares}>Unstake ALL as $REMY</button></div>
                     </div>
                 </div>
             </fieldset>
@@ -174,6 +190,33 @@ export function RemyVaultStaking() {
             </TabGroup>
         </div>
     )
+}
+
+function Marquee({ children }) {
+    return (
+        <div className="marquee-container">
+            <div className="marquee-content">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function truncateToFourDecimals(numString) {
+  // Convert the string to a number
+  let num = parseFloat(numString);
+
+  // Check if the number is valid
+  if (isNaN(num)) {
+    return "Invalid number";
+  }
+
+  // Truncate to 4 decimal places and convert back to string
+  return num.toFixed(4).replace(/\.?0+$/, '');
+}
+
+const formatEther2 = (num) => {
+  return truncateToFourDecimals(formatEther(num));
 }
 
 export function RemyVaultTrading() {
@@ -197,6 +240,14 @@ export function RemyVaultTrading() {
     const swapFeeForExchange = parseEther((numSwaps * 100).toString())
     const swapBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], swapQuoteRedeem + swapFeeForExchange);
     const swapSellPrice = useSellPrice(contractAddresses['token'], contractAddresses['weth'], swapQuoteMint);
+
+    const oneThousandRemy = parseEther('1000');
+    const oneNFTBuyTokens = parseEther('1100');
+    const oneNFTSellTokens = parseEther('900');
+
+    const remyTokensBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], oneThousandRemy);
+    const oneNFTBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], oneNFTBuyTokens);
+    const oneNFTSellPrice = useSellPrice(contractAddresses['token'], contractAddresses['weth'], oneNFTSellTokens);
 
     const isApproved = routerIsApproved(account).data ?? false;
 
@@ -270,28 +321,34 @@ export function RemyVaultTrading() {
 
     return (
         <div className="remy-vault">
+            <div role="tooltip" className='remy-price-bubble'>
+                <Marquee>
+                    <div><b>1000 $REMY</b> = {formatEther2(remyTokensBuyPrice.data?.result[0] ?? 0)} <b>ETH | </b>
+                        <b>NFT Buy Price:</b> {formatEther2(oneNFTBuyPrice.data?.result[0] ?? 0)} <b>ETH | </b>
+                        <b>NFT Sell Price:</b> {formatEther2(oneNFTSellPrice.data?.result[0] ?? 0)} <b>ETH</b></div>
+                </Marquee>
+            </div>
             <TradingFieldSet
                 routerIsApproved={isApproved}
                 approveFn={approveRouter}
             >
-                <p>ETH Balance: {formatEther(ethBalance.data?.value ?? 0)}</p>
+                <p>ETH Balance: {formatEther2(ethBalance.data?.value ?? 0)}</p>
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <p>Selected for Buying: {buySelected.length}</p>
-                        <p>Price: {formatEther(buyValue)}</p>
-                        <button onClick={swapEthForNft}>Buy</button>
-                    </div>
-                    <div className="trade-button">
                         <p>Selected for Selling: {sellSelected.length}</p>
-                        <p>Proceeds: {formatEther(sellValue)}</p>
-                        <button onClick={swapNftForEth}>Sell</button>
-                    </div>
-                    <div className="trade-button">
-                        <p>Selected for Buying: {buySelected.length}</p>
-                        <p>Selected for Selling: {sellSelected.length}</p>
-                        <p>Price: {formatEther(swapBuyValue)}</p>
-                        <p>Proceeds: {formatEther(swapSellValue)}</p>
+                        <p>Price: {formatEther2(swapBuyValue)}</p>
+                        <p>Proceeds: {formatEther2(swapSellValue)}</p>
                         <button onClick={swapNftForNft}>Swap</button>
+                    </div>
+                    <div>
+                        <blockquote>
+                            <ul>
+                                <li>There is a 10% fee on all NFT swaps.</li>
+                                <li>Select NFTs from the Wallet Inventory to buy, and from the Vault Inventory to sell.</li>
+                                <li>NFT-for-NFT swaps pay half as much in fees as you would pay performing both a buy and a sell.</li>
+                            </ul>
+                        </blockquote>
                     </div>
                 </div>
             </TradingFieldSet>
@@ -337,7 +394,7 @@ export const RemyVault = () => {
                 checked={!stakingMode}
                 onChange={() => setStakingMode(false)}
             />
-            <label htmlFor="trading">Trading</label>
+            <label htmlFor="trading">NFT Trading</label>
             <input
                 type="radio"
                 id="staking"
@@ -347,7 +404,6 @@ export const RemyVault = () => {
                 onChange={() => setStakingMode(true)}
             />
             <label htmlFor="staking">Staking</label>
-
         </div>
     )
 

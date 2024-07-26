@@ -9,7 +9,9 @@ import contractAddresses from './contractAddresses.json'
 function SwitchChainButton({ chains, switchChain }) {
   return (
     <div className="switch-chain">
-      {chains.map((chain) => (
+      {chains
+        .filter((chain) => {return chain.name === "Base"})
+        .map((chain) => (
         <button className="switch-chain-button" key={chain.id} onClick={() => switchChain({ chainId: chain.id })}>
           Switch to {chain.name}
         </button>
@@ -27,6 +29,7 @@ export const AccountDetails: React.FC = ({ account, disconnect, networkButtons }
     args: [account.address],
   })
   const { chains, switchChain } = useSwitchChain()
+  const chainId = useChainId()
   return (
     <div className="account-details">
     <fieldset>
@@ -34,7 +37,7 @@ export const AccountDetails: React.FC = ({ account, disconnect, networkButtons }
       <div className="account-details">
         <p>Address: {account.address}</p>
         <p>Balance: {nftBalance.data?.toString() ?? 0}</p>
-        <SwitchChainButton chains={chains} switchChain={switchChain} />
+          {chainId != 8453 && (<SwitchChainButton chains={chains} switchChain={switchChain} />)}
         <button type="button" onClick={() => disconnect()}>
           Disconnect
         </button>
