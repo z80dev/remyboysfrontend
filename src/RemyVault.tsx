@@ -7,28 +7,31 @@ import contractAddresses from './contractAddresses.json'
 import { useRemyRouter } from './remyRouter.ts'
 import { RemyRouterABI, UniV2RouterABI } from './Abis.ts'
 import { parseEther, formatEther } from 'viem'
-import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useERC20Balance, usePreviewRedeem, useUnlockedStake, useStakeLock, useStakeInventory, useApproveRouterForStakingToken, useRouterStakingTokenAllowance, useConvertNftCountToShares, useUnstakeInventory, useRedeemSharesFromERC4626, useRouterIsNFTApprovedForAll, useApproveNFTForRouter } from './tradingHooks.ts'
+import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useERC20Balance, usePreviewRedeem, useUnlockedStake, useStakeLock, useStakeInventory, useApproveRouterForStakingToken, useRouterStakingTokenAllowance, useConvertNftCountToShares, useUnstakeInventory, useRedeemSharesFromERC4626, useRouterIsNFTApprovedForAll, useApproveNFTForRouter, useTokenBalance, useAddNFTLiquidity, useApproveNonFungiblePositionManager, useMintREMYBatch, useApproveVaultForAllNFTs } from './tradingHooks.ts'
 import { TabGroup, Tab } from './Tabs.tsx'
 import { useNFTBalance, useOwnedNFTTokenIDs } from './nftHooks.ts'
 import { useBlock } from 'wagmi'
 
-const IMG_URL = 'http://localhost:5173/images/'
+const IMG_URL = 'https://basedremyboys.club/images/'
 
 const MULTICALL_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11'
 
 function TradingFieldSet({ children, routerIsApproved, approveFn }) {
-    if (!routerIsApproved) {
-        return (
-            <fieldset>
-                <legend>Approve Remy Router</legend>
-                <button onClick={approveFn}>Approve</button>
-            </fieldset>
-        )
-    }
-    return (
+    const approveRouterButton = (
+        <button onClick={approveFn}>Approve</button>
+    )
+   return (
         <fieldset>
             <legend>Trade NFTs</legend>
             {children}
+        {!routerIsApproved ?
+               (
+                   <fieldset>
+                       <legend>Approve Remy Router</legend>
+                       <button onClick={approveFn}>Approve</button>
+                   </fieldset>
+               ) : ''}
+
         </fieldset>
     )
 }
@@ -69,6 +72,7 @@ export function RemyVaultStaking() {
     const inventoryStakingAddress = contractAddresses['erc4626'];
     const stakedSharesBalance = useERC20Balance(inventoryStakingAddress, account);
     const unlockedBalance = useUnlockedStake(account.address);
+    const lockedBalance = stakedSharesBalance.data - unlockedBalance.data;
     const redeemShares = useRedeemSharesFromERC4626(unlockedBalance.data ?? 0, account.address);
     const [showDialog, setShowDialog] = useState(false);
 
@@ -105,6 +109,7 @@ export function RemyVaultStaking() {
     const formattedStakedBalance = formatEther2(stakedSharesBalance.data ?? 0);
     const redeemableAmount = usePreviewRedeem(stakedSharesBalance.data ?? 0);
     const unlockedRedeemableAmount = usePreviewRedeem(unlockedBalance.data ?? 0);
+    const lockedRedeemableAmount = usePreviewRedeem(lockedBalance);
 
     const invalidateQueries = useInvalidateQueries();
 
@@ -136,14 +141,26 @@ export function RemyVaultStaking() {
     }
 
     const requiredSharesForSelectedToUnstake = useConvertNftCountToShares(selectedForUnstaking.length) + BigInt(1);
+    // dont delete these
     console.log('requiredSharesForSelectedToUnstake', requiredSharesForSelectedToUnstake.data);
     console.log('routerStakingAllowance', routerStakingAllowance);
+
+    const currentTimeInSec = Math.floor(new Date().getTime() / 1000);
+    const currentTimestamp = new Date(currentTimeInSec * 1000).toLocaleString();
+    console.log('currentTimestamp', currentTimestamp);
+
+    const userLockData = useStakeLock(account.address);
+    console.log('userLockData', userLockData);
+    const lockEndTimestampInSec: BigInt = userLockData.data?.timestamp ?? 0;
+    console.log('lockEndTimestampInSec', lockEndTimestampInSec);
+    console.log(Number(lockEndTimestampInSec))
+    const lockEndTimestamp = new Date(Number(lockEndTimestampInSec) * 1000).toLocaleString();
+    console.log('lockEndTimestamp', lockEndTimestamp);
 
     const approveRouterForStakingToken = useApproveRouterForStakingToken(requiredSharesForSelectedToUnstake.data ?? 0);
     const redeemableAmountInNfts = tokensToNfts(unlockedRedeemableAmount.data ?? 0);
 
     // current timestamp in seconds
-    const currentTimestamp = Math.floor(new Date().getTime() / 1000)
     const block: UseBlockReturnType = useBlock();
 
     const needsApproval = (selectedForUnstaking.length > 0) && (routerStakingAllowance < requiredSharesForSelectedToUnstake.data ?? 0);
@@ -152,11 +169,18 @@ export function RemyVaultStaking() {
 
     const unstakeInventory = useUnstakeInventory(account.address, selectedForUnstaking, additionalUnstakeArgs);
 
+
     return (
         <div className="remy-vault">
             <fieldset>
                 <legend>Stake/Unstake NFTs</legend>
-                <p><b>Owned Vault Shares</b>: {formattedStakedBalance} Shares ({formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens)</p>
+                <p><b>Total Vault Shares</b>: {formattedStakedBalance} Shares ({formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens)</p>
+                <p><b>Locked Shares</b>: {formatEther2(lockedBalance)} Shares ({formatEther2(lockedRedeemableAmount.data ?? 0)} Tokens)</p>
+                <p><b>Unlocked Shares</b>: {formatEther2(unlockedBalance.data ?? 0)} Shares</p>
+                <p><b>Total Staked Balance</b>: {formatEther2(redeemableAmount.data ?? 0)} Tokens</p>
+                <p><b>Locked</b>: {formatEther2(lockedRedeemableAmount.data ?? 0)} Tokens</p>
+                <p><b>Unlocked</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens</p>
+                <p><b>Locked Until</b>: {lockEndTimestamp}</p>
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <div><p><b>NFTs Selected for Staking:</b> {selectedForStaking.length}</p></div>
@@ -238,8 +262,19 @@ export function RemyVaultTrading() {
     const swapQuoteRedeem = useQuoteRedeem(numBuys).data ?? parseEther('0');
     const swapQuoteMint = useQuoteMint(numSells).data ?? parseEther('0');
     const swapFeeForExchange = parseEther((numSwaps * 100).toString())
+    const oneThousandOneHundredRemy = parseEther('1100');
     const swapBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], swapQuoteRedeem + swapFeeForExchange);
     const swapSellPrice = useSellPrice(contractAddresses['token'], contractAddresses['weth'], swapQuoteMint);
+
+    console.log({
+        numBuys,
+        numSells,
+        numSwaps,
+        swapQuoteRedeem,
+        swapQuoteMint,
+        swapFeeForExchange,
+        swapBuyPrice,
+    })
 
     const oneThousandRemy = parseEther('1000');
     const oneNFTBuyTokens = parseEther('1100');
@@ -248,6 +283,11 @@ export function RemyVaultTrading() {
     const remyTokensBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], oneThousandRemy);
     const oneNFTBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], oneNFTBuyTokens);
     const oneNFTSellPrice = useSellPrice(contractAddresses['token'], contractAddresses['weth'], oneNFTSellTokens);
+
+    const dn404Balance = useTokenBalance(contractAddresses['token'], account.address);
+    const approveNFPM = useApproveNonFungiblePositionManager();
+    const approveVault = useApproveVaultForAllNFTs();
+    const addNFTLiquidity = useAddNFTLiquidity(account.address, dn404Balance.data ?? 0);
 
     const isApproved = routerIsApproved(account).data ?? false;
 
@@ -261,6 +301,8 @@ export function RemyVaultTrading() {
     const userBalance = useNFTBalance(account.address);
     const vaultOwnedTokenIDs = useOwnedNFTTokenIDs(contractAddresses['vault'], nftBalance.data ?? 0);
     const userOwnedTokenIDs = useOwnedNFTTokenIDs(account.address, userBalance.data ?? 0);
+
+    const mintRemy = useMintREMYBatch(userOwnedTokenIDs.data?.map((id) => id.result), account.address);
 
     const buySwapArgs = [buySelected, account.address];
     const sellSwapArgs = [sellSelected, sellPrice.data?.result[0] ?? 0, account.address];
@@ -319,6 +361,16 @@ export function RemyVaultTrading() {
     const ids = idsToDisplay?.map((id) => id.result?.toString()) ?? [];
     const selectedList = isSellMode ? sellSelected : buySelected;
 
+    const adminButtons = (
+        <div>
+                    <button onClick={approveVault}>Approve Vault</button>
+            <button onClick={mintRemy}>Mint REMY</button>
+            <button onClick={approveNFPM}>Approve NonfungiblePositionManager</button>
+            <button onClick={addNFTLiquidity}>Add NFT Liquidity</button>
+            </div>
+
+    )
+
     return (
         <div className="remy-vault">
             <div role="tooltip" className='remy-price-bubble'>
@@ -344,7 +396,7 @@ export function RemyVaultTrading() {
                     <div>
                         <blockquote>
                             <ul>
-                                <li>There is a 10% fee on all NFT swaps.</li>
+                                <li>There is a 10% fee on all NFT swaps. Fees go directly to stakers.</li>
                                 <li>Select NFTs from the Wallet Inventory to buy, and from the Vault Inventory to sell.</li>
                                 <li>NFT-for-NFT swaps pay half as much in fees as you would pay performing both a buy and a sell.</li>
                             </ul>

@@ -5,6 +5,7 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import ERC4626 from './contractAbis/ERC4626.json'
 import RemyRouterAbi2 from './contractAbis/RemyRouter.json'
+import NonFungiblePositionManagerAbi from './contractAbis/NonfungiblePositionManager.json'
 
 const QUOTER_ADDRESS = contractAddresses['quoter']
 
@@ -338,4 +339,122 @@ export const useApproveNFTForRouter = () => {
     }, [writeContract]);
 
     return approveNFTForRouter;
+}
+
+export const useTokenName = (tokenAddress) => {
+    return useReadContract({
+        abi: ERC20Abi,
+        address: tokenAddress,
+        functionName: 'name',
+        args: [],
+    });
+}
+
+export const useTokenSymbol = (tokenAddress) => {
+    return useReadContract({
+        abi: ERC20Abi,
+        address: tokenAddress,
+        functionName: 'symbol',
+        args: [],
+    });
+}
+
+export const useAddNFTLiquidity = (account, nftAmount) => {
+    const { writeContract } = useWriteContract();
+
+    let mintParams = {
+        'token0': '0x4200000000000000000000000000000000000006',
+        'token1': '0x765D0443eD57eB0C89953c3EBF54885189A4aEF2',
+        'fee': 3000,
+        'tickLower': 69060,
+        'tickUpper': 120720,
+        'amount0Desired': nftAmount,
+        'amount1Desired': 0,
+        'amount0Min': 0,
+        'amount1Min': 0,
+        'recipient': account,
+        'deadline': 1157920892373160791312963991283129391283912335n
+    }
+
+    const mintParamsArray = Object.values(mintParams)
+
+    console.log('mintParams', mintParams);
+    console.log('mintParamsArray', mintParamsArray);
+
+
+    const addNFTLiquidity = useCallback(() => {
+        return writeContract({
+            abi: NonFungiblePositionManagerAbi['abi'],
+            address: contractAddresses['nonfungible_position_manager'] as `0x${string}`,
+            functionName: 'mint',
+            args: [mintParamsArray],
+        }, {
+            onSuccess: () => console.log('success'),
+            onError: (error) => console.log(error)
+        });
+
+    }, [nftAmount, writeContract]);
+
+    return addNFTLiquidity;
+}
+
+export const useTokenBalance = (tokenAddress, account) => {
+    console.log('useTokenBalance', tokenAddress, account);
+    return useReadContract({
+        abi: ERC20Abi,
+        address: tokenAddress,
+        functionName: 'balanceOf',
+        args: [account],
+    });
+}
+
+export const useApproveNonFungiblePositionManager = () => {
+    const { writeContract } = useWriteContract();
+
+    const approveNonFungiblePositionManager = useCallback(() => {
+        return writeContract({
+            abi: ERC20Abi,
+            address: contractAddresses['token'] as `0x${string}`,
+            functionName: 'approve',
+            args: [contractAddresses['nonfungible_position_manager'], '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'],
+        });
+    }, [writeContract]);
+
+    return approveNonFungiblePositionManager;
+}
+
+export const useMintREMYBatch = (nftsIn, account) => {
+    const { writeContract } = useWriteContract();
+
+    console.log('useMintREMYBatch', nftsIn, account);
+
+    let mintRemy = useCallback(() => {
+        console.log('mintRemy', nftsIn, account);
+        return writeContract({
+            abi: VaultABI,
+            address: contractAddresses['vault'] as `0x${string}`,
+            functionName: 'mint_batch',
+            args: [nftsIn, account],
+        }, {
+        onSuccess: () => console.log('success'),
+        onError: (error) => console.log(error)
+    });
+    }, [nftsIn, account, writeContract]);
+
+    return mintRemy;
+}
+
+export const useApproveVaultForAllNFTs = () => {
+    const { writeContract } = useWriteContract();
+
+    const approveVaultForAllNFTs = useCallback(() => {
+        return writeContract({
+            abi: NFTAbi,
+            address: contractAddresses['nft'] as `0x${string}`,
+            functionName: 'setApprovalForAll',
+            args: [contractAddresses['vault'] as `0x${string}`, true],
+        });
+    }, [writeContract]);
+
+    return approveVaultForAllNFTs;
 }
