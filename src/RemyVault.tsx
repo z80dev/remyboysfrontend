@@ -24,14 +24,6 @@ function TradingFieldSet({ children, routerIsApproved, approveFn }) {
         <fieldset>
             <legend>Trade NFTs</legend>
             {children}
-        {!routerIsApproved ?
-               (
-                   <fieldset>
-                       <legend>Approve Remy Router</legend>
-                       <button onClick={approveFn}>Approve</button>
-                   </fieldset>
-               ) : ''}
-
         </fieldset>
     )
 }
@@ -180,7 +172,7 @@ export function RemyVaultStaking() {
                 <p><b>Total Staked Balance</b>: {formatEther2(redeemableAmount.data ?? 0)} Tokens</p>
                 <p><b>Locked</b>: {formatEther2(lockedRedeemableAmount.data ?? 0)} Tokens</p>
                 <p><b>Unlocked</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens</p>
-                <p><b>Locked Until</b>: {lockEndTimestamp}</p>
+                {lockedBalance.data && (<p><b>Locked Until</b>: {lockEndTimestamp}</p>)}
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <div><p><b>NFTs Selected for Staking:</b> {selectedForStaking.length}</p></div>
@@ -368,8 +360,9 @@ export function RemyVaultTrading() {
             <button onClick={approveNFPM}>Approve NonfungiblePositionManager</button>
             <button onClick={addNFTLiquidity}>Add NFT Liquidity</button>
             </div>
-
     )
+
+    const mustApproveRouter = sellSelected.length > 0 && !isApproved;
 
     return (
         <div className="remy-vault">
@@ -391,7 +384,8 @@ export function RemyVaultTrading() {
                         <p>Selected for Selling: {sellSelected.length}</p>
                         <p>Price: {formatEther2(swapBuyValue)}</p>
                         <p>Proceeds: {formatEther2(swapSellValue)}</p>
-                        <button onClick={swapNftForNft}>Swap</button>
+                        <button disabled={!mustApproveRouter} onClick={approveVault}>Approve Router</button>
+                        <button onClick={swapNftForNft} disabled={mustApproveRouter}>Swap</button>
                     </div>
                     <div>
                         <blockquote>
