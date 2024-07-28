@@ -179,6 +179,7 @@ export function RemyVaultStaking() {
                         <div>
                           <span className='red-text bold mr-1'>*Warning*:</span>
                           <span>Only stake what you consider to be <b>floor</b> NFTs. Staked NFTs are made available for trading by other users. There is <b>no guarantee</b> you will be able to unstake for the same NFTs.</span>
+                          <span>There is a <b>1 week</b> lockup period on staked NFTs.</span>
                         </div>
                         <div className='unstake-buttons mt-1'>
                             <button onClick={approveNFTForRouter} disabled={routerIsNFTApprovedForAll}>Approve</button>
