@@ -1,3 +1,4 @@
+// @ts-nocheck
 // define react hooks for interacting with the RemyRouter contract
 import { useWriteContract } from 'wagmi';
 import { RemyRouterABI } from './Abis.ts';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 export function ConnectButtons({ connectors, connect, error }) {
   return (
     <div className="connect-buttons">

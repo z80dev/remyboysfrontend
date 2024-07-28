@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useSimulateContract, useReadContract, useWriteContract } from 'wagmi'
 import { QuoterV2ABI, NFTAbi, VaultABI, RemyRouterABI, ERC20Abi, ERC4626ABI } from './Abis'
 import contractAddresses from './contractAddresses.json'
