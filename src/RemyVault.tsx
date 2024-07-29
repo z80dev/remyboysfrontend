@@ -161,6 +161,13 @@ export function RemyVaultStaking() {
 
     const unstakeInventory = useUnstakeInventory(account.address, selectedForUnstaking, additionalUnstakeArgs);
 
+    const selectAllForStaking = () => {
+        setSelectedForStaking(userIds);
+    }
+
+    const clearSelectedForStaking = () => {
+        setSelectedForStaking([]);
+    }
 
     return (
         <div className="remy-vault">
@@ -176,6 +183,8 @@ export function RemyVaultStaking() {
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <div><p><b>NFTs Selected for Staking:</b> {selectedForStaking.length}</p></div>
+                        <div className='stake-all-button'><button onClick={selectAllForStaking}>Select All</button>
+                        <button disabled={selectedForStaking.length === 0} onClick={clearSelectedForStaking}>Clear All</button></div>
                         <div>
                           <span className='red-text bold mr-1'>*Warning*:</span>
                           <span>Only stake what you consider to be <b>floor</b> NFTs. Staked NFTs are made available for trading by other users. There is <b>no guarantee</b> you will be able to unstake for the same NFTs.</span>
@@ -381,9 +390,13 @@ export function RemyVaultTrading() {
                 <p>ETH Balance: {formatEther2(ethBalance.data?.value ?? 0)}</p>
                 <div className="tradingGrid">
                     <div className="trade-button">
-                        <p>Selected for Buying: {buySelected.length}</p>
-                        <p>Selected for Selling: {sellSelected.length}</p>
-                        <p>Price: {formatEther2(swapBuyValue)}</p>
+                        <div>
+                        Selected for Buying: {buySelected.length}
+                        <button className='clear-button' onClick={() => setBuySelected([])}>Clear</button>
+                        </div>
+                        Selected for Selling: {sellSelected.length}
+                        <button className='clear-button' onClick={() => setSellSelected([])}>Clear</button>
+                        <div>Price: {formatEther2(swapBuyValue)}</div>
                         <p>Proceeds: {formatEther2(swapSellValue)}</p>
                         <button disabled={!mustApproveRouter} onClick={approveVault}>Approve Router</button>
                         <button onClick={swapNftForNft} disabled={mustApproveRouter}>Swap</button>

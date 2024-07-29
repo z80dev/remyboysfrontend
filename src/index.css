@@ -244,3 +244,12 @@ li {
 .mt-1 {
   margin-top: 1rem;
 }
+
+.stake-all-button {
+  margin-bottom: 10px;
+}
+
+.clear-button {
+  margin-left: .6rem;
+  margin-bottom: 1rem;
+}
