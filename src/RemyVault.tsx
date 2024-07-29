@@ -388,6 +388,8 @@ export function RemyVaultTrading() {
                 approveFn={approveRouter}
             >
                 <p>ETH Balance: {formatEther2(ethBalance.data?.value ?? 0)}</p>
+                <p>User NFT Balance: {userBalance.data?.toString() ?? 0}</p>
+                <p>Vault NFT Balance: {nftBalance.data?.toString() ?? 0}</p>
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <div>
