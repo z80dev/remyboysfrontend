@@ -373,6 +373,9 @@ export function RemyVaultTrading() {
     )
 
     const mustApproveRouter = sellSelected.length > 0 && !isApproved;
+    console.log('sellSelected', sellSelected);
+    console.log('isApproved', isApproved);
+    console.log('mustApproveRouter', mustApproveRouter);
 
     return (
         <div className="remy-vault">
@@ -400,7 +403,7 @@ export function RemyVaultTrading() {
                         <button className='clear-button' onClick={() => setSellSelected([])}>Clear</button>
                         <div>Price: {formatEther2(swapBuyValue)}</div>
                         <p>Proceeds: {formatEther2(swapSellValue)}</p>
-                        <button disabled={!mustApproveRouter} onClick={approveVault}>Approve Router</button>
+                        <button disabled={!mustApproveRouter} onClick={approveRouter}>Approve Router</button>
                         <button onClick={swapNftForNft} disabled={mustApproveRouter}>Swap</button>
                     </div>
                     <div>
