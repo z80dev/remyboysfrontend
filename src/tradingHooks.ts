@@ -52,6 +52,9 @@ export const useApproveRouterForToken = (tokenAddress, amount) => {
             address: tokenAddress,
             functionName: 'approve',
             args: [contractAddresses['remy_router'], amount],
+        }, {
+            onSuccess: () => console.log('success'),
+            onError: (error) => console.log(error)
         });
     }, [writeContract, tokenAddress]);
 
@@ -59,7 +62,7 @@ export const useApproveRouterForToken = (tokenAddress, amount) => {
 }
 
 export const useApproveRouterForStakingToken = (amount) => {
-    return useApproveRouterForToken(contractAddresses['erc4626'], amount);
+    return useApproveRouterForToken(contractAddresses['erc4626'], '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
 }
 
 export const useRouterStakingTokenAllowance = (owner) => {
@@ -119,7 +122,6 @@ export const useSwapNftForNft = (nftsToSell, nftsToBuy, recipient, value, additi
     const { writeContract } = useWriteContract();
 
     const swapNftForNft = useCallback(() => {
-        console.log('swapNftForNft', nftsToSell, nftsToBuy, recipient, value, additionalArgs);
         return writeContract({
             abi: RemyRouterABI,
             address: contractAddresses['remy_router'] as `0x${string}`,
@@ -379,10 +381,6 @@ export const useAddNFTLiquidity = (account, nftAmount) => {
 
     const mintParamsArray = Object.values(mintParams)
 
-    console.log('mintParams', mintParams);
-    console.log('mintParamsArray', mintParamsArray);
-
-
     const addNFTLiquidity = useCallback(() => {
         return writeContract({
             abi: NonFungiblePositionManagerAbi['abi'],
@@ -400,7 +398,6 @@ export const useAddNFTLiquidity = (account, nftAmount) => {
 }
 
 export const useTokenBalance = (tokenAddress, account) => {
-    console.log('useTokenBalance', tokenAddress, account);
     return useReadContract({
         abi: ERC20Abi,
         address: tokenAddress,
@@ -427,10 +424,8 @@ export const useApproveNonFungiblePositionManager = () => {
 export const useMintREMYBatch = (nftsIn, account) => {
     const { writeContract } = useWriteContract();
 
-    console.log('useMintREMYBatch', nftsIn, account);
 
     let mintRemy = useCallback(() => {
-        console.log('mintRemy', nftsIn, account);
         return writeContract({
             abi: VaultABI,
             address: contractAddresses['vault'] as `0x${string}`,
