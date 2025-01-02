@@ -15,7 +15,7 @@ export function RemyTrading() {
     const amountIn = walletTokenBalance.data ?? 0;
     const invalidateQueries = useInvalidateQueries();
     const additionalArgs = { onSettled: invalidateQueries };
-    const expectedSellAmount = useSellPrice(tokenIn, tokenOut, walletTokenBalance.data ?? 0).data?.result[0] ?? 0;
+    const expectedSellAmount = useSellPrice(tokenIn, tokenOut, walletTokenBalance.data ?? 0).data?.result[0] ?? BigInt(0);
     const swapTokenForETH = useSwapTokenForETH(tokenIn, tokenOut, amountIn, account.address, additionalArgs);
     return (
         <div className="remy-vault">
@@ -26,7 +26,7 @@ export function RemyTrading() {
                 <div><p>Your wallet balance: {formatEther2(walletTokenBalance.data ?? 0)} $REMY</p></div>
                 <div><p>Expected ETH: {formatEther(expectedSellAmount)}</p></div>
                 <div><p>Router Approval Status: {isApproved ? "Approved" : "Not Approved"}</p></div>
-                <div><button disabled={isApproved} onClick={() => approveRemyswapRouter()}>Approve RemySwap Router</button></div>
+                <div><button disabled={!!isApproved} onClick={() => approveRemyswapRouter()}>Approve RemySwap Router</button></div>
                 <div><button disabled={!isApproved} onClick={() => swapTokenForETH()}>Sell $REMY for ETH</button></div>
             </fieldset>
         </div>
