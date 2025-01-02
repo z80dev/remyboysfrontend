@@ -11,6 +11,7 @@ import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMi
 import { TabGroup, Tab } from './Tabs.tsx'
 import { useNFTBalance, useOwnedNFTTokenIDs } from './nftHooks.ts'
 import { RemyVaultStaking } from './RemyVaultStaking.tsx'
+import { RemyTrading } from './RemyTrading.tsx'
 
 const IMG_URL = 'https://basedremyboys.club/images/'
 
@@ -270,6 +271,7 @@ export function RemyVaultTrading() {
 export const RemyVault = () => {
 
     const [stakingMode, setStakingMode] = useState(false);
+    const [currentMode, setCurrentMode] = useState(0);
 
     const invalidateQueries = useInvalidateQueries();
 
@@ -293,8 +295,8 @@ export const RemyVault = () => {
                 id="trading"
                 name="mode"
                 value="trading"
-                checked={!stakingMode}
-                onChange={() => setStakingMode(false)}
+                checked={currentMode === 0}
+                onChange={() => setCurrentMode(0)}
             />
             <label htmlFor="trading">NFT Trading</label>
             <input
@@ -302,17 +304,36 @@ export const RemyVault = () => {
                 id="staking"
                 name="mode"
                 value="staking"
-                checked={stakingMode}
-                onChange={() => setStakingMode(true)}
+                checked={currentMode === 1}
+                onChange={() => setCurrentMode(1)}
             />
             <label htmlFor="staking">Staking</label>
+            <input
+                type="radio"
+                id="selling"
+                name="mode"
+                value="selling"
+                checked={currentMode === 2}
+                onChange={() => setCurrentMode(2)}
+            />
+            <label htmlFor="selling">Sell $REMY</label>
         </div>
     )
+
+    let currentComponent = <RemyVaultTrading />;
+
+    if (currentMode === 1) {
+        currentComponent = <RemyVaultStaking />;
+    } else if (currentMode === 2) {
+        currentComponent = <RemyTrading />;
+    }
+
+    console.log('currentMode', currentMode);
 
     return (
         <div>
             {stakingOrTradingRadioButtons}
-            {stakingMode ? <RemyVaultStaking /> : <RemyVaultTrading />}
+            {currentComponent}
         </div>
     )
 }

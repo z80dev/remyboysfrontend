@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useSimulateContract, useReadContract, useWriteContract } from 'wagmi'
-import { QuoterV2ABI, NFTAbi, VaultABI, RemyRouterABI, ERC20Abi, ERC4626ABI } from './Abis'
+import { QuoterV2ABI, NFTAbi, VaultABI, RemyRouterABI, ERC20Abi, RemySwapRouterAbi, ERC4626ABI } from './Abis'
 import contractAddresses from './contractAddresses.json'
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -61,6 +61,24 @@ export const useApproveRouterForToken = (tokenAddress, amount) => {
     return approveRouterForToken;
 }
 
+export const useApproveRemyswapRouterForToken = (tokenAddress, amount) => {
+    const { writeContract } = useWriteContract();
+
+    const approveRouterForToken = useCallback(() => {
+        return writeContract({
+            abi: ERC20Abi,
+            address: tokenAddress,
+            functionName: 'approve',
+            args: [contractAddresses['remyswap_router'], amount],
+        }, {
+            onSuccess: () => console.log('success'),
+            onError: (error) => console.log(error)
+        });
+    }, [writeContract, tokenAddress]);
+
+    return approveRouterForToken;
+}
+
 export const useApproveRouterForStakingToken = (amount) => {
     return useApproveRouterForToken(contractAddresses['erc4626'], '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
 }
@@ -72,6 +90,19 @@ export const useRouterStakingTokenAllowance = (owner) => {
         functionName: 'allowance',
         args: [owner, contractAddresses['remy_router']],
     });
+}
+
+export const useRemyswapRouterStakingTokenAllowance = (owner) => {
+    return useReadContract({
+        abi: ERC20Abi,
+        address: contractAddresses['dn404_token'] as `0x${string}`,
+        functionName: 'allowance',
+        args: [owner, contractAddresses['remyswap_router']],
+    });
+}
+
+export const useApproveRemyswapRouterForStakingToken = () => {
+    return useApproveRemyswapRouterForToken(contractAddresses['dn404_token'], '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
 }
 
 export function useInvalidateQueries() {
@@ -132,6 +163,32 @@ export const useSwapNftForNft = (nftsToSell, nftsToBuy, recipient, value, additi
     }, [nftsToSell, nftsToBuy, recipient, additionalArgs, writeContract]);
 
     return swapNftForNft;
+}
+
+export const useSwapTokenForETH = (tokenIn, tokenOut, amountIn, recipient, additionalArgs) => {
+    const { writeContract } = useWriteContract();
+
+    //args = [tokenIn, tokenOut, 3000, recipient, amountIn, 0, 0]
+    const args = {
+        tokenIn,
+        tokenOut,
+        fee: 3000,
+        recipient,
+        amountIn,
+        amountOutMinimum: 0,
+        sqrtPriceLimitX96: 0
+    }
+
+    const swapTokenForETH = useCallback(() => {
+        return writeContract({
+            abi: RemySwapRouterAbi,
+            address: contractAddresses['remyswap_router'] as `0x${string}`,
+            functionName: 'exactInputSingle',
+            args: [args]
+        }, additionalArgs);
+    }, [tokenIn, tokenOut, amountIn, recipient, additionalArgs, writeContract]);
+
+    return swapTokenForETH;
 }
 
 

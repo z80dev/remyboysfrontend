@@ -7,7 +7,27 @@ import { TabGroup, Tab } from './Tabs.tsx';
 import { useNFTBalance, useOwnedNFTTokenIDs } from './nftHooks.ts';
 import { useBlock } from 'wagmi';
 import { formatEther2, RemyVaultGrid } from './RemyVault.tsx';
+import { parseEther } from 'viem';
 
+export function toEthereumNumber(value: string | number | bigint): bigint {
+  if (typeof value === 'string') {
+    return parseEther(value);
+  }
+  if (typeof value === 'bigint') {
+    return value;
+  }
+  // For number, convert to bigint and multiply by 1e18
+  return BigInt(value) * BigInt(1e18);
+}
+
+export function fromEthereumNumber(value: string | bigint): number {
+  if (typeof value === 'string') {
+    const weiValue = parseEther(value);
+    return Number(weiValue / BigInt(1e18));
+  }
+  // For bigint
+    return Number(BigInt(value) / BigInt(1e18));
+}
 
 export function RemyVaultStaking() {
     const account = useAccount();
@@ -18,8 +38,9 @@ export function RemyVaultStaking() {
     const inventoryStakingAddress = contractAddresses['erc4626'];
     const stakedSharesBalance = useERC20Balance(inventoryStakingAddress, account);
     const unlockedBalance = useUnlockedStake(account.address);
-    const lockedBalance = stakedSharesBalance.data - unlockedBalance.data;
-    const redeemShares = useRedeemSharesFromERC4626(unlockedBalance.data ?? 0, account.address);
+    const lockedBalance = BigInt(stakedSharesBalance.data ?? 0) - BigInt(unlockedBalance.data ?? 0);
+    const [redeemableAmountShares, setRedeemableAmountShares] = useState(unlockedBalance.data ?? 0);
+    const redeemShares = useRedeemSharesFromERC4626(redeemableAmountShares, account.address);
     const [showDialog, setShowDialog] = useState(false);
 
     const routerStakingAllowance = useRouterStakingTokenAllowance(account.address);
@@ -35,6 +56,17 @@ export function RemyVaultStaking() {
     const vaultNftBalance = useNFTBalance(contractAddresses['vault']);
     const vaultOwnedTokenIDs = useOwnedNFTTokenIDs(contractAddresses['vault'], vaultNftBalance.data ?? 0);
     const vaultIds = vaultOwnedTokenIDs.data?.map((id) => id.result?.toString()) ?? [];
+
+    const walletTokenBalance = useERC20Balance(contractAddresses['dn404_token'], account);
+
+    const setRedeemableSharesMax = () => {
+        console.log('unlockedBalance.data', unlockedBalance.data);
+        setRedeemableAmountShares(unlockedBalance.data ?? 0);
+    };
+
+    const setRedeemableShares = (shares) => {
+        setRedeemableAmountShares(toEthereumNumber(shares));
+    };
 
     const toggleSelect = (id) => {
         if (stakingMode) {
@@ -134,6 +166,7 @@ export function RemyVaultStaking() {
                 <p><b>Total Staked Balance</b>: {formatEther2(redeemableAmount.data ?? 0)} Tokens</p>
                 <p><b>Locked</b>: {formatEther2(lockedRedeemableAmount.data ?? 0)} Tokens</p>
                 <p><b>Unlocked</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} Tokens</p>
+                <p><b>Wallet Balance</b>: {formatEther2(walletTokenBalance.data ?? 0)} Tokens</p>
                 {lockedBalance.data && (<p><b>Locked Until</b>: {lockEndTimestamp}</p>)}
                 <div className="tradingGrid">
                     <div className="trade-button">
@@ -156,8 +189,10 @@ export function RemyVaultStaking() {
                         <div className='unstake-buttons nft-unstake'><button onClick={approveRouterForStakingToken}>Approve</button>
                             <button disabled={!hasEnoughShares} onClick={unstakeInventory}>Unstake as NFTs</button></div>
                         <div className='divider'></div>
+                        <div><p><b>Unlocked Shares:</b> {formatEther2(unlockedBalance.data ?? 0)} Shares</p></div>
                         <div><p><b>Unlocked Shares Redeemable for</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} $REMY</p></div>
-                        <div className='unstake-buttons'><button disabled={!hasUnlockedShares} onClick={redeemShares}>Unstake ALL as $REMY</button></div>
+                        <div><input type="number" value={fromEthereumNumber(redeemableAmountShares)} onChange={(e) => setRedeemableShares(e.target.value)}></input><button onClick={setRedeemableSharesMax}>Max Shares</button></div>
+                        <div className='unstake-buttons'><button disabled={!hasUnlockedShares} onClick={redeemShares}>Unstake as $REMY</button></div>
                     </div>
                 </div>
             </fieldset>
