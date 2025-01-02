@@ -349,8 +349,6 @@ export const RemyVault = () => {
 
     console.log('currentMode', currentMode);
 
-    const chainId = useChainId();
-
     if (account.chainId === 8453) {
         return (
             <div>

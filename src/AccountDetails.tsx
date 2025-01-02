@@ -72,7 +72,7 @@ export const AccountDetails: React.FC = ({ account, disconnect, networkButtons }
         <p>Balance: {nftBalance.data?.toString() ?? 0} {nftCollectionName}</p>
         <p>Balance: {dn404Balance.data?.toString() ?? 0} {dn404Name} Tokens</p>
         <p>Balance: {mirrorNFTBalance.data?.toString() ?? 0} {mirrorNFTName.data ?? 'NFT'} NFTs</p>
-          {chainId != 8453 && (<SwitchChainButton chains={chains} switchChain={switchChain} />)}
+          {account.chainId != 8453 && (<SwitchChainButton chains={chains} switchChain={switchChain} />)}
         <button type="button" onClick={() => disconnect()}>
           Disconnect
         </button>
