@@ -59,7 +59,7 @@ export const AccountDetails: React.FC = ({ account, disconnect, networkButtons }
   })
 
   const { chains, switchChain } = useSwitchChain()
-  const chainId = useChainId()
+  const chainId = account.chainId;
   const nftCollectionName = useTokenName(contractAddresses['nft']).data ?? 'NFT';
   const dn404Name = useTokenName(contractAddresses['dn404_token']).data ?? 'DN404';
   console.log('mirrorNFTAddress', mirrorNFTAddress.data);

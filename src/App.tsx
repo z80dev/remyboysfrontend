@@ -38,7 +38,7 @@ function RemyVaultWindow({ onClose }) {
 function App() {
   const { chains, switchChain } = useSwitchChain()
   const account = useAccount()
-  const chainId = useChainId()
+  const chainId = account.chainId;
   const { connectors, connect, status, error } = useConnect()
   const { disconnect } = useDisconnect()
   const [showRemyVault, setShowRemyVault] = useState(false)

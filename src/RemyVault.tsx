@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useAccount, useBalance, useChainId, useReadContract, useReadContracts, useWriteContract } from 'wagmi'
+import { useAccount, useBalance, useChainId, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from 'wagmi'
 import { useEffect, useState } from 'react'
 import { NFTAbi } from './Abis.ts'
 import addresses from './addresses.ts'
@@ -16,6 +16,22 @@ import { RemyTrading } from './RemyTrading.tsx'
 const IMG_URL = 'https://basedremyboys.club/images/'
 
 const MULTICALL_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11'
+
+function SwitchChainButton({ chains, switchChain }) {
+  return (
+    <div className="switch-chain">
+      {chains
+        .filter((chain) => {return chain.name === "Base"})
+        .map((chain) => (
+        <button className="switch-chain-button" key={chain.id} onClick={() => switchChain({ chainId: chain.id })}>
+          Switch to {chain.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+
 
 function TradingFieldSet({ children, routerIsApproved, approveFn }) {
     const approveRouterButton = (
@@ -275,6 +291,9 @@ export const RemyVault = () => {
 
     const invalidateQueries = useInvalidateQueries();
 
+    const account = useAccount();
+    const { chains, switchChain } = useSwitchChain()
+
     useEffect(() => {
         invalidateQueries();
 
@@ -332,7 +351,7 @@ export const RemyVault = () => {
 
     const chainId = useChainId();
 
-    if (chainId === 8453) {
+    if (account.chainId === 8453) {
         return (
             <div>
                 {stakingOrTradingRadioButtons}
