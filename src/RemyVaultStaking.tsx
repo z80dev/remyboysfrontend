@@ -189,9 +189,10 @@ export function RemyVaultStaking() {
                         <div className='unstake-buttons nft-unstake'><button onClick={approveRouterForStakingToken}>Approve</button>
                             <button disabled={!hasEnoughShares} onClick={unstakeInventory}>Unstake as NFTs</button></div>
                         <div className='divider'></div>
+                        <div className="red-text bold">*Temporarily Disabled*</div>
                         <div><p><b>Unlocked Shares:</b> {formatEther2(unlockedBalance.data ?? 0)} Shares</p></div>
                         <div><p><b>Unlocked Shares Redeemable for</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} $REMY</p></div>
-                        <div><input type="number" value={fromEthereumNumber(redeemableAmountShares)} onChange={(e) => setRedeemableShares(e.target.value)}></input><button onClick={setRedeemableSharesMax}>Max Shares</button></div>
+                        <div><input disabled={true} type="number" value={fromEthereumNumber(redeemableAmountShares)} onChange={(e) => setRedeemableShares(e.target.value)}></input><button disabled={true} onClick={setRedeemableSharesMax}>Max Shares</button></div>
                         <div className='unstake-buttons'><button disabled={true} onClick={redeemShares}>Unstake as $REMY</button></div>
                     </div>
                 </div>
