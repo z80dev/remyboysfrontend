@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useAccount, useBalance, useReadContract, useReadContracts, useWriteContract } from 'wagmi'
+import { useAccount, useBalance, useChainId, useReadContract, useReadContracts, useWriteContract } from 'wagmi'
 import { useEffect, useState } from 'react'
 import { NFTAbi } from './Abis.ts'
 import addresses from './addresses.ts'
@@ -330,10 +330,21 @@ export const RemyVault = () => {
 
     console.log('currentMode', currentMode);
 
-    return (
-        <div>
-            {stakingOrTradingRadioButtons}
-            {currentComponent}
-        </div>
-    )
+    const chainId = useChainId();
+
+    if (chainId === 8453) {
+        return (
+            <div>
+                {stakingOrTradingRadioButtons}
+                {currentComponent}
+            </div>
+        )
+    } else {
+        return (
+            <div>
+                <SwitchChainButton chains={chains} switchChain={switchChain} />
+            </div>
+        )
+    }
+
 }
