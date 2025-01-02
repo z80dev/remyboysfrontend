@@ -263,7 +263,7 @@ export function RemyVaultTrading() {
                     <div>
                         <blockquote>
                             <ul>
-                                <li>There is a 10% fee on all NFT swaps. Fees go directly to stakers.</li>
+                                <li>There is a 10% fee on all NFT swaps. Fees go directly to stakers. This fee is already reflected in the buy/sell price.</li>
                                 <li>Select NFTs from the Wallet Inventory to buy, and from the Vault Inventory to sell.</li>
                                 <li>NFT-for-NFT swaps pay half as much in fees as you would pay performing both a buy and a sell.</li>
                             </ul>
