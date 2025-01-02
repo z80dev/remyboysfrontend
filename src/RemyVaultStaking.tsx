@@ -192,7 +192,7 @@ export function RemyVaultStaking() {
                         <div><p><b>Unlocked Shares:</b> {formatEther2(unlockedBalance.data ?? 0)} Shares</p></div>
                         <div><p><b>Unlocked Shares Redeemable for</b>: {formatEther2(unlockedRedeemableAmount.data ?? 0)} $REMY</p></div>
                         <div><input type="number" value={fromEthereumNumber(redeemableAmountShares)} onChange={(e) => setRedeemableShares(e.target.value)}></input><button onClick={setRedeemableSharesMax}>Max Shares</button></div>
-                        <div className='unstake-buttons'><button disabled={!hasUnlockedShares} onClick={redeemShares}>Unstake as $REMY</button></div>
+                        <div className='unstake-buttons'><button disabled={true} onClick={redeemShares}>Unstake as $REMY</button></div>
                     </div>
                 </div>
             </fieldset>
