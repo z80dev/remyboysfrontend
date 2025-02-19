@@ -7,7 +7,7 @@ import contractAddresses from './contractAddresses.json'
 import { useRemyRouter } from './remyRouter.ts'
 import { RemyRouterABI, UniV2RouterABI } from './Abis.ts'
 import { parseEther, formatEther } from 'viem'
-import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useTokenBalance, useAddNFTLiquidity, useApproveNonFungiblePositionManager, useMintREMYBatch, useApproveVaultForAllNFTs } from './tradingHooks.ts'
+import { useBuyPrice, useSellPrice, routerIsApproved, useQuoteRedeem, useQuoteMint, useSwapEthForNft, useSwapNftForEth, useSwapNftForNft, useApproveRouter, useInvalidateQueries, useTokenBalance, useAddNFTLiquidity, useApproveNonFungiblePositionManager, useMintREMYBatch, useApproveVaultForAllNFTs, useERC20Balance } from './tradingHooks.ts'
 import { TabGroup, Tab } from './Tabs.tsx'
 import { useNFTBalance, useOwnedNFTTokenIDs } from './nftHooks.ts'
 import { RemyVaultStaking } from './RemyVaultStaking.tsx'
@@ -122,6 +122,17 @@ export function RemyVaultTrading() {
     const swapBuyPrice = useBuyPrice(contractAddresses['weth'], contractAddresses['token'], swapQuoteRedeem + swapFeeForExchange);
     const swapSellPrice = useSellPrice(contractAddresses['token'], contractAddresses['weth'], swapQuoteMint);
 
+    const [paymentCurrency, setPaymentCurrency] = useState("ETH");
+
+    const setPayWithETH = () => {
+        setPaymentCurrency("ETH");
+    }
+
+    const setPayWithREMY = () => {
+        setPaymentCurrency("REMY");
+    }
+
+
     console.log({
         numBuys,
         numSells,
@@ -231,6 +242,32 @@ export function RemyVaultTrading() {
     console.log('isApproved', isApproved);
     console.log('mustApproveRouter', mustApproveRouter);
 
+
+    const walletTokenBalance = useERC20Balance(contractAddresses['dn404_token'], account);
+
+    const currencySelectionRadioButtons = (
+        <div className="currencyradio">
+            <input
+                type="radio"
+                id="eth"
+                name="currency"
+                value="eth"
+                checked={paymentCurrency === "ETH"}
+                onChange={setPayWithETH}
+            />
+            <label htmlFor="eth">ETH</label>
+            <input
+                type="radio"
+                id="remy"
+                name="currency"
+                value="remy"
+                checked={paymentCurrency === "REMY"}
+                onChange={setPayWithREMY}
+            />
+            <label htmlFor="remy">REMY</label>
+        </div>
+    )
+
     return (
         <div className="remy-vault">
             <div role="tooltip" className='remy-price-bubble'>
@@ -245,8 +282,10 @@ export function RemyVaultTrading() {
                 approveFn={approveRouter}
             >
                 <p>ETH Balance: {formatEther2(ethBalance.data?.value ?? 0)}</p>
+                <p>$REMY Balance: {formatEther2(walletTokenBalance.data?.value ?? 0)}</p>
                 <p>User NFT Balance: {userBalance.data?.toString() ?? 0}</p>
                 <p>Vault NFT Balance: {nftBalance.data?.toString() ?? 0}</p>
+                {/* {currencySelectionRadioButtons} */}
                 <div className="tradingGrid">
                     <div className="trade-button">
                         <div>
