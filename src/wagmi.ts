@@ -1,19 +1,26 @@
 import { http, createConfig } from 'wagmi'
-import { base, baseSepolia, localhost } from 'wagmi/chains'
+import { base } from 'wagmi/chains'
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors'
+import { CHAIN_RPC, RPC_URL, WALLETCONNECT_PROJECT_ID } from './config'
+
+export const chain = RPC_URL ? { ...base, rpcUrls: { default: { http: [CHAIN_RPC] } } } : base
 
 export const config = createConfig({
-  chains: [base],
+  chains: [chain],
   connectors: [
     injected(),
-    coinbaseWallet({ appName: 'Create Wagmi' }),
-    walletConnect({ projectId: 'd98b79aeb44471c27770f6ea2657fd17' }),
+    coinbaseWallet({ appName: 'Remy OS', preference: { telemetry: false } }),
+    walletConnect({
+      projectId: WALLETCONNECT_PROJECT_ID,
+      metadata: {
+        name: 'Remy OS',
+        description: 'Based Remy Boys',
+        url: 'https://basedremyboys.club',
+        icons: ['https://basedremyboys.club/images/Character0.webp'],
+      },
+    }),
   ],
-  transports: {
-    [base.id]: http(),
-    [baseSepolia.id]: http(),
-    [localhost.id]: http(),
-  },
+  transports: { [chain.id]: http(RPC_URL) },
 })
 
 declare module 'wagmi' {
