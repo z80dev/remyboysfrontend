@@ -9,7 +9,7 @@ export const config = createConfig({
   chains: [chain],
   connectors: [
     injected(),
-    coinbaseWallet({ appName: 'Remy OS', preference: { telemetry: false } }),
+    coinbaseWallet({ appName: 'Remy OS', preference: { options: 'all', telemetry: false } }),
     walletConnect({
       projectId: WALLETCONNECT_PROJECT_ID,
       metadata: {
