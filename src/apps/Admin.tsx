@@ -512,7 +512,7 @@ function Collection({ snap }: { snap: Snapshot }) {
 
 function VaultLp({ snap }: { snap: Snapshot }) {
   const v = snap.vault
-  const outside = weiNum(v.fremyOutsideVault)
+  const supply = weiNum(v.fremySupply)
   return (
     <>
       <div className="adm-stats">
@@ -577,7 +577,7 @@ function VaultLp({ snap }: { snap: Snapshot }) {
             sort: (h) => labelOf(snap, h.address, h.label) ?? h.address,
           },
           { key: 'bal', label: 'fREMY', num: true, render: (h) => wei(h.balance, 4), sort: (h) => weiNum(h.balance) },
-          { key: 'share', label: 'Share outside vault', render: (h) => <Meter value={pct(weiNum(h.balance), outside)} />, sort: (h) => weiNum(h.balance) },
+          { key: 'share', label: 'Share of supply', render: (h) => <Meter value={pct(weiNum(h.balance), supply)} />, sort: (h) => weiNum(h.balance) },
         ]}
       />
     </>
