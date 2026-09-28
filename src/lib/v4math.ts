@@ -6,7 +6,6 @@
 
 export const Q96 = 1n << 96n
 export const Q128 = 1n << 128n
-const Q192 = 1n << 192n
 const MAX_UINT256 = (1n << 256n) - 1n
 export const MIN_TICK = -887272
 export const MAX_TICK = 887272
@@ -59,26 +58,14 @@ export function getTickAtSqrtPrice(sqrtPriceX96: bigint): number {
   return t
 }
 
-export const floorToSpacing = (tick: number, spacing: number) => Math.floor(tick / spacing) * spacing
-
-function isqrt(n: bigint): bigint {
-  if (n < 2n) return n
-  // Newton from a power-of-two upper bound decreases monotonically to floor(sqrt(n)).
-  let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2))
-  for (;;) {
-    const y = (x + n / x) >> 1n
-    if (y >= x) return x
-    x = y
-  }
-}
-
-/** Pool sqrt price for an ETH-per-fREMY price in wei (SeedPool.sqrtPriceX96For). */
-export const sqrtPriceForEthWei = (ethPerFremyWei: bigint) => isqrt(mulDiv(10n ** 18n, Q192, ethPerFremyWei))
-
-/** Tick on the spacing grid for an ETH-per-fREMY price, floored like SeedPool.ticksFor (ETH price rounds up). */
-export function tickForEthPrice(ethPerFremy: number, spacing: number): number {
-  const wei = BigInt(Math.round(ethPerFremy * 1e18))
-  return floorToSpacing(getTickAtSqrtPrice(sqrtPriceForEthWei(wei)), spacing)
+/**
+ * Nearest tick on the spacing grid for an ETH-per-fREMY price (ethPriceAtTick(t) = 1.0001^-t).
+ * Undefined for non-positive prices or prices beyond the pool's usable tick range.
+ */
+export function nearestTickForEthPrice(ethPerFremy: number, spacing: number): number | undefined {
+  if (!(ethPerFremy > 0) || !Number.isFinite(ethPerFremy)) return undefined
+  const tick = Math.round(-Math.log(ethPerFremy) / Math.log(1.0001) / spacing) * spacing
+  return Math.abs(tick) > Math.floor(MAX_TICK / spacing) * spacing ? undefined : tick
 }
 
 /** ETH per fREMY at a pool sqrt price. */

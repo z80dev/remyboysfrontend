@@ -17,10 +17,10 @@ import {
   ethPriceAtTick,
   getSqrtPriceAtTick,
   mulDivUp,
+  nearestTickForEthPrice,
   positionFor,
   rangeSide,
   simulateBuy,
-  tickForEthPrice,
 } from '../lib/v4math'
 import type { AppProps } from '../os/apps'
 import { Icon } from '../os/icons'
@@ -478,11 +478,15 @@ function OrderTicket({ pool, tx, navigate }: { pool: PoolData; tx: TxUi; navigat
 
 /* --- Market Maker tab ---------------------------------------------------------------------------------- */
 
+/** One grid step of the pool: ranges start and end on multiples of the tick spacing (1.0001^200 ≈ +2.02%). */
+const STEP = `${((1.0001 ** SPACING - 1) * 100).toFixed(2)}%`
+
+/** Range presets pinned to exact ticks; "curve" is the launch position's range (#3094976). */
 const PRESETS = [
-  { id: 'curve', name: 'Stack on the floor curve', min: 0.0015, max: 0.015, blurb: 'fREMY spread from the floor to 10×, alongside the launch position.' },
-  { id: 'near', name: 'Near the floor', min: 0.0015, max: 0.005, blurb: 'fREMY concentrated close to the floor: earns the most while the price stays low.' },
-  { id: 'bid', name: 'Floor bid', min: 0.001, max: 0.0015, blurb: 'ETH that buys fREMY back if the price dips under the floor.' },
-  { id: 'custom', name: 'Custom range', min: 0, max: 0, blurb: 'Your own min and max price.' },
+  { id: 'curve', name: 'Stack on the floor curve', label: '0.0015–0.015', tickLower: 41800, tickUpper: 65000, blurb: 'fREMY spread from the floor to 10×, alongside the launch position.' },
+  { id: 'near', name: 'Near the floor', label: '0.0015–0.005', tickLower: 52800, tickUpper: 65000, blurb: 'fREMY concentrated close to the floor: earns the most while the price stays low.' },
+  { id: 'bid', name: 'Floor bid', label: '0.001–0.0015', tickLower: 65000, tickUpper: 69000, blurb: 'ETH that buys fREMY back if the price dips under the floor.' },
+  { id: 'custom', name: 'Custom range', label: '', tickLower: 0, tickUpper: 0, blurb: `Your own min and max price, on ${STEP} steps.` },
 ] as const
 
 function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: () => void }) {
@@ -495,12 +499,29 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
   const { data: fremyBal } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'balanceOf', args: address ? [address] : undefined })
 
   const p = PRESETS.find((x) => x.id === preset) ?? PRESETS[0]
-  const min = preset === 'custom' ? Number(cMin) : p.min
-  const max = preset === 'custom' ? Number(cMax) : p.max
-  const valid = min > 0 && max > min
-  const tickLower = valid ? tickForEthPrice(max, SPACING) : 0
-  const tickUpper = valid ? tickForEthPrice(min, SPACING) : 0
-  const ok = valid && tickLower < tickUpper
+  // Custom prices snap to the nearest grid step; the min price sets the upper tick (ETH per fREMY = 1.0001^-tick).
+  const cUpper = nearestTickForEthPrice(Number(cMin), SPACING)
+  const cLower = nearestTickForEthPrice(Number(cMax), SPACING)
+  const rangeError =
+    preset !== 'custom'
+      ? undefined
+      : cUpper === undefined || cLower === undefined
+        ? 'Enter positive prices in ETH per fREMY.'
+        : Number(cMax) <= Number(cMin)
+          ? 'Max must be above min.'
+          : cLower >= cUpper
+            ? `Min and max round to the same ${STEP} step. Widen the range.`
+            : undefined
+  const ok = rangeError === undefined
+  const tickLower = preset === 'custom' ? (ok ? (cLower as number) : 0) : p.tickLower
+  const tickUpper = preset === 'custom' ? (ok ? (cUpper as number) : 0) : p.tickUpper
+  /** ▲ raises a price one grid step (one tick spacing down), ▼ lowers it. */
+  const nudge = (which: 'min' | 'max', up: boolean) => {
+    const current = nearestTickForEthPrice(Number(which === 'min' ? cMin : cMax), SPACING) ?? Math.round(pool.tick / SPACING) * SPACING
+    const next = String(Number(ethPriceAtTick(current + (up ? -SPACING : SPACING)).toPrecision(6)))
+    if (which === 'min') setCMin(next)
+    else setCMax(next)
+  }
   const side = ok ? rangeSide(pool.sqrtPriceX96, tickLower, tickUpper) : 'fremy'
   const input: 'eth' | 'fremy' = side === 'eth' ? 'eth' : 'fremy'
   const amount = parse(amt) ?? 0n
@@ -552,7 +573,7 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
               <label key={x.id} className={`preset${preset === x.id ? ' on' : ''}`}>
                 <input type="radio" name="preset" className="sr-only" checked={preset === x.id} onChange={() => setPreset(x.id)} />
                 <b>{x.name}</b>
-                <small>{x.id === 'custom' ? x.blurb : `${x.min}–${x.max} ETH · ${x.blurb}`}</small>
+                <small>{x.id === 'custom' ? x.blurb : `${x.label} ETH · ${x.blurb}`}</small>
               </label>
             ))}
           </fieldset>
@@ -566,6 +587,14 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
                 value={cMin}
                 onChange={(e) => setCMin(e.target.value.replace(/[^0-9.]/g, ''))}
               />
+              <span className="spin">
+                <button type="button" aria-label={`Raise min price one ${STEP} step`} onClick={() => nudge('min', true)}>
+                  ▲
+                </button>
+                <button type="button" aria-label={`Lower min price one ${STEP} step`} onClick={() => nudge('min', false)}>
+                  ▼
+                </button>
+              </span>
               <label htmlFor="mm-max">Max</label>
               <input
                 id="mm-max"
@@ -574,15 +603,24 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
                 value={cMax}
                 onChange={(e) => setCMax(e.target.value.replace(/[^0-9.]/g, ''))}
               />
+              <span className="spin">
+                <button type="button" aria-label={`Raise max price one ${STEP} step`} onClick={() => nudge('max', true)}>
+                  ▲
+                </button>
+                <button type="button" aria-label={`Lower max price one ${STEP} step`} onClick={() => nudge('max', false)}>
+                  ▼
+                </button>
+              </span>
             </div>
           )}
           {ok ? (
             <p className="mm-snap small">
-              Snaps to <b className="num">{px(ethPriceAtTick(tickUpper))}</b> – <b className="num">{px(ethPriceAtTick(tickLower))}</b> ETH (ticks {tickLower} to{' '}
+              {preset === 'custom' ? `Nearest ${STEP} steps: ` : 'Range: '}
+              <b className="num">{px(ethPriceAtTick(tickUpper))}</b> – <b className="num">{px(ethPriceAtTick(tickLower))}</b> ETH (ticks {tickLower} to{' '}
               {tickUpper}) · <span className={`side-badge ${side}`}>{sideLabel}</span>
             </p>
           ) : (
-            <p className="err small">Enter a max price above the min price.</p>
+            <p className="err small">{rangeError}</p>
           )}
         </Group>
         <Group title="2. Amount">

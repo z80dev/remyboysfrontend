@@ -4028,6 +4028,36 @@ button.thumb {
   margin-top: 4px;
 }
 
+/* XP up-down control beside a price field: two stacked arrow buttons. */
+.spin {
+  display: inline-flex;
+  flex-direction: column;
+  margin-left: -1px;
+}
+
+.spin button {
+  width: 17px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid var(--field-border);
+  background: linear-gradient(to bottom, #fff, #e8e7e0);
+  font-size: 7px;
+  line-height: 10px;
+  color: #333;
+}
+
+.spin button + button {
+  margin-top: -1px;
+}
+
+.spin button:hover {
+  background: linear-gradient(to bottom, #fff, #fbe7b8);
+}
+
+.spin button:active {
+  background: linear-gradient(to bottom, #e3e2da, #fff);
+}
+
 .side-badge {
   display: inline-block;
   padding: 0 6px;
