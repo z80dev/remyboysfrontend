@@ -61,7 +61,7 @@ function AmountRow({
             </button>
           </div>
           <span className="muted small">
-            → <b>{fmt(preview, 18, 6)}</b> fREMY
+            → <b>{fmt(preview ?? 0n, 18, 6)}</b> fREMY
           </span>
         </div>
         <button type="button" className="btn primary" disabled={disabled} onClick={onConvert}>
@@ -90,6 +90,7 @@ function LegacyInner({ converter }: { converter: Address }) {
       { address: ADDR.wRemy, abi: erc20Abi, functionName: 'balanceOf', args: [acct] },
       { address: converter, abi: converterAbi, functionName: 'maxRbRemyPerCall' },
       { address: converter, abi: converterAbi, functionName: 'paused' },
+      { address: converter, abi: converterAbi, functionName: 'maxStakedPerCall' },
     ],
     allowFailure: true,
   })
@@ -102,6 +103,7 @@ function LegacyInner({ converter }: { converter: Address }) {
   const wBal = val<bigint>(5)
   const maxRb = val<bigint>(6)
   const paused = val<boolean>(7)
+  const maxStaked = val<bigint>(8)
   const { data: fremyBal } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'balanceOf', args: [acct] })
 
   const rbAmt = parse(rb)
@@ -115,14 +117,6 @@ function LegacyInner({ converter }: { converter: Address }) {
     args: [lsAmt ?? 0n],
     query: { enabled: !!lsAmt },
   })
-  // Share → rbREMY rate, used to size chunks that stay under maxRbRemyPerCall.
-  const { data: rateAssets } = useReadContract({
-    address: ADDR.rbRemyLS,
-    abi: stakedAbi,
-    functionName: 'previewRedeem',
-    args: [ONE],
-  })
-
   const approve = (token: Address, amount: bigint): TxStep => ({
     label: 'Approve',
     request: async () => {
@@ -143,9 +137,8 @@ function LegacyInner({ converter }: { converter: Address }) {
   }
 
   const convertLs = async () => {
-    if (!lsAmt || !maxRb || !rateAssets) return
-    // shares whose redeemed assets stay ≤ maxRb (previewRedeem rounds down, so this is conservative)
-    const perChunk = (maxRb * ONE) / rateAssets - 1n
+    if (!lsAmt || !maxStaked) return
+    const perChunk = maxStaked
     const steps: TxStep[] = [approve(ADDR.rbRemyLS, lsAmt)]
     for (let left = lsAmt; left > 0n; ) {
       const c = left > perChunk ? perChunk : left
@@ -182,7 +175,7 @@ function LegacyInner({ converter }: { converter: Address }) {
             <b>1 wREMY</b> = <b>1 fREMY</b>
           </div>
           <div>
-            <b>rbREMYLS</b> → its rbREMY → fREMY
+            <b>rbREMYLS</b> → rbREMY → fREMY
           </div>
           <div className="muted small">
             fREMY is backed 1:1 by Remys in the new vault. Your balance: <b>{fmt(fremyBal, 18, 6)} fREMY</b>

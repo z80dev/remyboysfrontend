@@ -929,6 +929,9 @@ button.thumb:hover {
   flex-direction: column;
   gap: 2px;
 }
+.legacy-bal .badge {
+  align-self: flex-start;
+}
 .legacy-bal b {
   font-size: 18px;
   font-variant-numeric: tabular-nums;

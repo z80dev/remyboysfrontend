@@ -44,6 +44,7 @@ export const vaultAbi = parseAbi([
   'function deposit(uint256[] ids, address recipient)',
   'function redeem(uint256[] ids, address recipient)',
   'function inventory(uint256) view returns (bool)',
+  'function blocked(uint256) view returns (bool)',
   'function inventoryCount() view returns (uint256)',
   'function reserve() view returns (uint256)',
   'function floor() view returns (address)',
@@ -62,6 +63,7 @@ export const converterAbi = parseAbi([
   'function previewRbRemy(uint256 amount) view returns (uint256)',
   'function previewStaked(uint256 shares) view returns (uint256)',
   'function maxRbRemyPerCall() view returns (uint256)',
+  'function maxStakedPerCall() view returns (uint256)',
   'function paused() view returns (bool)',
   'error BatchTooLarge()',
 ])
