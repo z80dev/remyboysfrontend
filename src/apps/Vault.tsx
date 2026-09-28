@@ -7,19 +7,20 @@ import { ADDR, NEW } from '../config'
 import { useArtIndexes } from '../lib/art'
 import { deadline, fmt } from '../lib/format'
 import { useOwnedIds } from '../lib/owned'
-import { usePoolKey, useQuote, useSpotPrice } from '../lib/pool'
+import { usePoolState } from '../lib/launch'
+import { useQuote } from '../lib/pool'
 import type { TxStep } from '../lib/tx'
 import type { AppProps } from '../os/apps'
 import { Icon } from '../os/icons'
 import { useIsMobile } from '../os/shell'
 import { useTxUi } from '../os/system'
-import { AddressBar, ComingSoon, ConnectPrompt, Loading, StatusBar, TaskBox, TaskLink, TaskPane, Thumb } from '../os/ui'
+import { AddressBar, ConnectPrompt, Loading, StatusBar, TaskBox, TaskLink, TaskPane, Thumb } from '../os/ui'
 import { config } from '../wagmi'
 
 const ONE = 10n ** 18n
 const PAGE = 60
 
-type Deployed = { vault: Address; fremy: Address; router?: Address }
+type Deployed = { vault: Address; fremy: Address; router: Address }
 
 function Grid({
   ids,
@@ -27,16 +28,10 @@ function Grid({
   toggle,
   loading,
   empty,
-}: { ids: bigint[]; selected: Set<bigint>; toggle: (id: bigint) => void; loading: boolean; empty: string }) {
+}: { ids: bigint[]; selected: Set<bigint>; toggle: (id: bigint) => void; loading: boolean; empty: React.ReactNode }) {
   const { map } = useArtIndexes(ids)
   if (loading) return <Loading>Loading Remys…</Loading>
-  if (!ids.length)
-    return (
-      <div className="empty-folder">
-        <Icon name="folder" size={48} />
-        <p>{empty}</p>
-      </div>
-    )
+  if (!ids.length) return <>{empty}</>
   return (
     <div className="thumbs">
       {ids.map((id) => (
@@ -89,10 +84,9 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
   const inv = useOwnedIds(vault, page, PAGE)
   const mine = useOwnedIds(tab === 'sell' ? address : undefined, myPage, PAGE)
 
-  const key = usePoolKey(router)
-  const spot = useSpotPrice(key)
+  const pool = usePoolState()
   const n = BigInt(selected.size)
-  const quote = useQuote(key, tab, n * ONE)
+  const quote = useQuote(pool.live ? pool.key : undefined, tab, n * ONE)
   const quoted = quote.data?.[0]
 
   const toggle = (id: bigint) =>
@@ -117,7 +111,7 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
   })
 
   const buy = async () => {
-    if (!router || !quoted) return
+    if (!quoted) return
     const value = (quoted * 102n) / 100n // 2% slippage headroom; the router refunds unused ETH
     done(
       await tx.run([
@@ -147,7 +141,7 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
     )
   }
   const sell = async () => {
-    if (!router || !quoted) return
+    if (!quoted) return
     const minOut = (quoted * 98n) / 100n
     done(
       await tx.run([
@@ -176,8 +170,10 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
       ? tab === 'buy'
         ? 'Pick Remys from the vault.'
         : 'Pick Remys to sell or deposit.'
-      : !router
-        ? 'Pool opens soon.'
+      : !pool.live
+        ? pool.loading
+          ? 'Checking the pool…'
+          : 'Pool opening soon. Buying and selling with ETH opens then.'
         : quote.isLoading
           ? 'Quoting…'
           : quoted
@@ -186,6 +182,34 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
               : `≈ ${fmt(quoted, 18, 5)} ETH out`
             : 'No pool liquidity for this size.'
   const nSel = selected.size
+  const price = pool.live && pool.spot ? `${pool.spot.toPrecision(3)} ETH` : pool.loading ? '…' : 'Pool opening soon'
+  const emptyVault = (
+    <div className="empty-folder">
+      <Icon name="vault" size={48} />
+      <b>This folder is empty</b>
+      <p className="muted">
+        No Remys are in the vault yet. Deposit a Remy to receive 1 fREMY, or convert legacy tokens. Anything deposited shows up here for everyone to buy or
+        redeem.
+      </p>
+      <div className="row center">
+        <button type="button" className="btn" onClick={() => setTab('sell')}>
+          <Icon name="gallery" size={16} />
+          Deposit from My Remys
+        </button>
+        <button type="button" className="btn" onClick={() => navigate('legacy')}>
+          <Icon name="exchange" size={16} />
+          Legacy Exchange
+        </button>
+      </div>
+    </div>
+  )
+  const emptyWallet = (
+    <div className="empty-folder">
+      <Icon name="folder" size={48} />
+      <b>This folder is empty</b>
+      <p className="muted">No Remys in this wallet.</p>
+    </div>
+  )
   const plural = nSel === 1 ? 'Remy' : 'Remys'
   const actions =
     tab === 'buy'
@@ -238,7 +262,7 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
         <div className="stat-strip">
           <span>
             <small>Floor</small>
-            <b>{spot ? `${spot.toPrecision(3)} ETH` : router ? '—' : 'soon'}</b>
+            <b>{pool.live || pool.loading ? price : 'Opening soon'}</b>
           </span>
           <span>
             <small>In vault</small>
@@ -284,7 +308,7 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
             <TaskBox title="Details">
               <dl className="kv tight">
                 <dt>Floor price</dt>
-                <dd>{spot ? `${spot.toPrecision(3)} ETH` : router ? '—' : 'pool soon'}</dd>
+                <dd>{price}</dd>
                 <dt>In vault</dt>
                 <dd>{invCount?.toString() ?? '…'}</dd>
                 <dt>Your fREMY</dt>
@@ -298,9 +322,9 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
         )}
         <main className="split-main scroll ex-view">
           {tab === 'buy' ? (
-            <Grid ids={inv.ids} selected={selected} toggle={toggle} loading={inv.loading} empty="The vault is empty right now." />
+            <Grid ids={inv.ids} selected={selected} toggle={toggle} loading={inv.loading} empty={emptyVault} />
           ) : address ? (
-            <Grid ids={mine.ids} selected={selected} toggle={toggle} loading={mine.loading} empty="No Remys in this wallet." />
+            <Grid ids={mine.ids} selected={selected} toggle={toggle} loading={mine.loading} empty={emptyWallet} />
           ) : (
             <ConnectPrompt why="Connect to sell or deposit your Remys." />
           )}
@@ -335,13 +359,6 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
 
 export function Vault({ navigate }: AppProps) {
   const { address } = useAccount()
-  if (!NEW.vault || !NEW.fremy)
-    return (
-      <ComingSoon title="The new Remy Vault is under construction" app="Remy Vault">
-        Every Remy in the vault is backed by exactly one fREMY. Deposit a Remy to get 1 fREMY, redeem 1 fREMY for any Remy, or buy straight from the vault with
-        ETH.
-      </ComingSoon>
-    )
   return (
     <div className="app-col explorer">
       <VaultInner key={address} vault={NEW.vault} fremy={NEW.fremy} router={NEW.router} navigate={navigate} />

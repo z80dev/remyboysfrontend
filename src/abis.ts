@@ -27,8 +27,14 @@ export const erc20Abi = parseAbi([
   'function balanceOf(address) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)',
   'function totalSupply() view returns (uint256)',
 ])
+
+/** Legacy vault (Vyper): only the owner matters here. */
+export const legacyVaultAbi = parseAbi(['function owner() view returns (address)'])
+
+export const migratorRouterAbi = parseAbi(['function owner() view returns (address)', 'function transfer_vault_ownership(address new_owner)'])
 
 export const stakedAbi = parseAbi([
   'function balanceOf(address) view returns (uint256)',

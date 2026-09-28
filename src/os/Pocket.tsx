@@ -3,8 +3,8 @@ import { useAccount, useReadContract } from 'wagmi'
 import { vaultAbi } from '../abis'
 import { LINKS, NEW } from '../config'
 import { shortAddr } from '../lib/format'
-import { usePoolKey, useSpotPrice } from '../lib/pool'
-import { APPS, appById } from './apps'
+import { usePoolState } from '../lib/launch'
+import { appById, useVisibleApps } from './apps'
 import { BalloonHost } from './Balloons'
 import { FlagMark, Icon } from './icons'
 import { UserPicture } from './StartMenu'
@@ -33,6 +33,7 @@ export function Pocket({ active, open, onLaunch, onClose, onToday, onLogOff, chi
   const startRef = useOutside<HTMLDivElement>(start, closeStart)
   const walletRef = useOutside<HTMLDivElement>(wallet, closeWallet)
   const { address } = useAccount()
+  const apps = useVisibleApps()
   const now = useClock()
   const app = active ? appById(active) : undefined
 
@@ -62,7 +63,7 @@ export function Pocket({ active, open, onLaunch, onClose, onToday, onLogOff, chi
                 Today
               </button>
               <hr />
-              {APPS.filter((a) => !a.hidden).map((a) => (
+              {apps.map((a) => (
                 <button
                   type="button"
                   role="menuitem"
@@ -168,10 +169,11 @@ function TodayRow({ icon, title, text, tone, onClick }: { icon: string; title: s
 /** Pocket PC "Today" screen: date, owner, live status plug-ins and the program list. */
 function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWallet: () => void }) {
   const { address } = useAccount()
+  const apps = useVisibleApps()
   const sec = useSecurityState()
   const now = useClock()
-  const { data: inv } = useReadContract({ address: NEW.vault, abi: vaultAbi, functionName: 'inventoryCount', query: { enabled: !!NEW.vault } })
-  const spot = useSpotPrice(usePoolKey(NEW.router))
+  const { data: inv } = useReadContract({ address: NEW.vault, abi: vaultAbi, functionName: 'inventoryCount' })
+  const pool = usePoolState()
 
   const recovery = !address
     ? { tone: undefined, text: 'Connect to check for stolen Remys' }
@@ -214,13 +216,13 @@ function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWalle
         <TodayRow
           icon="vault"
           title="Remy Vault"
-          text={NEW.vault ? `${inv?.toString() ?? '…'} Remys in the vault${spot ? ` · floor ${spot.toPrecision(3)} ETH` : ''}` : 'Opening soon'}
+          text={`${inv?.toString() ?? '…'} Remys in the vault · ${pool.live && pool.spot ? `floor ${pool.spot.toPrecision(3)} ETH` : 'pool opening soon'}`}
           onClick={() => onLaunch('vault')}
         />
       </div>
       <h2 className="today-h">Programs</h2>
       <div className="today-apps">
-        {APPS.filter((a) => !a.hidden).map((a) => (
+        {apps.map((a) => (
           <button type="button" key={a.id} className="today-app" onClick={() => onLaunch(a.id)}>
             <Icon name={a.icon} size={40} />
             <span>{a.short}</span>

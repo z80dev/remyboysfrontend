@@ -2636,6 +2636,20 @@ button.thumb {
   text-align: center;
 }
 
+.empty-folder b {
+  font: bold 14px var(--font-title);
+  color: #003399;
+}
+
+.empty-folder p {
+  max-width: 380px;
+}
+
+.empty-folder .row {
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
 .connect-prompt {
   width: min(440px, 100%);
   margin: 24px auto;
@@ -2728,78 +2742,6 @@ button.thumb {
 
 .lv-act .btn {
   min-width: 70px;
-}
-
-/* Setup wizard shown while contracts are not configured. */
-.setup {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.setup-side {
-  position: relative;
-  flex: none;
-  width: 170px;
-  overflow: hidden;
-  background: linear-gradient(to bottom, #0b2f8c 0%, #2a62d8 60%, #5d93ee 100%);
-}
-
-.setup-side img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 30%;
-}
-
-.setup-tape {
-  position: absolute;
-  left: -30px;
-  right: -30px;
-  top: 68%;
-  padding: 4px 0;
-  transform: rotate(-12deg);
-  background: repeating-linear-gradient(-45deg, #ffcf2e 0 14px, #1b1b1b 14px 28px);
-  color: #fff;
-  font: bold 12px var(--font-title);
-  letter-spacing: 1px;
-  text-align: center;
-  text-transform: uppercase;
-  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.setup-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 26px 24px;
-  background: #fff;
-}
-
-.setup-main h2 {
-  font: bold 18px var(--font-title);
-  color: #003399;
-}
-
-.setup-main p {
-  max-width: 440px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.setup-progress {
-  display: grid;
-  gap: 6px;
-  max-width: 360px;
-  margin-top: 26px;
-}
-
-.setup-progress .progress {
-  width: 100%;
-  height: 18px;
 }
 
 /* --- Welcome ----------------------------------------------------------------- */
@@ -3122,6 +3064,181 @@ button.thumb {
   align-items: center;
   gap: 4px;
   color: #333;
+}
+
+.lx-closed {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #a4bdea;
+  border-radius: 3px;
+  background: #f4f8ff;
+  color: #0b3a91;
+}
+
+/* --- Launch Control ------------------------------------------------------ */
+
+.lc-meter {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  height: 14px;
+  padding: 1px;
+  border: 1px solid #686868;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.lc-meter i {
+  border-radius: 1px;
+  background: #eef0f4;
+}
+
+.lc-meter i.on {
+  background: linear-gradient(to bottom, #b6f0b7 0%, #6fe172 25%, #2ed330 50%, #52dc55 75%, #aaeeac 100%);
+}
+
+.lc-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc-step {
+  display: grid;
+  grid-template-columns: 26px 32px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c6d3f7;
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #fbfcff, #eef3fd);
+}
+
+.lc-step.ok {
+  border-color: #b5dca3;
+  background: linear-gradient(to bottom, #fbfefa, #eef9e8);
+}
+
+.lc-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #c9d8f8 100%);
+  box-shadow: 0 0 0 1px #7f9fd8;
+  color: #0b3a91;
+  font: bold 12px var(--font-title);
+}
+
+.lc-step.ok .lc-num {
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #dff3d4 100%);
+  box-shadow: 0 0 0 1px #5aa845;
+}
+
+.lc-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lc-text b {
+  font: bold 13px var(--font-title);
+  color: #003399;
+}
+
+.lc-step.ok .lc-text b {
+  color: #1d5e0b;
+}
+
+.lc-text p {
+  color: #333;
+}
+
+.lc-amount {
+  margin-top: 2px;
+  padding: 3px 6px;
+  border: 1px solid #c6d3f7;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.lc-amount svg {
+  vertical-align: -3px;
+  margin-right: 4px;
+}
+
+.lc-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #7a5200;
+}
+
+.lc-state i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #e6a800 70%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.lc-state.ok {
+  color: var(--ok);
+}
+
+.lc-state.ok i {
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #3aa31d 70%);
+}
+
+.lc-state.pending {
+  color: #555;
+}
+
+.lc-state.pending i {
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #999 70%);
+}
+
+.lc-act {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  max-width: 150px;
+  text-align: right;
+}
+
+.lc-act small {
+  color: #555;
+  font-size: 11px;
+}
+
+.lc-done {
+  color: var(--ok);
+  font-weight: bold;
+}
+
+.pocket .lc-step {
+  grid-template-columns: 26px 1fr;
+}
+
+.pocket .lc-step > svg {
+  display: none;
+}
+
+.pocket .lc-act {
+  grid-column: 2;
+  justify-items: stretch;
+  max-width: none;
+  text-align: left;
 }
 
 /* --- Picture viewer (Gallery) ------------------------------------------------ */
@@ -3993,23 +4110,6 @@ button.thumb {
 
 .pocket .go-btn {
   height: 34px;
-}
-
-.pocket .setup {
-  flex-direction: column;
-}
-
-.pocket .setup-side {
-  width: auto;
-  height: 180px;
-}
-
-.pocket .setup-tape {
-  top: 44%;
-}
-
-.pocket .setup-main {
-  padding: 18px 16px;
 }
 
 .pocket .connect-prompt {

@@ -3,7 +3,7 @@ import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
 import { LINKS } from '../config'
 import { shortAddr } from '../lib/format'
-import { APPS } from './apps'
+import { useVisibleApps } from './apps'
 import { FlagMark, Icon } from './icons'
 import { useWalletRemy } from './system'
 
@@ -33,7 +33,7 @@ export function StartMenu({ onLaunch, onLogOff, onTurnOff }: Props) {
   const { address } = useAccount()
   const { id: firstId } = useWalletRemy(address)
   const [all, setAll] = useState(false)
-  const visible = APPS.filter((a) => !a.hidden)
+  const visible = useVisibleApps()
   const pinned = visible.filter((a) => PINNED.includes(a.id))
   const rest = visible.filter((a) => !PINNED.includes(a.id))
 

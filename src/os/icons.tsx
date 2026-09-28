@@ -502,6 +502,25 @@ const icons: Record<string, ReactNode> = {
       <path d="M8 27h16" stroke="#3d4550" strokeWidth="1.8" strokeLinecap="round" />
     </>
   ),
+  /* Clipboard checklist: Launch Control. */
+  launch: (
+    <>
+      <Shadow />
+      <rect x="5" y="4.6" width="22" height="24.4" rx="2" fill="url(#xi-wood)" stroke="#8a5a24" strokeWidth=".9" />
+      <rect x="7.6" y="7.6" width="16.8" height="19" fill="url(#xi-paper)" stroke="#9aa3b3" strokeWidth=".6" />
+      <rect x="11" y="2.6" width="10" height="4.6" rx="1.2" fill="url(#xi-steel)" stroke="#59626d" strokeWidth=".8" />
+      <path
+        d="m9.6 12.2 1.6 1.6 2.8-3.2M9.6 17.4l1.6 1.6 2.8-3.2"
+        fill="none"
+        stroke="#2b8a1c"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="9.8" y="21" width="3.6" height="3.4" fill="#fff" stroke="#8c96a8" strokeWidth=".7" />
+      <path d="M15.6 12.4h6.8M15.6 17.6h6.8M15.6 22.8h6.8" stroke="#8c96a8" strokeWidth="1.1" />
+    </>
+  ),
   check: <path d="m6 17 6.6 6.6L26.4 9" fill="none" stroke="#2b8a1c" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />,
   help: (
     <>

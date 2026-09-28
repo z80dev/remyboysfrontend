@@ -91,27 +91,6 @@ export function RequireWallet({ why, title, children }: { why: string; title?: s
   return address ? <>{children}</> : <ConnectPrompt why={why} title={title} />
 }
 
-/** "Setup is installing…" page shown while a contract address is not configured yet. */
-export function ComingSoon({ title, app, children }: { title: string; app: string; children: ReactNode }) {
-  return (
-    <div className="setup">
-      <aside className="setup-side">
-        <img src="/images/Character1337.webp" alt="" />
-        <span className="setup-tape">Under construction</span>
-      </aside>
-      <div className="setup-main">
-        <h2>{title}</h2>
-        <p>{children}</p>
-        <div className="setup-progress">
-          <span className="small">Setup is installing {app}…</span>
-          <Progress />
-          <span className="muted small">Estimated time remaining: coming soon</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /** Explorer thumbnail tile. */
 export function Thumb({
   index,

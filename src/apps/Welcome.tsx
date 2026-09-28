@@ -27,7 +27,6 @@ export function Welcome({ navigate }: AppProps) {
     address: NEW.vault,
     abi: vaultAbi,
     functionName: 'inventoryCount',
-    query: { enabled: !!NEW.vault },
   })
 
   return (
@@ -51,7 +50,7 @@ export function Welcome({ navigate }: AppProps) {
             <dt>Tokens minted</dt>
             <dd>{supply !== undefined ? supply.toLocaleString() : '…'}</dd>
             <dt>In the vault</dt>
-            <dd>{NEW.vault ? (inv !== undefined ? inv.toString() : '…') : 'soon'}</dd>
+            <dd>{inv !== undefined ? inv.toString() : '…'}</dd>
             <dt>Network</dt>
             <dd>Base</dd>
           </dl>

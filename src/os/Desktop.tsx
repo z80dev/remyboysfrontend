@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, type MouseEvent, useCallback, useEffect, useState } from 'react'
 import { TOTAL_SUPPLY_HINT } from '../config'
-import { APPS } from './apps'
+import { useVisibleApps } from './apps'
 import { FLAG_COLORS, Icon } from './icons'
 import { type Wallpaper as WallpaperPref, setPrefs, useShell } from './shell'
 import { useOutside } from './Taskbar'
@@ -78,6 +78,7 @@ export function Wallpaper() {
 }
 
 export function DesktopIcons({ open }: { open: (id: string) => void }) {
+  const apps = useVisibleApps()
   const [sel, setSel] = useState<string>()
   useEffect(() => {
     const clear = (e: PointerEvent) => !(e.target as HTMLElement).closest('.desk-icon') && setSel(undefined)
@@ -86,7 +87,7 @@ export function DesktopIcons({ open }: { open: (id: string) => void }) {
   }, [])
   return (
     <nav className="desktop-icons" aria-label="Desktop">
-      {APPS.filter((a) => !a.hidden).map((a) => (
+      {apps.map((a) => (
         <button
           type="button"
           key={a.id}

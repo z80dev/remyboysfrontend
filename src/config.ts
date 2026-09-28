@@ -2,8 +2,9 @@ import { type Address, getAddress, isAddress } from 'viem'
 
 const env = import.meta.env
 
-function optionalAddress(value: string | undefined): Address | undefined {
-  return value && isAddress(value) ? getAddress(value) : undefined
+/** A `VITE_*` override (e.g. a fork deployment) or the Base mainnet default. */
+function addressOr(value: string | undefined, fallback: string): Address {
+  return getAddress(value && isAddress(value) ? value : fallback)
 }
 
 /** RPC used for reads. Point at a local anvil fork with VITE_RPC_URL=http://127.0.0.1:8552. */
@@ -21,6 +22,8 @@ export const ADDR = {
   openseaConduit: getAddress('0x1E0049783F008A0085193E00003D00cd54003c71'),
   seaport16: getAddress('0x0000000000000068F116a894984e2DB1123eB395'),
   legacyVault: getAddress('0x2eB990A5f9aDeA7BCaF09fde6261469aD906635C'),
+  /** Owns the legacy vault until the handover; `transfer_vault_ownership` hands it to the converter. */
+  migratorRouter: getAddress('0x0A3DeCD55E9dbD9A5a0Ed57c9415F837544790a1'),
   rbRemy: getAddress('0x765D0443eD57eB0C89953c3EBF54885189A4aEF2'),
   rbRemyLS: getAddress('0x9C6661C87A10e712B0A817184230FcA4258CCC15'),
   wRemy: getAddress('0xed56735245fb156d94e254A061d9E65fD4a5230B'),
@@ -28,12 +31,22 @@ export const ADDR = {
   v4Quoter: getAddress('0x0d5e0F971ED27FBfF6c2837bf31316121532048D'),
 } as const
 
-/** New contracts; undefined until deployed (windows depending on them render a "coming soon" state). */
+/** Vault stack, live on Base (remy-boys-recovery `deployments/8453.json`). `VITE_*` overrides point at a fork deployment. */
 export const NEW = {
-  fremy: optionalAddress(env.VITE_FREMY),
-  vault: optionalAddress(env.VITE_NFT_VAULT),
-  converter: optionalAddress(env.VITE_CONVERTER),
-  router: optionalAddress(env.VITE_ROUTER),
+  fremy: addressOr(env.VITE_FREMY, '0x66e66f9772c9ea0B38B7Cd52820Af42CCbb31721'),
+  vault: addressOr(env.VITE_NFT_VAULT, '0xd91368768eA898c9BC09d85b13C0924B59405D1C'),
+  converter: addressOr(env.VITE_CONVERTER, '0x12D22fb38a4D5B7Dd7b3B951f5342e943744E9fB'),
+  router: addressOr(env.VITE_ROUTER, '0x957CA7472ced1C1B3608152F83E0E69F975a37a9'),
+  /** Vault deployer; seeds the fREMY/ETH pool from the owner's rbREMY. */
+  deployer: addressOr(env.VITE_DEPLOYER, '0x97a90100d77D05E309cdeB7e2AaF91F0EF8CA5ac'),
+} as const
+
+/** Wallets that see Launch Control, and which launch steps each can sign. */
+export const TEAM = {
+  /** Remy Boys owner: enables claims, sends rbREMY for pool seeding, owns the converter. */
+  owner: getAddress('0xe23FA24551d36CFfd2859a50e5110beFA411E7C6'),
+  /** MigratorRouter owner: hands the legacy vault to the converter. */
+  migrator: getAddress('0x70f4b83795Af9236dA8211CDa3b031E503C00970'),
 } as const
 
 export const RECLAIM_BATCH = 50

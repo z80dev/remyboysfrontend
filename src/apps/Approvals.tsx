@@ -17,8 +17,8 @@ const KNOWN: Op[] = [
   { label: 'Seaport 1.6', address: ADDR.seaport16, note: 'Seaport direct' },
   { label: 'Legacy vault (rbREMY)', address: ADDR.legacyVault, note: 'Old vault, now closed' },
   { label: 'wREMY', address: ADDR.wRemy, note: 'Old wrapper' },
-  ...(NEW.router ? [{ label: 'RemyRouter', address: NEW.router, note: 'Sell Remys for ETH' }] : []),
-  ...(NEW.vault ? [{ label: 'Remy Vault', address: NEW.vault, note: 'Deposit Remys for fREMY' }] : []),
+  { label: 'RemyRouter', address: NEW.router, note: 'Sell Remys for ETH' },
+  { label: 'Remy Vault', address: NEW.vault, note: 'Deposit Remys for fREMY' },
 ]
 
 function ApprovalsInner() {

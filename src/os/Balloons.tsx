@@ -75,9 +75,28 @@ export function MessageBoxHost() {
             <p>{box.text}</p>
           </div>
           <div className="row center">
-            <button type="button" ref={ok} className="btn default" onClick={() => closeMessageBox(box.id)}>
-              OK
-            </button>
+            {box.onConfirm ? (
+              <>
+                <button
+                  type="button"
+                  ref={ok}
+                  className="btn default"
+                  onClick={() => {
+                    closeMessageBox(box.id)
+                    box.onConfirm?.()
+                  }}
+                >
+                  Yes
+                </button>
+                <button type="button" className="btn" onClick={() => closeMessageBox(box.id)}>
+                  No
+                </button>
+              </>
+            ) : (
+              <button type="button" ref={ok} className="btn default" onClick={() => closeMessageBox(box.id)}>
+                OK
+              </button>
+            )}
           </div>
         </div>
       </section>

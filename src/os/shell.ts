@@ -7,7 +7,8 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
  */
 
 export type Balloon = { key: string; title: string; text: string; icon: string; app?: string; href?: string }
-export type MessageBox = { id: number; title: string; text: string; icon: 'error' | 'warning' | 'info' | 'question' }
+/** XP message box. With `onConfirm` it becomes a Yes/No question and runs the callback on Yes. */
+export type MessageBox = { id: number; title: string; text: string; icon: 'error' | 'warning' | 'info' | 'question'; onConfirm?: () => void }
 
 export type Wallpaper = { kind: 'bliss' } | { kind: 'solid' } | { kind: 'remy'; art: number; fit: 'stretch' | 'center' | 'tile' }
 export type Theme = 'blue' | 'olive' | 'silver'
