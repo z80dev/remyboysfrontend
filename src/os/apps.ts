@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { type Address, isAddressEqual } from 'viem'
+import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
 import { Approvals } from '../apps/Approvals'
 import { DisplayProperties } from '../apps/DisplayProperties'
@@ -10,7 +10,7 @@ import { Paint } from '../apps/Paint'
 import { Recovery } from '../apps/Recovery'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
-import { TEAM } from '../config'
+import { teamRole } from '../lib/launch'
 
 export type AppProps = { param?: string; navigate: (hash: string) => void; close: () => void }
 
@@ -89,7 +89,7 @@ export const APPS: AppDef[] = [
 
 export const appById = (id: string) => APPS.find((a) => a.id === id)
 
-export const isTeam = (address?: Address) => !!address && (isAddressEqual(address, TEAM.owner) || isAddressEqual(address, TEAM.migrator))
+export const isTeam = (address?: Address) => teamRole(address) !== undefined
 
 /** Apps listed on the desktop, Start menu and Today screen for the connected wallet. */
 export function useVisibleApps() {

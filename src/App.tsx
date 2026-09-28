@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
-import { appById } from './os/apps'
+import { appById, isTeam } from './os/apps'
 import { MessageBoxHost } from './os/Balloons'
 import { DesktopIcons, Wallpaper, useDesktopMenu } from './os/Desktop'
 import { IconDefs } from './os/icons'
 import { Pocket } from './os/Pocket'
 import { Session, type SessionStage, TurnOffDialog } from './os/Session'
 import { MobileContext, useShell } from './os/shell'
-import { useSecurityBalloons } from './os/system'
+import { TeamPrompt, useSecurityBalloons } from './os/system'
 import { Taskbar } from './os/Taskbar'
 import { TASKBAR_H, Window, type WinGeom } from './os/Window'
 
@@ -197,6 +197,7 @@ export default function App() {
           }}
         />
       )}
+      {session === null && isTeam(address) && <TeamPrompt navigate={navigate} />}
       <MessageBoxHost />
       {session && <Session key={session} stage={session} onDone={endSession} />}
     </MobileContext.Provider>

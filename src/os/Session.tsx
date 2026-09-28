@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAccount, useConnect } from 'wagmi'
 import { shortAddr } from '../lib/format'
+import { teamRole } from '../lib/launch'
 import { FlagMark, Icon, RemyFlag } from './icons'
 import { connectorLabel } from './shell'
 import { GUEST_ART, UserPicture } from './StartMenu'
@@ -105,6 +106,11 @@ function Users({ onLogOn }: { onLogOn: () => void }) {
   const [picking, setPicking] = useState(false)
   const first = useRef<HTMLButtonElement>(null)
   useEffect(() => first.current?.focus(), [])
+  // Continue as soon as a wallet chosen here connects. Mutation callbacks alone are not reliable across wallets.
+  useEffect(() => {
+    if (picking && address) onLogOn()
+  }, [picking, address, onLogOn])
+  const role = teamRole(address)
 
   return (
     <div className="logon-users">
@@ -113,7 +119,7 @@ function Users({ onLogOn }: { onLogOn: () => void }) {
           <UserPicture address={address} size={64} />
           <span>
             <b>{shortAddr(address)}</b>
-            <small>{count ? `${count} Remy${count === 1 ? '' : 's'}` : 'Wallet connected'}</small>
+            <small>{role ?? (count ? `${count} Remy${count === 1 ? '' : 's'}` : 'Wallet connected')}</small>
           </span>
         </button>
       )}
@@ -137,7 +143,7 @@ function Users({ onLogOn }: { onLogOn: () => void }) {
                   key={c.uid}
                   className="logon-connector"
                   disabled={isPending}
-                  onClick={() => connect({ connector: c }, { onSuccess: onLogOn })}
+                  onClick={() => connect({ connector: c })}
                 >
                   <span>{connectorLabel(c.name)}</span>
                   <Icon name="go" size={22} />

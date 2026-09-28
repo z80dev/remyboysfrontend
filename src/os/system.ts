@@ -4,6 +4,8 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { reclaimAbi, remyAbi } from '../abis'
 import { ADDR } from '../config'
 import { useArtIndexes } from '../lib/art'
+import { shortAddr } from '../lib/format'
+import { pendingSignatures, teamRole, useLaunchState } from '../lib/launch'
 import { useOwnedIds } from '../lib/owned'
 import { type TxStatus, type TxStep, useTx } from '../lib/tx'
 import { chain } from '../wagmi'
@@ -82,6 +84,32 @@ export function useSecurityBalloons(enabled: boolean) {
         text: 'Your wallet is not on Base. Remy OS will ask to switch before any transaction.',
       })
   }, [address, chainId, enabled])
+}
+
+/**
+ * Asks a team wallet, right after it connects, to open Launch Control when steps are waiting on its signature.
+ * Once per wallet per session. Mount only for team wallets so other visitors skip the launch reads.
+ */
+export function TeamPrompt({ navigate }: { navigate: (hash: string) => void }) {
+  const { address } = useAccount()
+  const launch = useLaunchState()
+  const summary = address ? pendingSignatures(address, launch)?.join('\n') : undefined
+  useEffect(() => {
+    if (!address || !summary) return
+    const key = `remyxp.teamPrompt.${address}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    const steps = summary.split('\n')
+    const role = teamRole(address)?.toLowerCase() ?? 'a team wallet'
+    const need = steps.length === 1 ? 'One launch step needs' : `${steps.length} launch steps need`
+    messageBox({
+      title: 'Launch Control',
+      icon: 'question',
+      text: `Signed in as the ${role} (${shortAddr(address)}). ${need} your signature: ${steps.join('; ')}. Open Launch Control now?`,
+      onConfirm: () => navigate('launch'),
+    })
+  }, [address, summary, navigate])
+  return null
 }
 
 /**

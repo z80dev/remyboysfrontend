@@ -5,7 +5,7 @@ import { readContract } from 'wagmi/actions'
 import { erc20Abi, migratorRouterAbi, remyAbi } from '../abis'
 import { ADDR, EXPLORER, NEW, TEAM } from '../config'
 import { fmt, shortAddr } from '../lib/format'
-import { useLaunchState } from '../lib/launch'
+import { seedFundsSent, useLaunchState } from '../lib/launch'
 import type { TxStep } from '../lib/tx'
 import { type AppProps, isTeam } from '../os/apps'
 import { Icon } from '../os/icons'
@@ -70,7 +70,9 @@ export function LaunchControl({ navigate }: AppProps) {
   const { address } = useAccount()
   const mobile = useIsMobile()
   const tx = useTxUi()
-  const { legacy, pool, claimsEnabled, ownerRb } = useLaunchState()
+  const launch = useLaunchState()
+  const { legacy, pool, claimsEnabled, ownerRb } = launch
+  const sent = seedFundsSent(launch)
 
   const steps: Step[] = [
     {
@@ -112,8 +114,8 @@ export function LaunchControl({ navigate }: AppProps) {
       icon: 'exchange',
       title: 'Send rbREMY to the deployer for pool seeding',
       plain: `Sends the owner's whole rbREMY balance to the deployer (${shortAddr(NEW.deployer)}), who converts it to fREMY and supplies it to the fREMY/ETH pool.`,
-      done: ownerRb === undefined && !pool.live ? undefined : ownerRb === 0n || pool.live,
-      state: ownerRb === undefined ? 'Checking…' : ownerRb === 0n || pool.live ? 'Sent' : `Owner holds ${fmt(ownerRb, 18, 2)} rbREMY`,
+      done: sent,
+      state: sent === undefined ? 'Checking…' : sent ? 'Sent' : `Owner holds ${fmt(ownerRb ?? 0n, 18, 2)} rbREMY`,
       detail:
         ownerRb !== undefined && ownerRb > 0n ? (
           <p className="lc-amount">
