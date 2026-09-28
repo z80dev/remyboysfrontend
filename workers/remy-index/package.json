@@ -1,0 +1,22 @@
+{
+  "name": "remy-index",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-snapshot": "bun scripts/build-snapshot.ts",
+    "seed": "bun scripts/build-snapshot.ts --fresh --out /dev/null && wrangler kv key put state --path .state/state.json --binding INDEX --remote && wrangler kv key put snapshot --path .state/snapshot.json --binding INDEX --remote && wrangler kv key put meta --path .state/meta.json --binding INDEX --remote",
+    "lens": "bun scripts/lens.ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.142.0"
+  }
+}

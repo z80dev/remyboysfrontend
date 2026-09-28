@@ -1,0 +1,16 @@
+name = "remy-index"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+workers_dev = true
+# Same-origin API for the site; the Pages project keeps serving everything else on the zone.
+routes = [{ pattern = "basedremyboys.club/api/admin/*", zone_name = "basedremyboys.club" }]
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[kv_namespaces]]
+binding = "INDEX"
+id = "fa843076fb6f4cd7ad3e23947f9fff89"
+
+[observability]
+enabled = true
