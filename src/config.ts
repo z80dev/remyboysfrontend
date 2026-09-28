@@ -66,7 +66,6 @@ export const TOTAL_SUPPLY_HINT = 4490
 
 export const LINKS = [
   { label: 'Twitter', href: 'https://x.com/basedremyboys' },
-  { label: 'Discord', href: 'https://discord.gg/remyboys' },
   { label: 'OpenSea', href: 'https://opensea.io/collection/remy-boys' },
   { label: 'Magic Eden', href: 'https://magiceden.io/collections/base/0x3e9e529e32ad2821bdbfda348c2f9da94b43976c' },
   { label: 'Telegram', href: 'https://t.me/+0he27MlVgxU2OTQx' },
