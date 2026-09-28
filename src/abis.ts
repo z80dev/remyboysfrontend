@@ -85,6 +85,29 @@ export const routerAbi = parseAbi([
 export const stateViewAbi = parseAbi([
   'function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)',
   'function getLiquidity(bytes32 poolId) view returns (uint128)',
+  'function getFeeGrowthInside(bytes32 poolId, int24 tickLower, int24 tickUpper) view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)',
+  'function getPositionInfo(bytes32 poolId, address owner, int24 tickLower, int24 tickUpper, bytes32 salt) view returns (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128)',
+])
+
+/** Uniswap v4 PositionManager (v4-periphery). Liquidity is changed through `modifyLiquidities` action scripts. */
+export const positionManagerAbi = parseAbi([
+  'function modifyLiquidities(bytes unlockData, uint256 deadline) payable',
+  'function ownerOf(uint256 tokenId) view returns (address)',
+  'function getPositionLiquidity(uint256 tokenId) view returns (uint128)',
+  'function getPoolAndPositionInfo(uint256 tokenId) view returns ((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey, uint256 info)',
+  'event Transfer(address indexed from, address indexed to, uint256 indexed id)',
+])
+
+export const permit2Abi = parseAbi([
+  'function approve(address token, address spender, uint160 amount, uint48 expiration)',
+  'function allowance(address user, address token, address spender) view returns (uint160 amount, uint48 expiration, uint48 nonce)',
+])
+
+/** PoolManager events for one pool (the pool id is the first indexed topic). */
+export const poolEventsAbi = parseAbi([
+  'event Initialize(bytes32 indexed id, address indexed currency0, address indexed currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick)',
+  'event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)',
+  'event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)',
 ])
 
 // The V4Quoter functions are non-view (they revert internally), but are meant to be eth_call'ed.

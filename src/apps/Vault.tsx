@@ -295,6 +295,9 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
               <p className={`task-quote${quoted && nSel ? ' on' : ''}`}>{quoteText}</p>
             </TaskBox>
             <TaskBox title="Other Places">
+              <TaskLink icon="trader" onClick={() => navigate('trader')}>
+                Open Remy Trader
+              </TaskLink>
               <TaskLink icon="exchange" onClick={() => navigate('legacy')}>
                 Legacy Exchange
               </TaskLink>

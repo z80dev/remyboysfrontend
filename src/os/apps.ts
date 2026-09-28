@@ -8,6 +8,7 @@ import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
 import { Paint } from '../apps/Paint'
 import { Recovery } from '../apps/Recovery'
+import { Trader } from '../apps/Trader'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
 import { teamRole } from '../lib/launch'
@@ -62,6 +63,15 @@ export const APPS: AppDef[] = [
     Component: Legacy,
   },
   { id: 'vault', title: 'Remy Vault', short: 'Remy Vault', desc: 'Buy, sell and redeem Remys', icon: 'vault', size: [880, 620], Component: Vault },
+  {
+    id: 'trader',
+    title: 'Remy Trader',
+    short: 'Remy Trader',
+    desc: 'Trade fREMY and make markets',
+    icon: 'trader',
+    size: [980, 680],
+    Component: Trader,
+  },
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
   { id: 'paint', title: 'Remy Paint', short: 'Remy Paint', desc: 'Make a Remy meme', icon: 'paint', size: [940, 640], Component: Paint },
   {

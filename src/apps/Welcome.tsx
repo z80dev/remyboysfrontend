@@ -6,6 +6,12 @@ import { Icon, RemyFlag } from '../os/icons'
 
 const NEWS = [
   {
+    id: 'trader',
+    icon: 'trader',
+    title: 'Remy Trader',
+    text: 'A trading terminal for the fREMY/ETH pool: live tape, depth ladder, an order ticket, and a Market Maker desk to provide liquidity and collect fees.',
+  },
+  {
     id: 'recovery',
     icon: 'recovery',
     title: 'Recovery Center',

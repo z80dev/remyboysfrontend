@@ -29,6 +29,9 @@ export const ADDR = {
   wRemy: getAddress('0xed56735245fb156d94e254A061d9E65fD4a5230B'),
   stateView: getAddress('0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71'),
   v4Quoter: getAddress('0x0d5e0F971ED27FBfF6c2837bf31316121532048D'),
+  poolManager: getAddress('0x498581fF718922c3f8e6A244956aF099B2652b2b'),
+  positionManager: getAddress('0x7C5f5A4bBd8fD63184577525326123B519429bDc'),
+  permit2: getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3'),
 } as const
 
 /** Vault stack, live on Base (remy-boys-recovery `deployments/8453.json`). `VITE_*` overrides point at a fork deployment. */
@@ -48,6 +51,9 @@ export const TEAM = {
   /** MigratorRouter owner: hands the legacy vault to the converter. */
   migrator: getAddress('0x70f4b83795Af9236dA8211CDa3b031E503C00970'),
 } as const
+
+/** First block worth scanning for fREMY/ETH pool and position logs (vault deploy; the pool opened just after). */
+export const POOL_START_BLOCK = 51884322n
 
 export const RECLAIM_BATCH = 50
 export const TOTAL_SUPPLY_HINT = 4490

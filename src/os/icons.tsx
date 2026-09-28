@@ -502,6 +502,23 @@ const icons: Record<string, ReactNode> = {
       <path d="M8 27h16" stroke="#3d4550" strokeWidth="1.8" strokeLinecap="round" />
     </>
   ),
+  /* Trading terminal: dark CRT with a green up-trend and red/green candles. */
+  trader: (
+    <>
+      <Shadow />
+      <path d="M11 24.4h10l2.4 3.4H8.6z" fill="url(#xi-steel-side)" stroke="#3d4550" strokeWidth=".6" />
+      <rect x="2.6" y="3.8" width="26.8" height="20.6" rx="2" fill="url(#xi-steel)" stroke="#3d4550" strokeWidth=".8" />
+      <rect x="4.6" y="5.8" width="22.8" height="15.4" rx="1" fill="#071b3a" stroke="#1d2a44" strokeWidth=".6" />
+      <path d="M4.6 10.4h22.8M4.6 15h22.8" stroke="#1f3f73" strokeWidth=".5" />
+      <path d="M8 13.6v4.4M13 11.4v4.6M18 9.4v3.8" stroke="#8a95a8" strokeWidth=".6" />
+      <rect x="7" y="14.4" width="2" height="2.8" fill="#e8492c" />
+      <rect x="12" y="12" width="2" height="3.2" fill="#3ddc4a" />
+      <rect x="17" y="10" width="2" height="2.6" fill="#3ddc4a" />
+      <path d="M5.8 18.6 10.4 16l4 1.2 4.4-5 3.4 1.6 4.2-5" fill="none" stroke="#6cff6a" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M4.8 6h22.4L4.8 13.4z" fill="#fff" opacity=".12" />
+      <circle cx="26" cy="22.8" r=".7" fill="#4cc23a" />
+    </>
+  ),
   /* Clipboard checklist: Launch Control. */
   launch: (
     <>
