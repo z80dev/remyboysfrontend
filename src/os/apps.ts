@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
+import { Admin } from '../apps/Admin'
 import { Approvals } from '../apps/Approvals'
 import { DisplayProperties } from '../apps/DisplayProperties'
 import { Gallery } from '../apps/Gallery'
@@ -11,7 +12,7 @@ import { Recovery } from '../apps/Recovery'
 import { Trader } from '../apps/Trader'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
-import { teamRole } from '../lib/launch'
+import { isAdmin, teamRole } from '../lib/launch'
 
 export type AppProps = { param?: string; navigate: (hash: string) => void; close: () => void }
 
@@ -28,6 +29,8 @@ export type AppDef = {
   hidden?: boolean
   /** Listed only for the team wallets in TEAM; the hash route still opens it for anyone. */
   team?: boolean
+  /** Listed only for ADMINS; the hash route still opens it (the app then asks for an admin wallet). */
+  admin?: boolean
   /** Fixed-size dialog chrome: close button only, no resize. */
   dialog?: boolean
   Component: ComponentType<AppProps>
@@ -85,6 +88,16 @@ export const APPS: AppDef[] = [
     Component: LaunchControl,
   },
   {
+    id: 'admin',
+    title: 'Remy Admin',
+    short: 'Remy Admin',
+    desc: 'Holders, whales and stuck Remys',
+    icon: 'admin',
+    size: [1000, 680],
+    admin: true,
+    Component: Admin,
+  },
+  {
     id: 'display',
     title: 'Display Properties',
     short: 'Display',
@@ -105,5 +118,6 @@ export const isTeam = (address?: Address) => teamRole(address) !== undefined
 export function useVisibleApps() {
   const { address } = useAccount()
   const team = isTeam(address)
-  return APPS.filter((a) => !a.hidden && (!a.team || team))
+  const admin = isAdmin(address)
+  return APPS.filter((a) => !a.hidden && (!a.team || team) && (!a.admin || admin))
 }

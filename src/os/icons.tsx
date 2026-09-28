@@ -519,6 +519,26 @@ const icons: Record<string, ReactNode> = {
       <circle cx="26" cy="22.8" r=".7" fill="#4cc23a" />
     </>
   ),
+  /* Computer Management: CRT with a steel gear over the corner. */
+  admin: (
+    <>
+      <Shadow />
+      <path d="M9 22.6h9l2.2 3.2H6.8z" fill="url(#xi-beige-side)" stroke="#8a8266" strokeWidth=".6" />
+      <rect x="2.4" y="3.6" width="21.6" height="19" rx="2" fill="url(#xi-beige)" stroke="#8a8266" strokeWidth=".8" />
+      <rect x="4.6" y="5.8" width="17.2" height="13.4" rx="1" fill="url(#xi-screen)" stroke="#27324a" strokeWidth=".7" />
+      <path d="M6.6 16.4h3.2v-4h3.2v-2.4h3.2v6.4h3.2" fill="none" stroke="#9fe2ff" strokeWidth="1.2" />
+      <path d="M4.9 6.1h16.6L4.9 15.2z" fill="#fff" opacity=".16" />
+      <g transform="translate(22.6 21.4)">
+        <path
+          d="M-1.4-7.2h2.8l.5 2a5.4 5.4 0 0 1 1.6.9l2-.6 1.4 2.4-1.5 1.4a5.4 5.4 0 0 1 0 1.9l1.5 1.4-1.4 2.4-2-.6a5.4 5.4 0 0 1-1.6.9l-.5 2h-2.8l-.5-2a5.4 5.4 0 0 1-1.6-.9l-2 .6-1.4-2.4 1.5-1.4a5.4 5.4 0 0 1 0-1.9l-1.5-1.4 1.4-2.4 2 .6a5.4 5.4 0 0 1 1.6-.9z"
+          fill="url(#xi-steel)"
+          stroke="#4b5561"
+          strokeWidth=".8"
+        />
+        <circle r="2.2" fill="url(#xi-steel-side)" stroke="#4b5561" strokeWidth=".7" />
+      </g>
+    </>
+  ),
   /* Clipboard checklist: Launch Control. */
   launch: (
     <>

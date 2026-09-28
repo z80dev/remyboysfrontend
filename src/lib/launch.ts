@@ -1,7 +1,7 @@
 import { type Address, isAddressEqual } from 'viem'
 import { useReadContract, useReadContracts } from 'wagmi'
 import { erc20Abi, legacyVaultAbi, remyAbi } from '../abis'
-import { ADDR, NEW, TEAM } from '../config'
+import { ADDR, ADMINS, NEW, TEAM } from '../config'
 import { type PoolKey, usePoolKey, useQuote, useSpotPrice } from './pool'
 
 const ONE = 10n ** 18n
@@ -74,6 +74,9 @@ export function teamRole(address?: Address): 'Collection owner' | 'Legacy vault 
   if (isAddressEqual(address, TEAM.migrator)) return 'Legacy vault admin'
   return undefined
 }
+
+/** Admin wallets see Remy Admin; independent of launch roles (z80.eth is an admin but signs no launch step). */
+export const isAdmin = (address?: Address) => !!address && ADMINS.some((a) => isAddressEqual(a, address))
 
 /** The owner's rbREMY has reached the deployer (or the pool is already live); undefined while loading. */
 export const seedFundsSent = (s: LaunchState): boolean | undefined =>
