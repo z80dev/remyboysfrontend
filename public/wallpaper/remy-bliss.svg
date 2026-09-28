@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d4fc7"/>
+      <stop offset=".28" stop-color="#2a74e0"/>
+      <stop offset=".52" stop-color="#5a9ded"/>
+      <stop offset=".66" stop-color="#9ccaf6"/>
+      <stop offset=".74" stop-color="#cfe6fb"/>
+    </linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6aae45"/>
+      <stop offset="1" stop-color="#3a7d24"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#86cc45"/>
+      <stop offset=".35" stop-color="#5dab2e"/>
+      <stop offset=".75" stop-color="#3b861d"/>
+      <stop offset="1" stop-color="#2a6a14"/>
+    </linearGradient>
+    <radialGradient id="sun" cx=".38" cy=".08" r=".55">
+      <stop offset="0" stop-color="#d8f58a" stop-opacity=".85"/>
+      <stop offset=".45" stop-color="#b3e05c" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#b3e05c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16450a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#16450a" stop-opacity=".45"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-80%" width="160%" height="260%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <filter id="wisp" x="-30%" y="-100%" width="160%" height="300%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9 .35" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .1  0 0 0 0 .3  0 0 0 0 .05  0 0 0 .55 -.18"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+  </defs>
+
+  <rect width="1920" height="1200" fill="url(#sky)"/>
+
+  <!-- cloud banks -->
+  <g fill="#fff" filter="url(#soft)">
+    <ellipse cx="330" cy="250" rx="360" ry="70" opacity=".85"/>
+    <ellipse cx="560" cy="200" rx="220" ry="60" opacity=".7"/>
+    <ellipse cx="170" cy="330" rx="260" ry="46" opacity=".6"/>
+    <ellipse cx="1460" cy="420" rx="340" ry="52" opacity=".55"/>
+    <ellipse cx="1180" cy="520" rx="420" ry="46" opacity=".6"/>
+    <ellipse cx="1780" cy="300" rx="200" ry="40" opacity=".45"/>
+    <ellipse cx="780" cy="560" rx="520" ry="54" opacity=".7"/>
+  </g>
+  <g fill="#fff" filter="url(#wisp)">
+    <ellipse cx="420" cy="232" rx="180" ry="20" opacity=".9"/>
+    <ellipse cx="610" cy="182" rx="120" ry="16" opacity=".85"/>
+    <ellipse cx="1320" cy="470" rx="170" ry="14" opacity=".75"/>
+    <ellipse cx="1560" cy="400" rx="130" ry="12" opacity=".7"/>
+    <ellipse cx="920" cy="600" rx="260" ry="18" opacity=".8"/>
+  </g>
+
+  <!-- distant ridge -->
+  <path d="M960 790 C 1180 700, 1470 690, 1920 720 V 1200 H 960 Z" fill="url(#far)"/>
+
+  <!-- the hill -->
+  <path d="M0 760 C 220 700, 480 640, 760 640 C 1060 640, 1380 740, 1920 850 V 1200 H 0 Z" fill="url(#hill)"/>
+  <path d="M0 760 C 220 700, 480 640, 760 640 C 1060 640, 1380 740, 1920 850 V 1200 H 0 Z" fill="url(#sun)"/>
+  <path d="M0 760 C 220 700, 480 640, 760 640 C 1060 640, 1380 740, 1920 850 V 1200 H 0 Z" fill="#000" filter="url(#grain)" opacity=".5"/>
+  <path d="M1020 1200 C 1200 1010, 1500 920, 1920 900 V 1200 Z" fill="url(#shade)"/>
+  <path d="M0 1040 C 300 980, 620 1000, 900 1200 H 0 Z" fill="#1f5a0e" opacity=".22"/>
+  <!-- rim light along the crest -->
+  <path d="M40 748 C 240 694, 490 642, 760 642 C 1040 642, 1330 732, 1880 842" fill="none" stroke="#e6ffa8" stroke-opacity=".35" stroke-width="3"/>
+</svg>

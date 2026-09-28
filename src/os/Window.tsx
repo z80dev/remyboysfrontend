@@ -6,12 +6,12 @@ export type WinGeom = { x: number; y: number; w: number; h: number }
 type Props = {
   title: string
   icon: string
-  accent: string
   geom: WinGeom
   z: number
   active: boolean
   maximized: boolean
   mobile: boolean
+  dialog?: boolean
   onFocus: () => void
   onClose: () => void
   onMinimize: () => void
@@ -20,7 +20,7 @@ type Props = {
   children: ReactNode
 }
 
-const TASKBAR = 48
+export const TASKBAR_H = 30
 
 function track(e: ReactPointerEvent, move: (dx: number, dy: number) => void) {
   const sx = e.clientX
@@ -38,9 +38,17 @@ function track(e: ReactPointerEvent, move: (dx: number, dy: number) => void) {
   target.addEventListener('pointercancel', onUp)
 }
 
+/** Luna window: rounded blue title bar, XP caption buttons, beige client area, 3px frame. */
 export function Window(p: Props) {
   const start = useRef(p.geom)
   const free = !p.mobile && !p.maximized
+
+  if (p.mobile)
+    return (
+      <section className="window pocket-window" aria-label={p.title}>
+        <div className="window-body">{p.children}</div>
+      </section>
+    )
 
   const onDrag = (e: ReactPointerEvent) => {
     if (!free || e.button !== 0 || (e.target as HTMLElement).closest('button')) return
@@ -48,7 +56,7 @@ export function Window(p: Props) {
     track(e, (dx, dy) => {
       const g = start.current
       const x = Math.min(Math.max(g.x + dx, 80 - g.w), window.innerWidth - 80)
-      const y = Math.min(Math.max(g.y + dy, 0), window.innerHeight - TASKBAR - 32)
+      const y = Math.min(Math.max(g.y + dy, 0), window.innerHeight - TASKBAR_H - 30)
       p.onGeom({ ...g, x, y })
     })
   }
@@ -58,7 +66,7 @@ export function Window(p: Props) {
     start.current = p.geom
     track(e, (dx, dy) => {
       const g = start.current
-      p.onGeom({ ...g, w: Math.max(360, g.w + dx), h: Math.max(260, g.h + dy) })
+      p.onGeom({ ...g, w: Math.max(380, g.w + dx), h: Math.max(280, g.h + dy) })
     })
   }
 
@@ -66,32 +74,32 @@ export function Window(p: Props) {
 
   return (
     <section
-      className={`window${p.active ? ' active' : ''}${p.maximized ? ' maximized' : ''}`}
-      style={{ ...style, ['--accent' as string]: p.accent }}
+      className={`window${p.active ? ' active' : ''}${p.maximized ? ' maximized' : ''}${p.dialog ? ' dialog' : ''}`}
+      style={style}
       onPointerDownCapture={p.onFocus}
       aria-label={p.title}
     >
-      <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.mobile && p.onToggleMax()}>
-        <span className="title-icon">
-          <Icon name={p.icon} size={16} />
-        </span>
+      <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.dialog && p.onToggleMax()}>
+        <Icon name={p.icon} size={16} className="title-icon" />
         <span className="title-text">{p.title}</span>
         <div className="title-controls">
-          <button type="button" className="tc min" aria-label="Minimize" onClick={p.onMinimize}>
-            <span />
-          </button>
-          {!p.mobile && (
-            <button type="button" className="tc max" aria-label="Maximize" onClick={p.onToggleMax}>
-              <span />
-            </button>
+          {!p.dialog && (
+            <>
+              <button type="button" className="cap min" aria-label="Minimize" title="Minimize" onClick={p.onMinimize} />
+              <button
+                type="button"
+                className={`cap ${p.maximized ? 'restore' : 'max'}`}
+                aria-label={p.maximized ? 'Restore' : 'Maximize'}
+                title={p.maximized ? 'Restore Down' : 'Maximize'}
+                onClick={p.onToggleMax}
+              />
+            </>
           )}
-          <button type="button" className="tc close" aria-label="Close" onClick={p.onClose}>
-            <span />
-          </button>
+          <button type="button" className="cap close" aria-label="Close" title="Close" onClick={p.onClose} />
         </div>
       </header>
       <div className="window-body">{p.children}</div>
-      {free && <div className="resize-grip" onPointerDown={onResize} />}
+      {free && !p.dialog && <div className="resize-grip" onPointerDown={onResize} />}
     </section>
   )
 }

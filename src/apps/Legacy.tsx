@@ -5,8 +5,11 @@ import { readContract } from 'wagmi/actions'
 import { converterAbi, erc20Abi, stakedAbi } from '../abis'
 import { ADDR, NEW } from '../config'
 import { fmt } from '../lib/format'
-import { type TxStep, useTx } from '../lib/tx'
-import { Badge, ComingSoon, Group, RequireWallet, StatusBar } from '../os/ui'
+import type { TxStep } from '../lib/tx'
+import { Icon } from '../os/icons'
+import { useIsMobile } from '../os/shell'
+import { useTxUi } from '../os/system'
+import { Badge, Banner, ComingSoon, RequireWallet, StatusBar } from '../os/ui'
 import { config } from '../wagmi'
 
 const ONE = 10n ** 18n
@@ -22,6 +25,8 @@ function parse(v: string): bigint | undefined {
 
 function AmountRow({
   name,
+  icon,
+  rate,
   sub,
   balance,
   max,
@@ -34,6 +39,8 @@ function AmountRow({
   note,
 }: {
   name: string
+  icon: string
+  rate: string
   sub: string
   balance?: bigint
   max?: bigint
@@ -45,37 +52,54 @@ function AmountRow({
   whole?: boolean
   note?: React.ReactNode
 }) {
+  const id = `lx-${name.split(' ')[0]}`
   return (
-    <Group title={name}>
-      <div className="legacy-row">
-        <div className="legacy-bal">
-          <span className="muted small">{sub}</span>
-          <b>{fmt(balance)}</b>
-          {note}
+    <section className="lx-row">
+      <div className="lx-token">
+        <Icon name={icon} size={32} />
+        <div>
+          <b>{name}</b>
+          <small>{rate}</small>
         </div>
-        <div className="legacy-input">
-          <div className="input-wrap">
-            <input className="input" inputMode="decimal" placeholder="0" value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ''))} />
-            <button type="button" className="chip" onClick={() => max !== undefined && onChange(formatUnits(whole ? (max / ONE) * ONE : max, 18))}>
-              Max
-            </button>
-          </div>
-          <span className="muted small">
-            → <b>{fmt(preview ?? 0n, 18, 6)}</b> fREMY
-          </span>
-        </div>
-        <button type="button" className="btn primary" disabled={disabled} onClick={onConvert}>
-          Convert
-        </button>
       </div>
-    </Group>
+      <div className="lx-bal">
+        <span className="muted small">{sub}</span>
+        <b>{fmt(balance)}</b>
+        {note}
+      </div>
+      <div className="lx-input">
+        <label className="sr-only" htmlFor={id}>
+          {name} amount
+        </label>
+        <div className="input-wrap">
+          <input
+            id={id}
+            className="input"
+            inputMode="decimal"
+            placeholder="0"
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ''))}
+          />
+          <button type="button" className="chip" onClick={() => max !== undefined && onChange(formatUnits(whole ? (max / ONE) * ONE : max, 18))}>
+            Max
+          </button>
+        </div>
+        <span className="lx-out">
+          <Icon name="coin" size={16} /> <b>{fmt(preview ?? 0n, 18, 6)}</b> fREMY
+        </span>
+      </div>
+      <button type="button" className="btn default" disabled={disabled} onClick={onConvert}>
+        Convert
+      </button>
+    </section>
   )
 }
 
 function LegacyInner({ converter }: { converter: Address }) {
   const { address } = useAccount()
   const acct = address as Address
-  const tx = useTx()
+  const tx = useTxUi()
+  const mobile = useIsMobile()
   const [rb, setRb] = useState('')
   const [ls, setLs] = useState('')
   const [w, setW] = useState('')
@@ -130,7 +154,10 @@ function LegacyInner({ converter }: { converter: Address }) {
     const steps: TxStep[] = [approve(ADDR.rbRemy, rbAmt)]
     for (let left = rbAmt; left > 0n; ) {
       const c = left > maxRb ? maxRb : left
-      steps.push({ label: `Convert ${fmt(c, 18, 2)} rbREMY`, request: { address: converter, abi: converterAbi, functionName: 'convertRbRemy', args: [c, acct] } })
+      steps.push({
+        label: `Convert ${fmt(c, 18, 2)} rbREMY`,
+        request: { address: converter, abi: converterAbi, functionName: 'convertRbRemy', args: [c, acct] },
+      })
       left -= c
     }
     if (await tx.run(steps)) setRb('')
@@ -142,7 +169,10 @@ function LegacyInner({ converter }: { converter: Address }) {
     const steps: TxStep[] = [approve(ADDR.rbRemyLS, lsAmt)]
     for (let left = lsAmt; left > 0n; ) {
       const c = left > perChunk ? perChunk : left
-      steps.push({ label: `Convert ${fmt(c, 18, 2)} rbREMYLS`, request: { address: converter, abi: converterAbi, functionName: 'convertStaked', args: [c, acct] } })
+      steps.push({
+        label: `Convert ${fmt(c, 18, 2)} rbREMYLS`,
+        request: { address: converter, abi: converterAbi, functionName: 'convertStaked', args: [c, acct] },
+      })
       left -= c
     }
     if (await tx.run(steps)) setLs('')
@@ -166,24 +196,24 @@ function LegacyInner({ converter }: { converter: Address }) {
 
   return (
     <>
-      <div className="pad scroll">
-        <div className="rate-card">
+      <div className="scroll grow wiz-body">
+        <div className="lx-balance">
+          <Icon name="coin" size={32} />
           <div>
-            <b>1,000 rbREMY</b> = <b>1 fREMY</b>
+            <small>Your fREMY</small>
+            <b>{fmt(fremyBal, 18, 6)}</b>
           </div>
-          <div>
-            <b>1 wREMY</b> = <b>1 fREMY</b>
-          </div>
-          <div>
-            <b>rbREMYLS</b> → rbREMY → fREMY
-          </div>
-          <div className="muted small">
-            fREMY is backed 1:1 by Remys in the new vault. Your balance: <b>{fmt(fremyBal, 18, 6)} fREMY</b>
-          </div>
+          <p className="muted small">fREMY is backed 1:1 by Remys in the new vault. Redeem 1 fREMY for any Remy there.</p>
         </div>
-        {paused && <div className="banner warn">The converter is paused by the team.</div>}
+        {paused && (
+          <Banner tone="warn" icon="warning" title="The converter is paused">
+            The team has paused conversions. Your tokens are safe; try again later.
+          </Banner>
+        )}
         <AmountRow
           name="rbREMY"
+          icon="exchange"
+          rate="1,000 → 1 fREMY"
           sub="Balance"
           balance={rbBal}
           max={rbBal}
@@ -195,6 +225,8 @@ function LegacyInner({ converter }: { converter: Address }) {
         />
         <AmountRow
           name="rbREMYLS (staked)"
+          icon="vault"
+          rate="Unstaked to rbREMY, then 1,000 → 1"
           sub="Shares"
           balance={lsBal}
           max={lsUnlocked}
@@ -206,7 +238,8 @@ function LegacyInner({ converter }: { converter: Address }) {
           note={
             locked ? (
               <span className="small">
-                <Badge tone="warn">locked</Badge> {fmt(lsUnlocked)} unlocked{unlockAt > Date.now() ? ` · rest unlocks ${new Date(unlockAt).toLocaleString()}` : ''}
+                <Badge tone="warn">locked</Badge> {fmt(lsUnlocked)} unlocked
+                {unlockAt > Date.now() ? ` · rest unlocks ${new Date(unlockAt).toLocaleString()}` : ''}
               </span>
             ) : lsBal ? (
               <Badge tone="ok">unlocked</Badge>
@@ -215,6 +248,8 @@ function LegacyInner({ converter }: { converter: Address }) {
         />
         <AmountRow
           name="wREMY"
+          icon="coin"
+          rate="1 → 1 fREMY, whole units"
           sub="Balance"
           balance={wBal}
           max={wBal}
@@ -228,23 +263,56 @@ function LegacyInner({ converter }: { converter: Address }) {
         />
         <p className="muted small">Large amounts are split into several transactions automatically ({fmt(maxRb, 18, 0)} rbREMY per call).</p>
       </div>
-      <StatusBar status={tx.status} />
+      <StatusBar status={tx.status} busy={tx.busy} right={mobile ? undefined : 'Legacy Exchange'} />
     </>
   )
 }
 
+function WizardFrame({ children }: { children: React.ReactNode }) {
+  const mobile = useIsMobile()
+  return (
+    <div className="app-col">
+      <div className="wiz">
+        {!mobile && (
+          <aside className="wiz-side" aria-hidden="true">
+            <img src="/images/Character777.webp" alt="" />
+            <span>
+              Legacy
+              <br />
+              Transfer
+              <br />
+              Wizard
+            </span>
+          </aside>
+        )}
+        <div className="wiz-main">
+          <header className="wiz-head">
+            <div>
+              <b>Convert legacy tokens</b>
+              <span>rbREMY, staked rbREMYLS and wREMY become fREMY at the fixed old rates.</span>
+            </div>
+            <Icon name="exchange" size={48} />
+          </header>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Legacy() {
+  const { address } = useAccount()
   if (!NEW.converter || !NEW.fremy)
     return (
-      <ComingSoon title="Legacy Exchange opens soon">
+      <ComingSoon title="Legacy Exchange is under construction" app="Legacy Exchange">
         rbREMY, staked rbREMYLS and wREMY will convert into fREMY here (1,000 rbREMY = 1 wREMY = 1 fREMY). Hold on to them.
       </ComingSoon>
     )
   return (
-    <div className="app-col">
+    <WizardFrame>
       <RequireWallet why="Connect a wallet holding rbREMY, rbREMYLS or wREMY.">
-        <LegacyInner converter={NEW.converter} />
+        <LegacyInner key={address} converter={NEW.converter} />
       </RequireWallet>
-    </div>
+    </WizardFrame>
   )
 }

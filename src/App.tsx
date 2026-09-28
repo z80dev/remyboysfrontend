@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { APPS, appById } from './os/apps'
-import { Icon } from './os/icons'
+import { useAccount, useDisconnect } from 'wagmi'
+import { appById } from './os/apps'
+import { MessageBoxHost } from './os/Balloons'
+import { DesktopIcons, Wallpaper, useDesktopMenu } from './os/Desktop'
+import { IconDefs } from './os/icons'
+import { Pocket } from './os/Pocket'
+import { Session, type SessionStage, TurnOffDialog } from './os/Session'
+import { MobileContext, useShell } from './os/shell'
+import { useSecurityBalloons } from './os/system'
 import { Taskbar } from './os/Taskbar'
-import { Window, type WinGeom } from './os/Window'
+import { TASKBAR_H, Window, type WinGeom } from './os/Window'
 
 type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean }
 
-const WALLPAPER = [101, 2210, 777, 3001, 42, 1869, 4200, 512, 3333, 909, 2600, 1500, 69, 4020, 250, 3777]
+const SESSION_KEY = 'remyxp.session'
 
 function parseHash(): { id?: string; param?: string } {
   const [id, param] = window.location.hash.replace(/^#\/?/, '').split('/')
@@ -28,19 +35,25 @@ function useMobile() {
 function initialGeom(id: string, count: number): WinGeom {
   const [w, h] = appById(id)?.size ?? [600, 500]
   const vw = window.innerWidth
-  const vh = window.innerHeight - 48
-  const W = Math.min(w, vw - 40)
-  const H = Math.min(h, vh - 30)
-  const off = (count % 6) * 28
-  return { w: W, h: H, x: Math.min(Math.max(120, (vw - W) / 2 + off), Math.max(12, vw - W - 12)), y: Math.max(8, (vh - H) / 2 - 20 + off) }
+  const vh = window.innerHeight - TASKBAR_H
+  const W = Math.min(w, vw - 120)
+  const H = Math.min(h, vh - 24)
+  const off = (count % 6) * 26
+  return { w: W, h: H, x: Math.min(Math.max(112, (vw - W) / 2 + off), Math.max(8, vw - W - 8)), y: Math.max(8, Math.min((vh - H) / 2 - 12 + off, vh - H - 8)) }
 }
 
 export default function App() {
   const mobile = useMobile()
+  const theme = useShell((s) => s.prefs.theme)
+  const { address } = useAccount()
+  const { disconnect } = useDisconnect()
+  const [session, setSession] = useState<SessionStage | null>(() => (sessionStorage.getItem(SESSION_KEY) ? null : 'boot'))
+  const [powerDialog, setPowerDialog] = useState(false)
   const [wins, setWins] = useState<Win[]>([])
   const [params, setParams] = useState<Record<string, string | undefined>>({})
   const zRef = useRef(10)
-  const nextZ = () => ++zRef.current
+
+  useSecurityBalloons(session === null)
 
   const active = wins.filter((w) => !w.min).sort((a, b) => b.z - a.z)[0]?.id
 
@@ -48,7 +61,7 @@ export default function App() {
     const { id, param } = parseHash()
     if (!id) return
     setParams((p) => ({ ...p, [id]: param }))
-    const nz = nextZ()
+    const nz = ++zRef.current
     setWins((ws) =>
       ws.some((w) => w.id === id)
         ? ws.map((w) => (w.id === id ? { ...w, z: nz, min: false } : w))
@@ -56,6 +69,8 @@ export default function App() {
     )
   }, [])
 
+  // Mount only: desktop visitors without a deep link land on Welcome; phones land on Today.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: must not re-run when the viewport crosses the breakpoint
   useEffect(() => {
     if (!parseHash().id && !mobile) window.location.hash = '#/welcome'
     openFromHash()
@@ -82,7 +97,7 @@ export default function App() {
   const update = (id: string, f: (w: Win) => Win) => setWins((ws) => ws.map((w) => (w.id === id ? f(w) : w)))
   const focus = (id: string) => {
     if (id === active) return
-    const nz = nextZ()
+    const nz = ++zRef.current
     update(id, (w) => ({ ...w, z: nz, min: false }))
   }
   const close = (id: string) => {
@@ -94,72 +109,96 @@ export default function App() {
     if (w && id === active && !w.min) update(id, (x) => ({ ...x, min: true }))
     else navigate(id)
   }
+  const minimizeAll = () => setWins((ws) => ws.map((w) => ({ ...w, min: true })))
+  const closeAll = () => {
+    setWins([])
+    history.replaceState(null, '', '#/')
+  }
 
-  const visible = mobile ? wins.filter((w) => w.id === active) : wins.filter((w) => !w.min)
+  const endSession = useCallback(() => {
+    sessionStorage.setItem(SESSION_KEY, '1')
+    setSession(null)
+  }, [])
+  const logOff = () => {
+    if (address) disconnect()
+    setSession('login')
+  }
+
+  const renderWindow = (w: Win) => {
+    const def = appById(w.id)
+    if (!def) return null
+    const { Component } = def
+    return (
+      <Window
+        key={w.id}
+        title={def.title}
+        icon={def.icon}
+        geom={w.geom}
+        z={w.z}
+        active={w.id === active}
+        maximized={w.max}
+        mobile={mobile}
+        dialog={def.dialog}
+        onFocus={() => focus(w.id)}
+        onClose={() => close(w.id)}
+        onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
+        onToggleMax={() => update(w.id, (x) => ({ ...x, max: !x.max }))}
+        onGeom={(geom) => update(w.id, (x) => ({ ...x, geom }))}
+      >
+        <Component param={params[w.id]} navigate={navigate} close={() => close(w.id)} />
+      </Window>
+    )
+  }
+
+  const menu = useDesktopMenu(navigate)
+  const activeWin = wins.find((w) => w.id === active)
 
   return (
-    <div className={`desktop${mobile ? ' mobile' : ''}`}>
-      <div className="wallpaper" aria-hidden="true">
-        <div className="wall-grid">
-          {WALLPAPER.map((i) => (
-            <img key={i} src={`/images/Character${i}.webp`} alt="" />
-          ))}
-        </div>
-        <div className="wall-glow" />
+    <MobileContext.Provider value={mobile}>
+      <IconDefs />
+      <div className={`xp theme-${theme}${powerDialog ? ' fading' : ''}`}>
+        {mobile ? (
+          <Pocket active={active} open={wins.map((w) => w.id)} onLaunch={navigate} onClose={close} onToday={minimizeAll} onLogOff={logOff}>
+            {activeWin ? renderWindow(activeWin) : null}
+          </Pocket>
+        ) : (
+          <div className="desktop" onContextMenu={menu.onContextMenu}>
+            <Wallpaper />
+            <DesktopIcons open={navigate} />
+            {wins.filter((w) => !w.min).map(renderWindow)}
+            {menu.element}
+            <Taskbar
+              wins={wins.map((w) => ({ id: w.id, min: w.min }))}
+              active={active}
+              onTask={toggleFromTaskbar}
+              onLaunch={navigate}
+              onLogOff={logOff}
+              onTurnOff={() => setPowerDialog(true)}
+            />
+          </div>
+        )}
       </div>
-
-      <nav className="desktop-icons" aria-label="Apps">
-        {APPS.map((a) => (
-          <a key={a.id} className="desk-icon" href={`#/${a.id}`} onClick={(e) => (e.preventDefault(), navigate(a.id))}>
-            <span className="desk-glyph" style={{ ['--accent' as string]: a.accent }}>
-              <Icon name={a.icon} size={mobile ? 30 : 28} />
-            </span>
-            <span className="desk-label">{mobile ? a.short : a.title.replace('Welcome to Remy OS', 'Welcome')}</span>
-          </a>
-        ))}
-      </nav>
-
-      {mobile && !active && (
-        <div className="mobile-hero">
-          <div className="brand">Remy OS</div>
-          <div className="muted">Based Remy Boys · Base</div>
-        </div>
+      {powerDialog && (
+        <TurnOffDialog
+          onCancel={() => setPowerDialog(false)}
+          onStandBy={() => {
+            setPowerDialog(false)
+            minimizeAll()
+          }}
+          onTurnOff={() => {
+            setPowerDialog(false)
+            closeAll()
+            logOff()
+          }}
+          onRestart={() => {
+            setPowerDialog(false)
+            closeAll()
+            setSession('boot')
+          }}
+        />
       )}
-
-      {visible.map((w) => {
-        const def = appById(w.id)
-        if (!def) return null
-        const { Component } = def
-        return (
-          <Window
-            key={w.id}
-            title={def.title}
-            icon={def.icon}
-            accent={def.accent}
-            geom={w.geom}
-            z={w.z}
-            active={w.id === active}
-            maximized={w.max}
-            mobile={mobile}
-            onFocus={() => focus(w.id)}
-            onClose={() => close(w.id)}
-            onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
-            onToggleMax={() => update(w.id, (x) => ({ ...x, max: !x.max }))}
-            onGeom={(geom) => update(w.id, (x) => ({ ...x, geom }))}
-          >
-            <Component param={params[w.id]} navigate={navigate} />
-          </Window>
-        )
-      })}
-
-      <Taskbar
-        mobile={mobile}
-        wins={wins.map((w) => ({ id: w.id, min: w.min }))}
-        active={active}
-        onTask={toggleFromTaskbar}
-        onLaunch={navigate}
-        onHome={() => setWins((ws) => ws.map((w) => ({ ...w, min: true })))}
-      />
-    </div>
+      <MessageBoxHost />
+      {session && <Session key={session} stage={session} onDone={endSession} />}
+    </MobileContext.Provider>
   )
 }
