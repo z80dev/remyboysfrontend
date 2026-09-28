@@ -3,9 +3,9 @@ import { type Address, formatUnits, parseUnits } from 'viem'
 import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import { readContract } from 'wagmi/actions'
 import { converterAbi, erc20Abi, stakedAbi } from '../abis'
-import { ADDR, NEW } from '../config'
+import { ADDR, EXPLORER, NEW } from '../config'
 import { useLegacyHandedOver } from '../lib/launch'
-import { fmt } from '../lib/format'
+import { fmt, shortAddr } from '../lib/format'
 import type { TxStep } from '../lib/tx'
 import { Icon } from '../os/icons'
 import { useIsMobile } from '../os/shell'
@@ -117,7 +117,7 @@ function LegacyInner({ converter }: { converter: Address }) {
   const [ls, setLs] = useState('')
   const [w, setW] = useState('')
 
-  const { data } = useReadContracts({
+  const { data, isError, refetch } = useReadContracts({
     contracts: [
       { address: ADDR.rbRemy, abi: erc20Abi, functionName: 'balanceOf', args: [acct] },
       { address: ADDR.rbRemyLS, abi: stakedAbi, functionName: 'balanceOf', args: [acct] },
@@ -217,6 +217,12 @@ function LegacyInner({ converter }: { converter: Address }) {
           <div>
             <small>Your fREMY</small>
             <b>{fmt(fremyBal, 18, 6)}</b>
+            <small>
+              Wallet{' '}
+              <a href={`${EXPLORER}/address/${acct}`} target="_blank" rel="noreferrer" title={acct}>
+                {shortAddr(acct)}
+              </a>
+            </small>
           </div>
           <p className="muted small">fREMY is backed 1:1 by Remys in the new vault. Redeem 1 fREMY for any Remy there.</p>
         </div>
@@ -228,6 +234,20 @@ function LegacyInner({ converter }: { converter: Address }) {
         {paused && (
           <Banner tone="warn" icon="warning" title="The converter is paused">
             The team has paused conversions. Your tokens are safe; try again later.
+          </Banner>
+        )}
+        {isError && (
+          <Banner tone="warn" icon="warning" title="Couldn't read your balances">
+            Base didn't answer the balance check.{' '}
+            <button type="button" className="linkish" onClick={() => refetch()}>
+              Try again
+            </button>
+          </Banner>
+        )}
+        {rbBal === 0n && lsBal === 0n && wBal === 0n && (
+          <Banner tone="info" icon="info" title={`Nothing to convert in ${shortAddr(acct)}`}>
+            This wallet holds no rbREMY, rbREMYLS or wREMY. If yours sit in another account, switch accounts in your wallet and this window
+            updates.
           </Banner>
         )}
         <AmountRow
