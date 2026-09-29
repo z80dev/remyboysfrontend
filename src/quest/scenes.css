@@ -1,0 +1,704 @@
+/* Title, intro, naming, starter lab, Hall of Fame, credits. 1rem = 1 logical px. */
+
+.scene {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* ───── Title ───── */
+.title {
+  background: #0a0730;
+}
+.t-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #06051f 0%, #1a1a6e 38%, #5b2ca0 65%, #ff6fa3 100%);
+}
+.t-sun {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 34%;
+  width: 96rem;
+  height: 48rem;
+  margin-left: -48rem;
+  border-radius: 48rem 48rem 0 0;
+  background: linear-gradient(180deg, #fff3a8 0%, #ffcf5a 45%, #ff7a8a 100%);
+  -webkit-mask: linear-gradient(180deg, #000 0 52%, transparent 52% 57%, #000 57% 68%, transparent 68% 74%, #000 74% 83%, transparent 83% 90%, #000 90%);
+  mask: linear-gradient(180deg, #000 0 52%, transparent 52% 57%, #000 57% 68%, transparent 68% 74%, #000 74% 83%, transparent 83% 90%, #000 90%);
+  filter: drop-shadow(0 0 12rem rgba(255, 150, 120, 0.9));
+}
+.t-logo,
+.t-press,
+.t-foot {
+  z-index: 2;
+}
+.t-wall {
+  position: absolute;
+  width: 420rem;
+  height: 420rem;
+  left: calc(50% - 210rem);
+  top: -24rem;
+  transform: perspective(420rem) rotateX(24deg) rotateZ(-12deg);
+  animation: wall-drift 48s ease-in-out infinite alternate;
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(180deg, #0005, #000 42%, #000 82%, transparent);
+  mask-image: linear-gradient(180deg, #0005, #000 42%, #000 82%, transparent);
+}
+.t-mosaic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.t-flip {
+  position: absolute;
+  width: 3.125%;
+  height: 3.125%;
+  z-index: 1;
+  animation: wall-flip 16s ease-in-out infinite;
+  animation-delay: var(--delay);
+  opacity: 0;
+  box-shadow: 0 0 0 1rem #f6df9b, 0 0 8rem #9ddfff;
+}
+.t-flip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.t-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #09082588, transparent 38%, #0a073000 58%, #0a0730dd 100%);
+}
+@keyframes wall-drift {
+  to { transform: perspective(420rem) rotateX(24deg) rotateZ(-12deg) translateY(-72rem); }
+}
+@keyframes wall-flip {
+  0%, 65%, 100% { opacity: 0; transform: perspective(60rem) rotateY(90deg) scale(1); }
+  70%, 92% { opacity: 1; transform: perspective(60rem) rotateY(0) scale(2.5); }
+}
+.t-logo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7%;
+  text-align: center;
+  animation: logo-bob 3s ease-in-out infinite;
+}
+@keyframes logo-bob {
+  50% {
+    transform: translateY(3rem);
+  }
+}
+.t-remy,
+.t-quest {
+  font-family: var(--font-hd);
+  line-height: 1;
+  letter-spacing: 2rem;
+  padding-left: 2rem;
+}
+.t-remy {
+  font-size: 28rem;
+  color: #fff;
+  background: linear-gradient(180deg, #ffffff 0 45%, #9ec0ff 55%, #3d7bff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(2rem 0 0 #0b1340) drop-shadow(-2rem 0 0 #0b1340) drop-shadow(0 2rem 0 #0b1340) drop-shadow(0 -2rem 0 #0b1340)
+    drop-shadow(0 4rem 0 #0052ff);
+}
+.t-quest {
+  margin-top: 4rem;
+  font-size: 18rem;
+  background: linear-gradient(180deg, #fff6c2 0 40%, #f5c542 50%, #d9822b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(2rem 0 0 #3b1d00) drop-shadow(-2rem 0 0 #3b1d00) drop-shadow(0 2rem 0 #3b1d00) drop-shadow(0 -2rem 0 #3b1d00)
+    drop-shadow(0 3rem 0 #b3123a);
+  position: relative;
+}
+.t-sub {
+  display: inline-block;
+  margin-top: 7rem;
+  font: 7rem/1 var(--font-hd);
+  letter-spacing: 1.5rem;
+  color: #fff;
+  background: #0052ff;
+  padding: 4rem 8rem;
+  border-radius: 3rem;
+  border: 1rem solid #9ec0ff;
+  box-shadow: 0 2rem 0 #0b1340;
+}
+.t-press {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 20%;
+  text-align: center;
+  font: 9rem/1 var(--font-hd);
+  color: #fff;
+  letter-spacing: 1rem;
+  text-shadow:
+    1rem 1rem 0 #0b1340,
+    0 0 8rem #ff8fd1;
+  animation: press 1.1s steps(2) infinite;
+}
+@keyframes press {
+  50% {
+    opacity: 0;
+  }
+}
+.t-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5rem;
+  text-align: center;
+  font: 5.5rem/1 var(--font-hd);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5rem;
+}
+.menu-title {
+  left: 50%;
+  bottom: 16%;
+  transform: translateX(-50%);
+  min-width: 96rem;
+  animation: none;
+}
+.menu-title .menu-item {
+  justify-content: center;
+}
+
+/* ───── Intro ───── */
+.intro {
+  background: radial-gradient(60% 55% at 50% 42%, #2b3fa8 0%, #121a52 55%, #050716 100%);
+  transition:
+    transform 0.7s cubic-bezier(0.6, 0, 0.8, 0.4),
+    opacity 0.7s;
+}
+.intro.shrink {
+  transform: scale(0.05);
+  opacity: 0;
+}
+.i-glow {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 180rem;
+  height: 60rem;
+  margin: -30rem 0 0 -90rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(143, 176, 255, 0.35), transparent);
+  top: 58%;
+}
+.i-prof,
+.i-remy {
+  position: absolute;
+  z-index: 1;
+  top: calc((100% - 52rem) / 2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition:
+    transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1),
+    opacity 0.25s;
+}
+.i-prof {
+  animation: rise 0.5s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+@keyframes rise {
+  from {
+    transform: translate(-50%, -30%);
+    opacity: 0;
+  }
+}
+.i-remy {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.2);
+}
+.pair .i-prof {
+  transform: translate(-108%, -50%) scale(0.9);
+}
+.pair .i-remy {
+  opacity: 1;
+  transform: translate(8%, -50%) scale(0.9) rotate(4deg);
+}
+.scene-pixels {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.i-cascade {
+  position: absolute;
+  top: 4rem;
+  left: 0;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(#000, transparent);
+  mask-image: linear-gradient(#000, transparent);
+}
+.intro .pf-hero {
+  width: 104rem;
+  height: 104rem;
+  border-width: 3rem;
+  border-radius: 8rem;
+}
+.tall .pf-hero {
+  width: 118rem;
+  height: 118rem;
+}
+
+/* ───── Naming ───── */
+.naming {
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 22, 0.75);
+  z-index: 25;
+}
+.n-box {
+  background: var(--paper);
+  border: 2rem solid var(--ink);
+  border-radius: 6rem;
+  box-shadow:
+    inset 0 0 0 1rem #fff,
+    inset 0 0 0 2rem #8fb0ff,
+    0 3rem 0 rgba(0, 0, 0, 0.4);
+  padding: 10rem 12rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7rem;
+  animation: pop 180ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.n-title {
+  font: 9rem/1 var(--font-hd);
+  color: var(--ink);
+}
+.n-input {
+  width: 130rem;
+  font: 12rem/1 var(--font-hd);
+  text-align: center;
+  padding: 6rem;
+  border: 2rem solid var(--ink);
+  border-radius: 4rem;
+  background: #fff;
+  color: var(--ink);
+  outline: none;
+  letter-spacing: 1rem;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.n-input:focus {
+  border-color: var(--base);
+  box-shadow: 0 0 0 2rem rgba(0, 82, 255, 0.25);
+}
+.n-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4rem;
+  max-width: 170rem;
+}
+.n-presets button,
+.n-ok {
+  appearance: none;
+  font: 7rem/1 var(--font-hd);
+  padding: 5rem 6rem;
+  border-radius: 3rem;
+  border: 1rem solid var(--ink);
+  background: #e6ecff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.n-ok {
+  background: var(--base);
+  color: #fff;
+  padding: 6rem 18rem;
+  box-shadow: 0 2rem 0 var(--ink);
+}
+
+@media (pointer: coarse) {
+  .n-presets button,
+  .n-ok {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ───── Lab / starter pick ───── */
+.lab {
+  background: radial-gradient(ellipse at 50% 20%, #2d447b, #111a35 70%);
+}
+.lab-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 55%;
+  bottom: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 1rem, transparent 1rem 20rem),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0 1rem, transparent 1rem 14rem);
+}
+.lab-title {
+  position: absolute;
+  top: 8rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 8rem/1 var(--font-hd);
+  color: #eff5ff;
+  letter-spacing: 1rem;
+  text-shadow: 0 0 8rem #8bc8ff;
+}
+/* The card row fills exactly the band between the title and the dialogue box (box 49rem + name tag 13rem),
+   so no card can ever sit under the text box; portraits shrink to whatever height is left. */
+.lab-row {
+  position: absolute;
+  left: 6rem;
+  right: 6rem;
+  top: 24rem;
+  bottom: 66rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 5rem;
+}
+.tall .lab-row {
+  grid-template-columns: repeat(2, 1fr);
+  top: 22rem;
+}
+.st-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+  min-height: 0;
+  padding: 5rem 3rem 5rem;
+  border-radius: 6rem;
+  background: linear-gradient(145deg, #ffffffee, #dce7f3ee 45%, var(--art-bg));
+  border: 2rem solid #b3c6e3;
+  box-shadow: 0 3rem 0 #060d22, 0 0 9rem var(--art-glow);
+  cursor: pointer;
+  position: relative;
+  transform: perspective(160rem) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 160ms ease-out, box-shadow 160ms;
+}
+.st-card.sel {
+  transform: perspective(160rem) translateY(-3rem) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  background: linear-gradient(145deg, #fff, #e5efffcc 60%, var(--art-glow));
+  border-color: #fff1ad;
+  box-shadow: 0 0 0 1rem #ffc857, 0 0 15rem var(--art-glow), 0 5rem 0 #060d22;
+}
+.st-card.chosen {
+  animation: chosen 0.6s ease-in-out;
+  background: #fff6c2;
+}
+@keyframes chosen {
+  30% {
+    transform: translateY(-12rem) scale(1.12);
+  }
+}
+.st-card.taken {
+  opacity: 0.35;
+  filter: grayscale(1);
+  transform: scale(0.92);
+}
+.lab .pf-starter {
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  aspect-ratio: 1;
+}
+/* Landscape has ~90rem of card height: art, name and type only (the Prof reads out the type blurb). */
+.screen:not(.tall) .st-stats {
+  display: none;
+}
+/* Sits inside the dialogue box's empty second line, clear of the cards and the title. */
+.menu-lab {
+  bottom: 8rem;
+  right: 9rem;
+  min-width: 0;
+  padding: 1rem 4rem;
+  box-shadow: none;
+  transform-origin: bottom right;
+}
+.menu-row {
+  display: flex;
+  gap: 4rem;
+}
+.st-name {
+  font: 5.5rem/1 var(--font-hd);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.st-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4rem;
+  pointer-events: none;
+  background: linear-gradient(125deg, transparent 25%, #8fffe522 40%, #fff8 48%, #d8a8ff33 54%, transparent 65%);
+  background-size: 250% 100%;
+  opacity: 0;
+}
+.st-card.sel::after,
+.st-card:hover::after {
+  opacity: 0.8;
+  animation: holo-sheen 2.8s ease-in-out infinite;
+}
+@keyframes holo-sheen {
+  from { background-position: 150% 0; }
+  to { background-position: -100% 0; }
+}
+.st-stats {
+  width: 100%;
+  display: grid;
+  gap: 2rem;
+  padding-top: 2rem;
+}
+.st-stats span {
+  display: grid;
+  grid-template-columns: 13rem 1fr 9rem;
+  align-items: center;
+  gap: 2rem;
+  font: 4rem/1 var(--font-hd);
+  color: #233253;
+}
+.st-stats b,
+.st-stats em {
+  font: inherit;
+}
+.st-stats i {
+  height: 2rem;
+  background: linear-gradient(90deg, #3f5687 var(--stat), #a3b2cc var(--stat));
+}
+.st-stats em { text-align: right; }
+.tall .st-card { gap: 2rem; padding: 3rem; }
+.tall .pf-starter { max-width: 70rem; }
+.tall .st-stats {
+  grid-template-columns: 1fr 1fr;
+  column-gap: 4rem;
+}
+.tall .st-stats span {
+  grid-template-columns: 12rem 1fr 8rem;
+}
+.tall .st-card.sel {
+  transform: perspective(160rem) translateY(-1rem) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+}
+
+/* ───── Hall of Fame ───── */
+.hof {
+  background: radial-gradient(80% 60% at 50% 40%, #3b1d7a 0%, #140a36 60%, #05030f 100%);
+  z-index: 12;
+}
+.hof-mosaic-stage {
+  position: absolute;
+  width: auto;
+  height: 72%;
+  aspect-ratio: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -48%);
+  transition: opacity 1.2s, transform 2s;
+}
+.hof-mosaic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  box-shadow: 0 0 28rem #967fff55;
+}
+.hof-revealed .hof-mosaic-stage {
+  opacity: 0.32;
+  transform: translate(-50%, -48%) scale(1.12);
+}
+.hof-dedication {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8rem;
+  text-align: center;
+  color: #d8c7ff;
+  font: 5rem/1.5 var(--font-hd);
+  letter-spacing: 0.5rem;
+  transition: opacity 0.6s;
+}
+.hof-revealed .hof-dedication { opacity: 0; }
+.hof-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1rem 1rem at 20% 30%, #fff, transparent),
+    radial-gradient(1rem 1rem at 70% 20%, #fff, transparent),
+    radial-gradient(1rem 1rem at 40% 70%, #fff, transparent),
+    radial-gradient(1rem 1rem at 85% 60%, #fff, transparent),
+    radial-gradient(1rem 1rem at 10% 80%, #fff, transparent),
+    radial-gradient(1rem 1rem at 55% 45%, #fff, transparent);
+  background-size: 80rem 80rem;
+  animation: twinkle 3s steps(3) infinite;
+}
+@keyframes twinkle {
+  50% {
+    opacity: 0.5;
+  }
+}
+.hof-title {
+  position: absolute;
+  top: 10rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 14rem/1 var(--font-hd);
+  letter-spacing: 1.5rem;
+  background: linear-gradient(180deg, #fff6c2 0 40%, #f5c542 50%, #d9822b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2rem 0 #3b1d00) drop-shadow(0 0 10rem rgba(245, 197, 66, 0.6));
+}
+.hof-row {
+  position: absolute;
+  top: 34rem;
+  left: 6rem;
+  right: 6rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6rem;
+}
+.hof-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+  animation: hof-in 0.6s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+@keyframes hof-in {
+  from {
+    transform: translateY(-40rem) scale(0.4) rotate(-20deg);
+    opacity: 0;
+  }
+}
+.hof .pf-hof {
+  width: 44rem;
+  height: 44rem;
+  border-width: 2rem;
+  box-shadow:
+    0 0 0 1rem #0b0e24,
+    0 0 12rem rgba(245, 197, 66, 0.55);
+}
+.tall .pf-hof {
+  width: 60rem;
+  height: 60rem;
+}
+.hof-name {
+  font: 5rem/1 var(--font-hd);
+  color: #fff;
+}
+.hof-lv {
+  font: 5rem/1 var(--font-hd);
+  color: #ffe27a;
+}
+.hof-confetti i {
+  position: absolute;
+  top: -10rem;
+  left: var(--x);
+  width: 3rem;
+  height: 5rem;
+  background: var(--c);
+  animation: confetti 3.2s linear infinite;
+  animation-delay: var(--d);
+}
+@keyframes confetti {
+  to {
+    transform: translateY(420rem) rotate(720deg);
+  }
+}
+
+/* ───── Credits ───── */
+.credits {
+  z-index: 13;
+  background: #09071a;
+  animation: panel-in 0.8s;
+}
+.cr-mosaic {
+  width: max(100%, 320rem);
+  height: auto;
+  max-width: none;
+  opacity: 0.4;
+  animation: credits-mosaic 24s ease-in-out infinite alternate;
+}
+.credits::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(#09071acc, transparent 35%, transparent 70%, #09071acc);
+}
+@keyframes credits-mosaic {
+  from { transform: translate(-50%, -48%) scale(1.1) rotate(-6deg); }
+  to { transform: translate(-50%, -52%) scale(1.3) rotate(6deg); }
+}
+.cr-roll {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  text-align: center;
+  color: #fff;
+  z-index: 1;
+  text-shadow: 0 1rem 3rem #000, 0 0 8rem #000;
+}
+.cr-roll h1 {
+  font: 14rem/1.4 var(--font-hd);
+  color: #ffe27a;
+  margin: 10rem 0;
+}
+.cr-roll h2 {
+  font: 7rem/1 var(--font-hd);
+  color: #8fb0ff;
+  margin: 18rem 0 6rem;
+  letter-spacing: 1rem;
+}
+.cr-roll p {
+  font-size: 11rem;
+  margin: 3rem 0;
+}
+.cr-roll .cr-end {
+  margin-top: 40rem;
+}
+.cr-hint {
+  color: #b9c6ff;
+}
+
+.tall .t-remy {
+  font-size: 36rem;
+}
+.tall .t-quest {
+  font-size: 23rem;
+}
+.tall .t-logo {
+  top: 10%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-wall, .t-flip, .t-logo, .t-press, .i-prof, .st-card::after,
+  .hof-card, .hof-stars, .hof-confetti i, .cr-mosaic {
+    animation: none;
+  }
+}

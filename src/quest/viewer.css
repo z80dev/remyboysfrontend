@@ -1,0 +1,149 @@
+/* Museum-quality original art, independent of the pixelated world canvas. */
+.art-viewer {
+  position: absolute;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7rem;
+  padding: 10rem 14rem 7rem;
+  color: #f2dfb0;
+  background: radial-gradient(ellipse at 50% 32%, #34444a 0%, #17272f 45%, #0a121e 100%);
+  animation: art-room-in 180ms ease-out both;
+}
+.art-viewer::before {
+  content: '';
+  position: absolute;
+  inset: 5rem;
+  border: 1rem solid #bb985b42;
+  pointer-events: none;
+}
+.art-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8rem;
+  width: 100%;
+  flex: none;
+  color: #baa777;
+  font-size: 7rem;
+  letter-spacing: 1rem;
+}
+.art-viewer-header span:first-child { color: #ffe6a5; }
+.art-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.art-viewer-frame {
+  position: relative;
+  width: min(100cqw - 12rem, 100cqh - 6rem);
+  aspect-ratio: 1;
+  flex: none;
+  padding: 4rem;
+  border: 2rem solid #705027;
+  outline: 1rem solid #e9cc85;
+  background: linear-gradient(135deg, #fff0b9, #ca9c48 20%, #795023 48%, #efd389 75%, #a57535);
+  box-shadow: 0 0 0 3rem #a67e40, 0 0 0 4rem #382d25, 0 7rem 12rem #0009;
+  animation: art-frame-in 300ms cubic-bezier(.2, .8, .2, 1) both;
+}
+.art-viewer-frame::after {
+  content: '';
+  position: absolute;
+  inset: 4rem;
+  border: 1rem solid #30241c;
+  box-shadow: inset 1rem 2rem 3rem #0006;
+  pointer-events: none;
+}
+.art-viewer-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.is-loaded .art-viewer-image { opacity: 1; }
+.art-viewer-loading {
+  position: absolute;
+  inset: 6rem;
+  display: grid;
+  place-items: center;
+  background: #203039;
+  font-size: 8rem;
+  text-align: center;
+}
+.art-viewer-plaque {
+  flex: none;
+  width: min(100%, 220rem);
+  padding: 6rem 10rem;
+  color: #3a2c22;
+  border: 1rem solid #ecd69d;
+  box-shadow: 1rem 2rem 0 #0006, inset 0 0 0 1rem #876b45;
+  background: linear-gradient(115deg, #e9d8ad, #c8ae79 65%, #e7d4a5);
+}
+.art-viewer-title { display: flex; align-items: center; justify-content: space-between; gap: 8rem; }
+.art-viewer-title strong { font-size: 13rem; letter-spacing: 1rem; }
+.art-viewer-type { color: white; background: var(--art-accent); padding: 1rem 4rem; font-size: 7rem; text-shadow: 0 1rem #0006; border: 1rem solid #0003; }
+.art-viewer-epithet { font-size: 8rem; margin-top: 2rem; }
+.art-viewer-status { font-size: 6rem; letter-spacing: .5rem; color: #655234; margin-top: 4rem; }
+.art-viewer-close {
+  flex: none;
+  padding: 3rem 8rem;
+  background: transparent;
+  border: 0;
+  color: #ddcca6;
+  font: inherit;
+  font-size: 7rem;
+  cursor: pointer;
+}
+.art-viewer-close:focus-visible { outline: 1rem solid #e8cd87; }
+@keyframes art-room-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes art-frame-in { from { transform: translateY(8rem) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .art-viewer, .art-viewer-frame { animation: none; }
+  .art-viewer-image { transition: none; }
+}
+@media (min-aspect-ratio: 6/5) {
+  .art-viewer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(82rem, .72fr);
+    grid-template-rows: 12rem minmax(0, 1fr) 13rem;
+    gap: 7rem 12rem;
+  }
+  .art-viewer-header { grid-column: 1 / -1; }
+  .art-viewer-stage { height: 100%; }
+  .art-viewer-plaque { align-self: center; padding: 10rem; }
+  .art-viewer-title { flex-wrap: wrap; gap: 5rem; }
+  .art-viewer-epithet { margin-top: 8rem; }
+  .art-viewer-status { line-height: 1.7; margin-top: 10rem; }
+  .art-viewer-close { grid-column: 1 / -1; }
+}
+.art-awakening {
+  position: absolute;
+  inset: 0;
+  z-index: 86;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10rem;
+  color: #ffedb5;
+  font-size: 9rem;
+  text-shadow: 1rem 1rem #152332;
+  background: radial-gradient(ellipse, #80ffdb33, transparent 65%);
+}
+.art-awakening canvas {
+  width: 48rem;
+  height: 48rem;
+  image-rendering: pixelated;
+  animation: art-step-out 850ms ease-out both;
+}
+@keyframes art-step-out {
+  from { transform: translateY(-35rem) scale(.35); opacity: 0; }
+  35% { opacity: 1; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}

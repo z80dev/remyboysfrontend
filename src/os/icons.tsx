@@ -293,6 +293,34 @@ const icons: Record<string, ReactNode> = {
       <path d="M2.2 14.2h26.2l-.4 2.6c-8.6 1-17.2 1-25.4 0z" fill="#fff" opacity=".45" />
     </>
   ),
+  /* Creative studio: a gleaming framed picture with a starburst. */
+  remix: (
+    <>
+      <Shadow />
+      <path d="M7 6h20v18H7z" fill="url(#xi-beige)" stroke="#655b43" strokeWidth=".8" />
+      <path d="M9.2 8.2h15.6v13.6H9.2z" fill="url(#xi-screen)" stroke="#334b72" strokeWidth=".8" />
+      <path d="M10 19c3.4-4.7 6.2-3.2 8.4-1.3 2-4.3 3.8-4.4 6.2-.7v4H10z" fill="url(#xi-grass)" />
+      <circle cx="20.5" cy="12" r="2.1" fill="url(#xi-yellow)" />
+      <path d="m7 6 20 0v5c-6.4 1.4-13.6 1.2-20 0z" fill="url(#xi-gloss)" opacity=".65" />
+      <path d="m7 24 4.4 3.2h14.8L27 24z" fill="url(#xi-beige-side)" stroke="#655b43" strokeWidth=".6" />
+      <path d="m5 11 .9 2.1 2.1.9-2.1.9L5 16l-.9-2.1L2 13.1l2.1-.9z" fill="url(#xi-yellow)" stroke="#9d6700" strokeWidth=".5" />
+    </>
+  ),
+  /* Remy Advance handheld: blue shell, lit screen with a grass horizon, d-pad and A/B buttons. */
+  quest: (
+    <>
+      <Shadow />
+      <rect x="2.4" y="8" width="27.2" height="17.4" rx="6" fill="url(#xi-blue)" stroke="#0b2a7a" strokeWidth=".9" />
+      <rect x="9.8" y="10" width="12.4" height="10" rx="1.2" fill="#12183a" stroke="#0b2a7a" strokeWidth=".7" />
+      <rect x="11" y="11.2" width="10" height="7.6" fill="url(#xi-screen)" />
+      <path d="M11 16.4c3-1.4 6.4-1.6 10-.4v2.8H11z" fill="url(#xi-grass)" />
+      <circle cx="17.6" cy="13.2" r="1.3" fill="url(#xi-yellow)" />
+      <path d="M5 15.4h1.5v-1.5h1.8v1.5h1.5v1.8H8.3v1.5H6.5v-1.5H5z" fill="#1d2440" />
+      <circle cx="24.4" cy="16.8" r="1.5" fill="url(#xi-red)" stroke="#6a1a14" strokeWidth=".4" />
+      <circle cx="27" cy="14.6" r="1.5" fill="url(#xi-red)" stroke="#6a1a14" strokeWidth=".4" />
+      <path d="M4.6 10.6c5.6-1.9 17.2-1.9 22.8 0" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth=".9" strokeLinecap="round" />
+    </>
+  ),
   /* Paint palette and brush. */
   paint: (
     <>

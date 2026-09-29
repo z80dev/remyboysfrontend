@@ -103,6 +103,9 @@ export function Gallery({ param, navigate }: AppProps) {
               <TaskLink icon="globe" href={`https://opensea.io/assets/base/${ADDR.remy}/${id}`}>
                 View on OpenSea
               </TaskLink>
+              <TaskLink icon="remix" onClick={() => navigate(`remix/${art}`)} disabled={art === undefined}>
+                Remix this Remy
+              </TaskLink>
             </TaskBox>
             <TaskBox title="Details">
               <b className="detail-name">{meta.data?.name ?? `Remy Boy #${id}`}</b>
@@ -174,6 +177,7 @@ export function Gallery({ param, navigate }: AppProps) {
             <a className="btn" href={`https://opensea.io/assets/base/${ADDR.remy}/${id}`} target="_blank" rel="noreferrer">
               View on OpenSea
             </a>
+            {art !== undefined && <button type="button" className="btn" onClick={() => navigate(`remix/${art}`)}><Icon name="remix" size={17}/> Remix this Remy</button>}
           </section>
         )}
       </div>

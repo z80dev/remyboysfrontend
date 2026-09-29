@@ -25,6 +25,7 @@ const NEWS = [
   },
   { id: 'legacy', icon: 'exchange', title: 'Legacy Exchange', text: 'rbREMY, staked rbREMYLS and wREMY convert into fREMY at the fixed old rates.' },
   { id: 'approvals', icon: 'approvals', title: 'Approvals Manager', text: 'Check which marketplaces can move your Remys and revoke them in one click.' },
+  { id: 'remix', icon: 'remix', title: 'Remy Remix Studio', text: 'Pick any original Remy and make a new image with AI. Choose a look, compare it with the source, and download your result.' },
 ]
 
 export function Welcome({ navigate }: AppProps) {

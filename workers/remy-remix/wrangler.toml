@@ -1,0 +1,19 @@
+name = "remy-remix"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+workers_dev = false
+routes = [{ pattern = "basedremyboys.club/api/remix*", zone_name = "basedremyboys.club" }]
+
+[[durable_objects.bindings]]
+name = "REMIX_ADMISSION"
+class_name = "Admission"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Admission"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[observability]
+enabled = true
