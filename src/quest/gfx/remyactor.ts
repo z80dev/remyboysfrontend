@@ -61,44 +61,48 @@ function sprite(idx: number, dir: Dir, frame: number, head: AtlasRect | null, ou
   if (!head) return c
   const h = document.createElement('canvas')
   h.width = h.height = 16
-  const hc = h.getContext('2d') as CanvasRenderingContext2D
+  const hc = h.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D
   hc.imageSmoothingEnabled = false
+  const side = art.side(idx) ?? head
   if (dir === 'up') {
-    // Reuse the actual silhouette, so a cap, afro or long hair survives the turn away.
+    // The back of the head: the real silhouette (caps, afros and long hair survive the turn), repainted as a lit
+    // hair ramp with the pipeline's dark rim, and a sliver of neck.
     hc.drawImage(head.img, head.sx, head.sy, head.sw, head.sh, 0, 0, 16, 16)
-    hc.globalCompositeOperation = 'source-in'
-    hc.fillStyle = info.bald ? info.palette.skin : info.palette.hair
-    hc.fillRect(0, 0, 16, 16)
-    hc.globalCompositeOperation = 'source-atop'
-    hc.fillStyle = '#ffffff'
-    hc.globalAlpha = info.bald ? 0.25 : 0.17
-    hc.fillRect(3, 2, 7, 2)
-    hc.fillRect(2, 4, 3, 4)
-    hc.fillStyle = '#172035'
-    hc.globalAlpha = 0.28
-    hc.fillRect(12, 4, 4, 12)
-    hc.fillRect(0, 13, 16, 3)
-    hc.globalAlpha = 1
+    const img = hc.getImageData(0, 0, 16, 16)
+    const d = img.data
+    const base = hexRgb(info.bald ? info.palette.skin : info.palette.hair)
+    const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < 16 && y < 16 && d[(y * 16 + x) * 4 + 3] > 0
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 16; x++) {
+        if (!solid(x, y)) continue
+        const edge = !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1)
+        const k = edge ? -0.62 : x + y < 9 ? 0.22 : x > 11 || y > 12 ? -0.24 : 0
+        const i = (y * 16 + x) * 4
+        for (let ch = 0; ch < 3; ch++) {
+          const v = base[ch]
+          d[i + ch] = k < 0 ? v + (RIM[ch] - v) * -k : v + (255 - v) * k
+        }
+      }
+    hc.putImageData(img, 0, 0)
     hc.fillStyle = info.palette.skin
     hc.fillRect(6, 14, 4, 2)
   } else if (dir === 'left' || dir === 'right') {
-    // A three-quarter turn: narrower face, looking toward the leading edge, with a shaded back quarter.
     if (dir === 'left') {
       hc.translate(16, 0)
       hc.scale(-1, 1)
     }
-    hc.drawImage(head.img, head.sx, head.sy, head.sw, head.sh, 3, 0, 13, 16)
-    hc.globalCompositeOperation = 'source-atop'
-    hc.fillStyle = info.bald ? info.palette.skin : info.palette.hair
-    hc.fillRect(3, 3, 3, 11)
-    hc.fillStyle = '#172035'
-    hc.globalAlpha = 0.16
-    hc.fillRect(3, 5, 2, 9)
+    hc.drawImage(side.img, side.sx, side.sy, side.sw, side.sh, 0, 0, 16, 16)
   } else {
     hc.drawImage(head.img, head.sx, head.sy, head.sw, head.sh, 0, 0, 16, 16)
   }
   ctx.drawImage(h, 0, bob)
   return c
+}
+
+const RIM = [26, 18, 40]
+function hexRgb(hex: string): number[] {
+  const n = Number.parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
 /** Tile-anchored, 16×24 max: the head extends eight logical pixels above the standing tile. */

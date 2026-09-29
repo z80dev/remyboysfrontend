@@ -1,4 +1,4 @@
-import { ITEMS, type ItemId, MOVES, type Remy, remyName, statsOf } from './data'
+import { ITEMS, type ItemId, MOVES, type Remy, civRemy, isCabald, remyName, statsOf } from './data'
 import type { Dir } from './types'
 
 const SAVE_KEY = 'remyquest.save.v1'
@@ -21,9 +21,16 @@ export interface SaveState {
   respawn: { map: string; x: number; y: number }
   playMs: number
   starter?: number
+  /** The Remy you play as. Never a Cabald member. */
+  avatar: number
+  /** Wild encounters are skipped while this many grass steps remain (Private Mempool). */
+  repel?: number
 }
 
-export function newGame(name: string): SaveState {
+/** Deterministic non-bald fallback for saves without a usable avatar. */
+export const defaultAvatar = () => civRemy(1)
+
+export function newGame(name: string, avatar = defaultAvatar()): SaveState {
   return {
     name,
     map: 'genesis',
@@ -39,6 +46,7 @@ export function newGame(name: string): SaveState {
     caught: [],
     respawn: { map: 'genesis', x: 5, y: 6 },
     playMs: 0,
+    avatar,
   }
 }
 
@@ -58,6 +66,8 @@ export function loadSave(): SaveState | null {
     // Restore awards omitted by earlier story versions without changing progress.
     if (s.starter !== undefined || s.party.length) s.flags.dex = true
     if (s.flags.rug) s.flags.badge_rug = true
+    // The player was once bald Remy #0; nobody plays as a Cabald member.
+    if (typeof s.avatar !== 'number' || isCabald(s.avatar)) s.avatar = defaultAvatar()
     return s
   } catch {
     return null
@@ -68,6 +78,22 @@ export function save() {
 }
 export function wipeSave() {
   localStorage.removeItem(SAVE_KEY)
+}
+
+/** Device-wide preferences (not per save). */
+export type TextSpeed = 'mid' | 'fast' | 'instant'
+const PREFS_KEY = 'remyquest.prefs.v1'
+const TEXT_MS: Record<TextSpeed, number> = { mid: 36, fast: 18, instant: 0 }
+export const prefs: { text: TextSpeed } = { text: 'fast' }
+try {
+  Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}'))
+} catch {}
+/** Typewriter delay per two characters, in ms; 0 prints whole pages at once. */
+export const textMs = () => TEXT_MS[prefs.text] ?? 18
+export function cycleTextSpeed() {
+  const order: TextSpeed[] = ['mid', 'fast', 'instant']
+  prefs.text = order[(order.indexOf(prefs.text) + 1) % order.length]
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
 }
 
 export function markSeen(idx: number) {

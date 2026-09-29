@@ -1,7 +1,8 @@
 /** World maps: grids, buildings, NPCs, trainers, items, warps and their scripts. */
 import { audio } from './audio'
 import { BRIDGE_BUILDING, BRIDGE_TERMINAL, enterBridge } from './bridge'
-import { ITEMS, type ItemId, type RType, makeRemy, remyName } from './data'
+import { art } from './art'
+import { ITEMS, type ItemId, type RType, cabaldRemy, civRemy, counterOf, makeRemy, remyName, species } from './data'
 import { shopScreen, storageScreen } from './menus'
 import { hallOfFame, starterScene } from './scenes'
 import { S, addItem, healParty, save } from './state'
@@ -83,7 +84,7 @@ const L = {
   rival: { skin: SKIN.light, hair: 'spiky', hairColor: '#d94a3a', shirt: '#2d3f6b', pants: '#1f2438' },
   girl: { skin: SKIN.mid, hair: 'long', hairColor: '#f2c14e', shirt: '#ff7aa8', pants: '#5a4bd8' },
   fisher: { skin: SKIN.tan, hair: 'cap', hairColor: '#2d6a4f', shirt: '#e9c46a', pants: '#3a5a40' },
-  oldman: { skin: SKIN.light, hair: 'bald', hairColor: '#ddd', shirt: '#8d6e63', pants: '#4e342e', extra: 'glasses' },
+  oldman: { skin: SKIN.light, hair: 'short', hairColor: '#ddd', shirt: '#8d6e63', pants: '#4e342e', extra: 'glasses' },
   newbie: { skin: SKIN.mid, hair: 'short', hairColor: '#4a3426', shirt: '#2b2b2b', pants: '#4a4a6a' },
   brenda: { skin: SKIN.light, hair: 'bun', hairColor: '#9b5de5', shirt: '#f15bb5', pants: '#2b2d42' },
   hunter: { skin: SKIN.dark, hair: 'beanie', hairColor: '#ff9f1c', shirt: '#2ec4b6', pants: '#1b1b3a' },
@@ -101,10 +102,36 @@ const L = {
 } satisfies Record<string, ActorLook>
 
 // ─────────── Cast (art indexes) ───────────
-export const CAST = { prof: 46, rival: 42, nurse: 14, clerk: 6, maxi: 2084, rug: 67, player: 0, gold: 2002 }
-export const STARTERS = [16, 9, 13, 54]
-/** Never appear as random wild Remys. */
-export const RESERVED = new Set([...STARTERS, ...Object.values(CAST), 2067, 45, 2, 2081, 2086, 2004])
+/**
+ * Story roles are seeds, not Remys: bald ⇔ Cabald is decided by the art catalogue at runtime, so members are drawn
+ * from `art.baldList()` and everyone else skips past any seed that turns out bald. Getters resolve lazily because
+ * this module evaluates before the catalogue has loaded.
+ */
+const CIV = { prof: 46, rival: 42, nurse: 14, clerk: 6, maxi: 2084, gold: 2002, curator: 2016 }
+const CABALD = {
+  rug: 67, nobody: 10, short: 1010, squeeze: 57, escrow: 2086, lobby: 1001, courier: 1002,
+  amy: 60, carl: 2038, dan: 5757, ray: 1000,
+}
+export const CAST = Object.defineProperties({} as Record<keyof typeof CIV | keyof typeof CABALD, number>, {
+  ...Object.fromEntries(Object.entries(CIV).map(([k, seed]) => [k, { get: () => civRemy(seed), enumerable: true }])),
+  ...Object.fromEntries(Object.entries(CABALD).map(([k, seed]) => [k, { get: () => cabaldRemy(seed), enumerable: true }])),
+})
+export const CAST_CABALD = Object.keys(CABALD)
+/** Starters in type order BULL, BEAR, WHALE, DEGEN. */
+const STARTER_SEEDS = [16, 9, 13, 54]
+export const starters = () => STARTER_SEEDS.map(civRemy)
+/** The gallery's three wandering works (BULL, DEGEN, GOLDEN wing). */
+export const livingArt = () => [29, 35, 2005].map(civRemy)
+
+export const isCabaldTrainer = (t: Pick<TrainerDef, 'title'>) => t.title.startsWith('CABALD')
+export const isCabaldNpc = (d: NpcDef) => !!d.outfit || (!!d.trainer && typeof d.trainer !== 'function' && isCabaldTrainer(d.trainer))
+const castIdx = (idx: number, cabald: boolean) => (cabald ? cabaldRemy(idx) : civRemy(idx))
+
+/** Applies bald ⇔ Cabald to a trainer: members field only bald Remys, everyone else none. Idempotent. */
+export function castTrainer(t: TrainerDef): TrainerDef {
+  const cabald = isCabaldTrainer(t)
+  return { ...t, portrait: castIdx(t.portrait, cabald), party: t.party.map(([idx, lv]) => [castIdx(idx, cabald), lv]) }
+}
 
 const rows = (border: string, inner: string[], right = border) => inner.map((r) => border + r + right)
 
@@ -113,22 +140,22 @@ const genesisGrid = [
   'TTTTTTTTTTT::TTTTTTTTTTT',
   'TTTTTTTTTTT::TTTTTTTTTTT',
   ...rows('TT', [
-    '..,......::....,....',
-    '.........::.........',
+    'T.,......::....,...T',
+    'T........::........T',
     '.........::.........',
     '.........::.........',
     '...:.....::.........',
     '...:::::::::::::::..',
-    '...:.......,........',
-    '...:........,.......',
-    ',..:.......ssssssss.',
+    '...:......:,......,,',
+    '...:......:.,.......',
+    ',..:......:ssssssss.',
     '...:.......s~~~~~~s.',
     '...::::....s~~~~~~s.',
     '...........s~~~~~~s,',
     '..,........s~~~~~~s.',
-    '...........ssssssss.',
+    ',,.........ssssssss.',
     '.,....b........,....',
-    '....................',
+    'T.,,.....,,.........',
   ]),
   'TTTTTTTTTTTTTTTTTTTTTTTT',
   'TTTTTTTTTTTTTTTTTTTTTTTT',
@@ -158,7 +185,6 @@ async function labIntro() {
 }
 
 // ─────────── THE FLOOR: original portraits, not token IDs ───────────
-const LIVING_ART = [29, 35, 2005]
 const GALLERY_ART = [
   [1, 16, 29, 34, 9, 15, 24, 37],
   [7, 13, 20, 39, 4, 27, 35, 31],
@@ -173,6 +199,12 @@ galleryObjects.push(
   { kind: 'sign', x: 10, y: 2 },
   { kind: 'sign', x: 10, y: 6 },
   { kind: 'sign', x: 10, y: 10 },
+  { kind: 'stanchion', x: 9, y: 16 },
+  { kind: 'stanchion', x: 12, y: 16 },
+  { kind: 'palm', x: 1, y: 3 },
+  { kind: 'palm', x: 20, y: 3 },
+  { kind: 'palm', x: 1, y: 16 },
+  { kind: 'palm', x: 20, y: 16 },
 )
 
 function galleryWing(o: MapObject): string {
@@ -182,7 +214,9 @@ function galleryWing(o: MapObject): string {
 }
 
 async function curator() {
-  const opts = { speaker: 'THE CURATOR', portrait: 2016 }
+  const opts = { speaker: 'THE CURATOR', portrait: CAST.curator }
+  const [bull, degen, gold] = livingArt()
+  const roll = `*REMY #${bull}*: BULL. *REMY #${degen}*: DEGEN. *REMY #${gold}*: GOLDEN.`
   if (S.flags.gallery_patron) {
     await say('*PATRON OF THE FLOOR*: {P}. The paintings voted. One tried to eat the ballot.', opts)
     return
@@ -190,7 +224,8 @@ async function curator() {
   if (!S.flags.gallery_living) {
     await talk([
       'Welcome to *THE FLOOR*. Real Remys. No right-click security.',
-      'Three works wander: *REMY #29* in BULL, *REMY #35* in DEGEN, *REMY #2005* in GOLDEN.',
+      `Three works wander. ${roll}`,
+      'No bald heads on these walls. The Cabald bought the frames, not the faces.',
       'Inspect them to battle. Mint *one* or meet *all three*, then see me for a gift.',
       'Here are *2 Ledger Pros*. Aim at the art, not the visitors.',
     ], opts)
@@ -200,8 +235,9 @@ async function curator() {
     save()
     return
   }
-  const met = LIVING_ART.filter((idx) => S.flags[`gallery_awake:${idx}`]).length
-  if (LIVING_ART.some((idx) => S.caught.includes(idx)) || met === LIVING_ART.length) {
+  const living = livingArt()
+  const met = living.filter((idx) => S.flags[`gallery_awake:${idx}`]).length
+  if (living.some((idx) => S.caught.includes(idx)) || met === living.length) {
     await talk([
       'Art belongs in a living collection. You understood the assignment.',
       '*3 Ledger Pros* and *2 Max Hopium*! Welcome, *PATRON OF THE FLOOR*.',
@@ -212,7 +248,7 @@ async function curator() {
     await audio.jingle('item')
     save()
   } else {
-    await talk([`Living works met: *${met}/3*. Mint one or meet all three.`, '*REMY #29*: BULL. *REMY #35*: DEGEN. *REMY #2005*: GOLDEN.'], opts)
+    await talk([`Living works met: *${met}/3*. Mint one or meet all three.`, roll], opts)
   }
 }
 
@@ -221,11 +257,11 @@ async function inspectArt(o: MapObject, museum: boolean) {
   if (o.kind === 'billboard' && idx === CAST.rug) {
     await talk(S.flags.rug
       ? ['*EXHIBIT A: CABALD PROPAGANDA*', 'Someone has taped a refund receipt over the logo.']
-      : ['*THERE IS NO CABALD. I LOVE YOU.*', 'A bald head inside a gold C. Subtle as a signed confession.'],
+      : ['*THERE IS NO CABALD. I LOVE YOU.*', 'A bald head inside a gold C. Every member is on it. None of them exist.'],
     { speaker: 'PUBLIC SERVICE DENIAL' })
     return
   }
-  const living = museum && !!S.flags.gallery_living && LIVING_ART.includes(idx) && !S.flags[`gallery_awake:${idx}`]
+  const living = museum && !!S.flags.gallery_living && livingArt().includes(idx) && !S.flags[`gallery_awake:${idx}`]
   closeText()
   await viewArt(idx, { wing: museum ? galleryWing(o) : 'STREET EDITION · THE FLOOR', living })
   if (!living) return
@@ -238,15 +274,29 @@ async function inspectArt(o: MapObject, museum: boolean) {
   await flash(2, 80)
   await awakenArt(idx)
   S.flags[`gallery_awake:${idx}`] = true
-  await wildBattle(makeRemy(idx, idx === 2005 ? 10 : 8), 'gallery')
+  await wildBattle(makeRemy(idx, idx === livingArt()[2] ? 10 : 8), 'gallery')
   save()
 }
 
-/** Bridge and canyon ambushes share one party, not two back-to-back fights. */
+/** SHORT & SQUEEZE field one party between them, not two back-to-back fights. */
+export function duoTrainers(): TrainerDef[] {
+  return (['meadow', 'canyon'] as const).map(duoTrainer)
+}
+
+function duoTrainer(area: 'meadow' | 'canyon'): TrainerDef {
+  return {
+    name: 'SHORT & SQUEEZE', title: 'CABALD ADMINS', portrait: CAST.short,
+    party: area === 'meadow' ? [[1502, 4], [4101, 5]] : [[1502, 11], [4101, 12]],
+    sight: 0, intro: [],
+    lose: 'Our position! Liquidated by friendship!',
+    after: ['The capes were non-refundable. So were the haircuts.'], prize: area === 'meadow' ? 300 : 700, music: 'cabald',
+  }
+}
+
 async function duoAmbush(area: 'meadow' | 'canyon', interact = false) {
   const id = `cabald_duo_${area}`
   if (S.flags.rug || (area === 'meadow' && S.flags.badge_mm) || S.flags[`t:${id}`]) {
-    if (interact) await say('Two unrelated strangers. Matching capes. Pure coincidence.', { speaker: 'SHORT & SQUEEZE', portrait: 10 })
+    if (interact) await say('Two unrelated strangers. Matching capes. Matching scalps. Pure coincidence.', { speaker: 'SHORT & SQUEEZE', portrait: CAST.short })
     return
   }
   if (!S.party.length) return
@@ -265,23 +315,17 @@ async function duoAmbush(area: 'meadow' | 'canyon', interact = false) {
   face(player, 'left')
   await say(area === 'meadow'
     ? 'Your airdrop is due for compulsory affection.'
-    : 'Promoted to plausible deniability! Same capes, worse hours.', { speaker: 'CABALD ADMIN SHORT', portrait: 10 })
+    : 'Promoted to plausible deniability! Same capes, worse hours.', { speaker: 'CABALD ADMIN SHORT', portrait: CAST.short })
   await say(area === 'meadow'
-    ? 'I’m SQUEEZE. He’s SHORT. We take the float. You keep the receipt.'
-    : 'Base. Mainnet. Solana. Robinhood Chain. Four drains, one tower.', { speaker: 'CABALD ADMIN SQUEEZE', portrait: 57 })
+    ? 'I’m SQUEEZE. He’s SHORT. We take the float. You keep the receipt. And your hair. For now.'
+    : 'Base. Mainnet. Solana. Robinhood Chain. Four drains, one tower.', { speaker: 'CABALD ADMIN SQUEEZE', portrait: CAST.squeeze })
   closeText()
-  const res = await trainerBattle({
-    name: 'SHORT & SQUEEZE', title: 'CABALD ADMINS', portrait: 10,
-    party: area === 'meadow' ? [[1502, 4], [4101, 5]] : [[1502, 11], [4101, 12]],
-    sight: 0, intro: [],
-    lose: 'Our position! Liquidated by friendship!',
-    after: ['The capes were non-refundable.'], prize: area === 'meadow' ? 240 : 600, music: 'cabald',
-  }, id)
+  const res = await trainerBattle(duoTrainer(area), id)
   if (res !== 'win') return
   await talk(area === 'meadow'
     ? ['Keep your airdrops. We have an Exchange to not occupy.', 'Our boss at *Rug Tower* will hear about this. From nobody.']
     : ['Fine! The *RUG LORD* runs our drain. That was not a confession.', 'We quit. Hypothetically.'],
-  { speaker: 'SHORT & SQUEEZE', portrait: 57 })
+  { speaker: 'SHORT & SQUEEZE', portrait: CAST.squeeze })
   closeText()
   refreshNpcs()
   save()
@@ -292,7 +336,7 @@ async function liberateExchange() {
   await talk([
     'We are leaving a building we never occupied.',
     'The grunts unplug their drain. The Exchange doors swing open!',
-  ], { speaker: 'CABALD ADMIN ESCROW', portrait: 2086 })
+  ], { speaker: 'CABALD ADMIN ESCROW', portrait: CAST.escrow })
   flag('cabald_city')
   refreshNpcs()
   healParty()
@@ -328,6 +372,10 @@ export const MAPS: Record<string, MapDef> = {
       { kind: 'flowerpot', x: 3, y: 5 },
       { kind: 'flowerpot', x: 20, y: 7 },
       { kind: 'billboard', x: 3, y: 14, idx: 24 },
+      { kind: 'lamp', x: 6, y: 11 },
+      { kind: 'lamp', x: 18, y: 8 },
+      { kind: 'lamp', x: 12, y: 16 },
+      { kind: 'planter', x: 13, y: 6 },
     ],
     signs: [
       { x: 13, y: 2, text: ['*GENESIS TOWN · BASE*', 'Small town. Big builder energy.'] },
@@ -335,10 +383,10 @@ export const MAPS: Record<string, MapDef> = {
     ],
     npcs: [
       {
-        id: 'cabald_nobody', x: 10, y: 5, dir: 'right', look: L.ray, portrait: 10,
+        id: 'cabald_nobody', x: 10, y: 5, dir: 'right', look: L.ray, portrait: CAST.nobody,
         outfit: 'cabald', name: 'ABSOLUTELY NOBODY', hideIf: 'rug',
         talk: [
-          'This is not a uniform. The gold C is a laundry instruction.',
+          'This is not a uniform. The gold C is a laundry instruction. The bald head is a coincidence.',
           'Missing liquidity? Have you checked between the sofa cushions?',
           'There is no Cabald. I love you.',
         ],
@@ -443,21 +491,21 @@ export const MAPS: Record<string, MapDef> = {
       'TTTTTTTTTTT::TTTTTTTTTTT',
       'TTTTTTTTTTT::TTTTTTTTTTT',
       ...rows('TT', [
-        '..,......::.....,...',
-        '.........::.........',
+        'T.,,,....::....,,,.T',
+        '.,.......::.........',
         '..T......::......T..',
-        '.........::.........',
+        '...,.....::...,,....',
         '"""".....::.."""""""',
         '"""""....::.""""""""',
         '""""""...::.""""""""',
         '"""""....::..""""""T',
         '.""".....::...""""TT',
-        '.........::.........',
+        '.,,......::.........',
         '..,..T...::..,......',
         '.........:::::::....',
         '^^^^^^^^^^^^^^::....',
-        '.........:::::::....',
-        '.........::.........',
+        ',,,......:::::::....',
+        '.,.......::.......,.',
         '..sssssss::sssssss..',
         '..s~~~~~~ww~~~~~~s..',
         '..s~~~~~~ww~~~~~~s..',
@@ -470,7 +518,7 @@ export const MAPS: Record<string, MapDef> = {
         '""""""...::...""""""',
         '"""""....::...""""""',
         '.""".....::....""""T',
-        '.........::.........',
+        ',........::........,',
         '..T..,...::...,..T..',
         '.........::.........',
         'TT.......::.......TT',
@@ -479,10 +527,10 @@ export const MAPS: Record<string, MapDef> = {
         '"""".....::.........',
         '"""".....::..b...b..',
         '"""......::.........',
-        '.........::...,.....',
-        '..,......::.........',
+        '.,,......::...,,,...',
+        '.,,,.....::.....,,..',
         '.........::.........',
-        '.........::.........',
+        'T........::........T',
       ]),
       'TTTTTTTTTTT::TTTTTTTTTTT',
       'TTTTTTTTTTT::TTTTTTTTTTT',
@@ -519,12 +567,12 @@ export const MAPS: Record<string, MapDef> = {
         },
       },
       {
-        id: 'cabald_short', x: 9, y: 22, dir: 'right', look: L.ray, portrait: 10,
+        id: 'cabald_short', x: 9, y: 22, dir: 'right', look: L.ray, portrait: CAST.short,
         outfit: 'cabald-admin', name: 'SHORT', hideIf: 'rug',
         talk: () => duoAmbush('meadow', true),
       },
       {
-        id: 'cabald_squeeze', x: 14, y: 22, dir: 'left', look: L.dan, portrait: 57,
+        id: 'cabald_squeeze', x: 14, y: 22, dir: 'left', look: L.dan, portrait: CAST.squeeze,
         outfit: 'cabald-admin', name: 'SQUEEZE', hideIf: 'rug',
         talk: () => duoAmbush('meadow', true),
       },
@@ -539,7 +587,7 @@ export const MAPS: Record<string, MapDef> = {
         trainer: {
           name: 'AMY',
           title: 'CABALD GRUNT',
-          portrait: 60,
+          portrait: CAST.amy,
           party: [
             [781, 5],
             [3305, 5],
@@ -605,7 +653,7 @@ export const MAPS: Record<string, MapDef> = {
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       ...rows('TT', [
-        '..,.................,.....',
+        '..,....,,...........,.....',
         '..........................',
         '..........................',
         '..........................',
@@ -613,22 +661,22 @@ export const MAPS: Record<string, MapDef> = {
         '==========================',
         '==========================',
         '..,...==============...,..',
-        '......==============......',
+        '.T,,T.==============......',
         '......==============......',
       ]),
       'TT......======================', // y12: road east to the canyon
       ...rows('TT', [
+        '......==============T...T.',
         '......==============......',
-        '......==============......',
-        '..,.........==............',
+        '.,,,........==............',
         '............==......,.....',
         '............==............',
         '............==............',
-        '...=================......',
+        '...==================.....',
+        '.=============............',
+        '..,.........==......,,,,..',
         '............==............',
-        '..,.........==......,.....',
-        '............==............',
-        '............==............',
+        'T...........==............',
       ]),
       'TTTTTTTTTTTTTT==TTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTT==TTTTTTTTTTTTTT',
@@ -655,10 +703,19 @@ export const MAPS: Record<string, MapDef> = {
       { kind: 'flowerpot', x: 9, y: 6 },
       { kind: 'flowerpot', x: 10, y: 6 },
       { kind: 'statue', x: 12, y: 21 },
-      { kind: 'billboard', x: 3, y: 12, idx: 67 },
-      { kind: 'billboard', x: 23, y: 14, idx: 67 },
+      { kind: 'billboard', x: 3, y: 12, idx: CAST.rug },
+      { kind: 'billboard', x: 23, y: 14, idx: CAST.rug },
       { kind: 'billboard', x: 20, y: 22, idx: 35 },
       { kind: 'sign', x: 25, y: 19 },
+      { kind: 'vending', x: 15, y: 6 },
+      { kind: 'bin', x: 17, y: 6 },
+      { kind: 'hydrant', x: 7, y: 9 },
+      { kind: 'cafe', x: 17, y: 13 },
+      { kind: 'cafe', x: 20, y: 13 },
+      { kind: 'vending', x: 9, y: 16 },
+      { kind: 'planter', x: 20, y: 17 },
+      { kind: 'lamp', x: 13, y: 22 },
+      { kind: 'lamp', x: 16, y: 22 },
     ],
     signs: [
       { x: 16, y: 16, text: ['*LIQUIDITY CITY · BASE*', 'Build by day. Trade... also by day. And night.'] },
@@ -735,7 +792,7 @@ export const MAPS: Record<string, MapDef> = {
         trainer: {
           name: 'ESCROW',
           title: 'CABALD ADMIN',
-          portrait: 2086,
+          portrait: CAST.escrow,
           party: [
             [3021, 8],
             [555, 9],
@@ -752,9 +809,9 @@ export const MAPS: Record<string, MapDef> = {
         },
       },
       {
-        id: 'cabald_lobby', x: 24, y: 7, dir: 'left', look: L.ray, portrait: 10,
+        id: 'cabald_lobby', x: 24, y: 7, dir: 'left', look: L.ray, portrait: CAST.lobby,
         outfit: 'cabald', hideIf: 'cabald_city', name: 'CABALD GRUNT',
-        talk: ['Complaints? Battle *ADMIN ESCROW* out front.', 'Customer service is a contact sport.'],
+        talk: ['Complaints? Battle *ADMIN ESCROW* out front.', 'Customer service is a contact sport. We shaved for aerodynamics.'],
       },
       {
         id: 'exchange_customer', x: 20, y: 8, dir: 'right', look: L.lady,
@@ -837,7 +894,7 @@ export const MAPS: Record<string, MapDef> = {
       { x: 10, y: 10, text: ['*THE GOLDEN WING*', 'Living work: *REMY #2005*, left of the aisle.'] },
     ],
     npcs: [
-      { id: 'curator', x: 9, y: 14, dir: 'right', look: L.carl, name: 'THE CURATOR', portrait: 2016, talk: curator },
+      { id: 'curator', x: 9, y: 14, dir: 'right', look: L.carl, name: 'THE CURATOR', portrait: CAST.curator, talk: curator },
       { id: 'artbull', x: 5, y: 4, dir: 'up', look: L.whale, portrait: 27, talk: ['Bullish brushwork. Bullish composition. Even the fire exit is bullish.'] },
       { id: 'artdegen', x: 17, y: 8, dir: 'up', look: L.degen, portrait: 36, talk: ['I came for utility. The frog winked. I stayed.', 'Some see a portrait. I see a 40-page roadmap.'] },
       { id: 'artgold', x: 4, y: 12, dir: 'up', look: L.lady, portrait: 2000, talk: ['It’s THE FLOOR. Please stop asking about the ceiling.', '*4,490 originals* in the real collection. These are a few of their faces.'] },
@@ -886,16 +943,16 @@ export const MAPS: Record<string, MapDef> = {
       '###dd""ddddddddddd"""dd###',
       '###dddddddddddddddddddd###',
       '###^^^^^^^ddd^^^^^^^^^^###',
-      '###dddddddddddddddddddd###',
-      '##dddd""""dddddd""""dddd##',
+      '###bddddddddddddddddddb###',
+      '##Tddd""""dddddd""""dddT##',
       '##ddd"""""dddddd"""""ddd##',
       '##dddd""""dddddd""""dddd##',
       '##dddddddddddddddddddddd##',
       '##dddddddddddddddddddddd##',
       'dddddddddddddddddddddddd##',
-      'dddddddddddddddddddddddd##',
-      '######dddddddddddd########',
-      '#######dddddddddd#########',
+      'dddddddddsssdddddddddddT##',
+      '######ddsssssddddd########',
+      '#######ddsssddddd#########',
       '##########################',
       '##########################',
     ],
@@ -914,6 +971,13 @@ export const MAPS: Record<string, MapDef> = {
       { kind: 'rock', x: 20, y: 26 },
       { kind: 'rock', x: 5, y: 32 },
       { kind: 'rock', x: 19, y: 12 },
+      { kind: 'crate', x: 3, y: 21 },
+      { kind: 'barrel', x: 8, y: 21 },
+      { kind: 'barrel', x: 17, y: 7 },
+      { kind: 'crate', x: 8, y: 8 },
+      { kind: 'crate', x: 21, y: 32 },
+      { kind: 'crate', x: 22, y: 32 },
+      { kind: 'barrel', x: 22, y: 33 },
     ],
     signs: [
       { x: 3, y: 33, text: ['*RUG PULL CANYON*', '*RUG TOWER ↑*', 'Someone crossed out “Cabald HQ.” Badly.'] },
@@ -933,12 +997,12 @@ export const MAPS: Record<string, MapDef> = {
     ],
     npcs: [
       {
-        id: 'cabald_short', x: 11, y: 18, dir: 'right', look: L.ray, portrait: 10,
+        id: 'cabald_short', x: 11, y: 18, dir: 'right', look: L.ray, portrait: CAST.short,
         outfit: 'cabald-admin', name: 'SHORT', hideIf: 'rug',
         talk: () => duoAmbush('canyon', true),
       },
       {
-        id: 'cabald_squeeze', x: 16, y: 18, dir: 'left', look: L.dan, portrait: 57,
+        id: 'cabald_squeeze', x: 16, y: 18, dir: 'left', look: L.dan, portrait: CAST.squeeze,
         outfit: 'cabald-admin', name: 'SQUEEZE', hideIf: 'rug',
         talk: () => duoAmbush('canyon', true),
       },
@@ -948,6 +1012,7 @@ export const MAPS: Record<string, MapDef> = {
         y: 9,
         dir: 'down',
         look: L.gold,
+        portrait: CAST.gold,
         hideIf: 'gold',
         talk: async () => {
           await say('A *GOLDEN REMY* shimmers between the crystals, watching you\u2026')
@@ -978,7 +1043,7 @@ export const MAPS: Record<string, MapDef> = {
         trainer: {
           name: 'CARL',
           title: 'CABALD GRUNT',
-          portrait: 2038,
+          portrait: CAST.carl,
           party: [
             [1880, 10],
             [2748, 11],
@@ -1002,7 +1067,7 @@ export const MAPS: Record<string, MapDef> = {
         trainer: {
           name: 'DAN',
           title: 'CABALD GRUNT',
-          portrait: 57,
+          portrait: CAST.dan,
           party: [
             [4101, 10],
             [3907, 10],
@@ -1027,7 +1092,7 @@ export const MAPS: Record<string, MapDef> = {
         trainer: {
           name: 'RAY',
           title: 'CABALD GRUNT',
-          portrait: 10,
+          portrait: CAST.ray,
           party: [
             [2921, 9],
             [1502, 10],
@@ -1108,8 +1173,51 @@ for (const map of Object.values(MAPS)) {
   if (artInteracts.length) map.interacts = [...(map.interacts ?? []), ...artInteracts]
 }
 
-export function rivalTrainer(round: 1 | 2): TrainerDef {
-  const starter = S.starter ?? STARTERS[0]
+/**
+ * Binds every authored role to a real Remy once the catalogue (and so the bald roll) has loaded. Runs once: map data
+ * is mutated in place so the renderer, triggers and dex all see the same faces.
+ */
+function resolveCast() {
+  const rugSeed = CABALD.rug
+  for (const map of Object.values(MAPS)) {
+    for (const d of map.npcs) {
+      const cabald = isCabaldNpc(d)
+      if (d.portrait !== undefined) d.portrait = castIdx(d.portrait, cabald)
+      if (d.trainer && typeof d.trainer !== 'function') d.trainer = castTrainer(d.trainer)
+    }
+    for (const o of map.objects) {
+      if (o.idx === undefined) continue
+      // Propaganda billboards show a member; every other exhibit is a civilian original.
+      o.idx = o.kind === 'billboard' && (o.idx === rugSeed || o.idx === CAST.rug) ? CAST.rug : civRemy(o.idx)
+    }
+  }
+  const [bull, degen, gold] = livingArt()
+  const wings = [`Living work: *REMY #${bull}*, left wing.`, `Living work: *REMY #${degen}*, right wing.`, `Living work: *REMY #${gold}*, left of the aisle.`]
+  MAPS.gallery.signs.forEach((s, i) => { s.text[1] = wings[i] })
+  reservedCache = null
+}
+
+let reservedCache: Set<number> | null = null
+/** Story Remys that never appear as random wild Remys. */
+export function reserved(): Set<number> {
+  if (!reservedCache) {
+    const trainers = [
+      ...Object.values(MAPS).flatMap((m) => m.npcs.flatMap((d) => (d.trainer && typeof d.trainer !== 'function' ? [d.trainer] : []))),
+      ...duoTrainers(),
+      maxiTrainer(),
+      ...starters().flatMap((s) => [rivalTrainer(2, s)]),
+    ].map(castTrainer)
+    reservedCache = new Set([...starters(), ...livingArt(), ...Object.values(CAST), ...trainers.flatMap((t) => t.party.map(([idx]) => idx))])
+  }
+  return reservedCache
+}
+
+art.ready.then(() => {
+  resolveCast()
+  if (import.meta.env.DEV) void import('./castcheck').then((m) => m.auditCast())
+})
+
+export function rivalTrainer(round: 1 | 2, starter = S.starter ?? starters()[0]): TrainerDef {
   const counter = rivalStarter(starter)
   const party: [number, number][] =
     round === 1
@@ -1135,10 +1243,31 @@ export function rivalTrainer(round: 1 | 2): TrainerDef {
   }
 }
 
-/** The rival always grabs the starter that beats yours. */
+/** The rival always grabs the starter whose type beats yours. */
 export function rivalStarter(mine: number) {
-  const order = { 16: 13, 9: 16, 13: 54, 54: 9 } as Record<number, number>
-  return order[mine] ?? STARTERS[1]
+  const want = counterOf(species(mine).type)
+  const all = starters()
+  return all.find((idx) => species(idx).type === want) ?? all[1]
+}
+
+export function maxiTrainer(): TrainerDef {
+  return {
+    name: 'MAXI',
+    title: 'GYM LEADER',
+    portrait: CAST.maxi,
+    party: [
+      [2081, 10],
+      [2004, 11],
+      [3434, 13],
+    ],
+    sight: 0,
+    intro: [],
+    lose: 'The market has spoken. You\u2019ve earned this.',
+    after: [],
+    prize: 1200,
+    bg: 'exchange',
+    music: 'trainer',
+  }
 }
 
 async function gym() {
@@ -1161,26 +1290,7 @@ async function gym() {
     o,
   )
   closeText()
-  const res = await trainerBattle(
-    {
-      name: 'MAXI',
-      title: 'GYM LEADER',
-      portrait: CAST.maxi,
-      party: [
-        [2081, 10],
-        [2004, 11],
-        [3434, 13],
-      ],
-      sight: 0,
-      intro: [],
-      lose: 'The market has spoken. You\u2019ve earned this.',
-      after: [],
-      prize: 1200,
-      bg: 'exchange',
-      music: 'trainer',
-    },
-    'maxi',
-  )
+  const res = await trainerBattle(maxiTrainer(), 'maxi')
   if (res !== 'win') return
   flag('badge_mm')
   refreshNpcs()

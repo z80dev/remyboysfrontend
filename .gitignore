@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .build/
+
+.cache/
+__pycache__/

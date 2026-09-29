@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/** Regenerate committed Remy Quest art: npm run quest:art (requires ffmpeg and cwebp).
- * 96px area sampling -> quantized 16px cutouts / 32px portraits; no runtime image analysis.
+/** Stage 1 of `npm run quest:art` (requires ffmpeg and cwebp): the art catalogue and 32px portraits.
+ * 96px area sampling -> palette samples, art-derived types/epithets (art.json) and quantized minis.webp.
+ * Stage 2 (quest-art.py) cuts the Remys out and paints sprites, heads and the canonical bald (Cabald) flags.
  * All indices, palette samples and type balancing are deterministic across worker order.
  */
 import { spawn } from 'node:child_process'
@@ -15,7 +16,6 @@ const COLS = 67
 const ROWS = Math.ceil(COUNT / COLS)
 const SIZE = 96
 const FRAME = SIZE * SIZE * 4
-const heads = Buffer.alloc(COLS * 16 * ROWS * 16 * 4)
 const minis = Buffer.alloc(COLS * 32 * ROWS * 32 * 4)
 const records = new Array(COUNT)
 const scores = new Array(COUNT)
@@ -87,40 +87,6 @@ function analyze(b, idx) {
     }
     put(minis, 32, idx, x, y, c)
   }
-  // The collection uses the same three-quarter head mesh. A conservative silhouette
-  // removes the photographic corners; color-guided expansion retains hair outside it.
-  const mask = new Uint8Array(256)
-  const colors = new Array(256)
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const sx = 19 + (x + 0.5) * 3.4
-    const sy = 13 + (y + 0.5) * 3.3
-    const c = sample(b, [[sx, sy], [sx - 0.6, sy], [sx + 0.6, sy], [sx, sy - 0.6], [sx, sy + 0.6]])
-    colors[y * 16 + x] = c
-    const ellipse = ((sx - 49) / 22.5) ** 2 + ((sy - 41) / 23.5) ** 2
-    const core = ellipse < 0.91 && sy > 18 && sy < 64
-    const envelope = ((sx - 47) / 26) ** 2 + ((sy - 40) / 27) ** 2 < 1
-    const hairMatch = !bald && envelope && distance(c, hair) < 62 && sy < 60 && sx > 21 && sx < 72
-    mask[y * 16 + x] = Number(core || hairMatch)
-  }
-  // Keep only the component connected to the face, never detached scenery.
-  const connected = new Uint8Array(256)
-  const queue = [8 * 16 + 8]
-  connected[queue[0]] = 1
-  for (let q = 0; q < queue.length; q++) {
-    const p = queue[q]
-    for (const n of [p - 16, p + 16, p % 16 ? p - 1 : -1, p % 16 < 15 ? p + 1 : -1]) {
-      if (n >= 0 && n < 256 && mask[n] && !connected[n]) { connected[n] = 1; queue.push(n) }
-    }
-  }
-  let bottom = 0
-  for (let p = 0; p < 256; p++) if (connected[p]) bottom = Math.max(bottom, Math.floor(p / 16))
-  const offset = 15 - bottom
-  for (let y = 0; y < 16 - offset; y++) for (let x = 0; x < 16; x++) {
-    const p = y * 16 + x
-    if (!connected[p]) continue
-    const edge = y === 0 || x === 0 || x === 15 || y === 15 || !connected[p - 16] || !connected[p + 16] || !connected[p - 1] || !connected[p + 1]
-    put(heads, 16, idx, x, y + offset, edge ? colors[p].map((v) => v * 0.58) : colors[p])
-  }
 }
 
 await mkdir(OUT, { recursive: true })
@@ -149,11 +115,11 @@ for (const { idx } of order) {
   distribution[type]++
 }
 await writeFile(`${OUT}art.json`, JSON.stringify({ v: 1, cols: COLS, count: COUNT, rows: records }))
-for (const [name, size, bytes] of [['heads', 16, heads], ['minis', 32, minis]]) {
+for (const [name, size, bytes] of [['minis', 32, minis]]) {
   const temp = `${OUT}.${name}.png`
   await run('ffmpeg', ['-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${COLS * size}x${ROWS * size}`, '-i', '-', '-frames:v', '1', '-threads', '1', temp], bytes)
   await run('cwebp', ['-quiet', '-lossless', '-z', '9', '-exact', temp, '-o', `${OUT}${name}.webp`])
   await rm(temp)
 }
-const sizes = await Promise.all(['art.json', 'heads.webp', 'minis.webp'].map(async (name) => [name, (await stat(`${OUT}${name}`)).size]))
+const sizes = await Promise.all(['art.json', 'minis.webp'].map(async (name) => [name, (await stat(`${OUT}${name}`)).size]))
 console.log(JSON.stringify({ distribution: Object.fromEntries(['BULL', 'BEAR', 'WHALE', 'DEGEN'].map((t, i) => [t, distribution[i]])), sizes, total: sizes.reduce((n, [, size]) => n + size, 0) }, null, 2))

@@ -1,8 +1,9 @@
 /** The collection at full resolution. Shared by world exhibits and the Remydex. */
 import { art } from './art'
 import { audio } from './audio'
-import { TYPE_COLOR, artSrc, species } from './data'
+import { artSrc, species } from './data'
 import { input } from './input'
+import { remySprite, typeBadge } from './skin'
 import { S } from './state'
 import { el, sleep, uiRoot } from './ui'
 import './viewer.css'
@@ -21,7 +22,6 @@ export async function viewArt(idx: number, opts: ViewArtOptions = {}): Promise<v
   root.setAttribute('role', 'dialog')
   root.setAttribute('aria-modal', 'true')
   root.setAttribute('aria-label', `Remy #${idx} artwork`)
-  root.style.setProperty('--art-accent', TYPE_COLOR[type])
   const header = el('div', 'art-viewer-header')
   header.append(el('span', '', 'THE FLOOR'), el('span', '', opts.wing ?? 'THE REMY COLLECTION'))
   const stage = el('div', 'art-viewer-stage')
@@ -37,7 +37,8 @@ export async function viewArt(idx: number, opts: ViewArtOptions = {}): Promise<v
   stage.append(frame)
   const plaque = el('div', 'art-viewer-plaque')
   const title = el('div', 'art-viewer-title')
-  title.append(el('strong', '', `REMY #${idx}`), el('span', 'art-viewer-type', type))
+  title.append(el('strong', '', `REMY #${idx}`))
+  title.insertAdjacentHTML('beforeend', typeBadge(type))
   const epithet = 'epithet' in info && typeof info.epithet === 'string' ? info.epithet : 'One of 4,490. Never another you.'
   const status = S.caught.includes(idx) ? 'MINTED · IN YOUR COLLECTION' : S.seen.includes(idx) ? 'SEEN · NOT YET MINTED' : 'UNDISCOVERED · A NEW FACE'
   plaque.append(title, el('div', 'art-viewer-epithet', epithet), el('div', 'art-viewer-status', status))
@@ -67,18 +68,9 @@ export async function viewArt(idx: number, opts: ViewArtOptions = {}): Promise<v
 /** A living exhibit leaves its frame before the normal wild-battle transition. */
 export async function awakenArt(idx: number): Promise<void> {
   const root = el('div', 'art-awakening')
-  const head = art.head(idx)
-  const portrait = el('canvas')
-  portrait.width = 32
-  portrait.height = 32
-  const ctx = portrait.getContext('2d')
-  if (ctx && head) {
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(head.img, head.sx, head.sy, head.sw, head.sh, 0, 0, 32, 32)
-  }
-  root.append(portrait, el('span', '', `REMY #${idx} STEPPED OUT OF THE FRAME!`))
+  root.append(remySprite(idx), el('span', 'win', `REMY #${idx} STEPPED OUT OF THE FRAME!`))
   uiRoot.append(root)
   audio.sfx('alert')
-  await sleep(950)
+  await sleep(1300)
   root.remove()
 }

@@ -1,0 +1,930 @@
+/*
+ * Remy Quest page chrome: the REMY ADVANCE handheld around the screen.
+ * Everything here lives outside the pixel screen, so it is sized in CSS px (rem is one game pixel; view.ts owns it).
+ * view.ts measures the .slot content box and picks the largest integer scale that fits, so each layout below sizes
+ * .slot to the space the device leaves and lets the screen sit centred inside the dark LCD recess.
+ *
+ * Layouts: html.desktop = horizontal handheld (full → lite → bare as the window shrinks, dropping decoration before
+ * screen scale), html.embedded desktop = bare full-bleed screen, html.touch.layout-portrait = the phone is the device
+ * (screen on top, controls below), html.touch.layout-landscape = controls either side of the screen.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #070a1a;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+#quest {
+  --plastic-hi: #7d78ff;
+  --plastic: #5548e0;
+  --plastic-lo: #3a2bb4;
+  --plastic-edge: #1d1470;
+  --glass: #16142b;
+  --rubber: #231f3f;
+  --rubber-hi: #3b3663;
+  --print: #d7d3ff;
+  --led: #6dff8e;
+  position: fixed;
+  inset: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(90% 70% at 50% 45%, rgba(58, 60, 190, 0.35) 0%, rgba(58, 60, 190, 0) 70%),
+    radial-gradient(120% 70% at 50% 0%, #16245e 0%, rgba(22, 36, 94, 0) 60%),
+    radial-gradient(80% 60% at 50% 110%, #2a0f4a 0%, rgba(42, 15, 74, 0) 70%),
+    #070a1a;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #05040c;
+}
+
+.screen {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.pad {
+  display: contents;
+}
+
+.dev-sh,
+.grille,
+.logo,
+.keys {
+  display: none;
+}
+
+/* ═════════════════════════ The handheld (desktop + both phone layouts) ═════════════════════════ */
+
+.dev {
+  position: relative;
+  display: grid;
+  background:
+    radial-gradient(60% 40% at 50% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, var(--plastic-hi) 0%, var(--plastic) 30%, var(--plastic-lo) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -6px 0 rgba(16, 8, 70, 0.35),
+    inset 6px 0 14px rgba(255, 255, 255, 0.07),
+    inset -6px 0 14px rgba(16, 8, 70, 0.25);
+}
+
+/* Translucent plastic: the circuit board shows faintly through the wings. */
+.dev::before {
+  content: '';
+  position: absolute;
+  inset: 10% 4%;
+  pointer-events: none;
+  opacity: 0.3;
+  background:
+    linear-gradient(rgba(20, 10, 90, 0.5), rgba(20, 10, 90, 0.5)) 9% 22% / 46px 30px no-repeat,
+    linear-gradient(rgba(20, 10, 90, 0.5), rgba(20, 10, 90, 0.5)) 93% 70% / 38px 24px no-repeat,
+    repeating-linear-gradient(90deg, rgba(20, 10, 90, 0.8) 0 2px, transparent 2px 58px),
+    repeating-linear-gradient(0deg, rgba(20, 10, 90, 0.8) 0 2px, transparent 2px 74px);
+  -webkit-mask: radial-gradient(closest-side, #000 30%, transparent 100%);
+  mask: radial-gradient(closest-side, #000 30%, transparent 100%);
+  mix-blend-mode: multiply;
+}
+/* The seam where front and back halves of the shell meet. */
+.dev::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(20, 10, 90, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.bezel {
+  grid-area: bezel;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 14px;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.05) 30% 48%, rgba(255, 255, 255, 0) 48%),
+    linear-gradient(180deg, #24213f 0%, var(--glass) 55%, #110f22 100%);
+  box-shadow:
+    inset 0 0 0 2px #0b0918,
+    inset 0 3px 0 rgba(255, 255, 255, 0.07),
+    0 2px 0 rgba(255, 255, 255, 0.28),
+    0 -2px 0 rgba(10, 5, 50, 0.45);
+}
+
+.slot {
+  flex: none;
+  box-shadow:
+    0 0 0 2px #04030a,
+    0 0 0 3px rgba(255, 255, 255, 0.07);
+}
+
+.bezel-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  font: 8px/1 var(--font-hd);
+  color: #8580c0;
+}
+.led {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #eaffef 0 18%, var(--led) 40%, #1b9b45 100%);
+  box-shadow:
+    0 0 6px 2px rgba(109, 255, 142, 0.55),
+    0 0 0 2px #0b0918;
+}
+.stripe {
+  flex: 1;
+  height: 6px;
+  border-top: 2px solid #3a54ff;
+  border-bottom: 2px solid #b44bff;
+  opacity: 0.8;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font: 16px/1 var(--font-hd);
+  letter-spacing: 2px;
+  color: #efedff;
+  text-shadow: 0 2px 0 #05040c;
+}
+.brand b {
+  font-weight: 400;
+  color: #7f8bff;
+}
+
+/* ───────────── D-pad ───────────── */
+
+.pad-dpad {
+  grid-area: dpad;
+  position: relative;
+  place-self: center;
+  display: grid;
+  place-items: center;
+  width: calc(var(--dp) + 26px);
+  height: calc(var(--dp) + 26px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(16, 8, 70, 0.34), rgba(16, 8, 70, 0.12) 70%);
+  box-shadow:
+    inset 0 4px 8px rgba(10, 4, 50, 0.45),
+    0 2px 0 rgba(255, 255, 255, 0.25);
+  touch-action: none;
+  cursor: pointer;
+}
+.pad-cross {
+  --arm: calc(var(--dp) / 3);
+  position: relative;
+  width: var(--dp);
+  height: var(--dp);
+  filter: drop-shadow(0 4px 0 #0f0b2c) drop-shadow(0 8px 10px rgba(5, 2, 30, 0.45));
+  transition: transform 60ms ease-out;
+}
+.pad-cross i,
+.pad-cross b {
+  position: absolute;
+  background: linear-gradient(180deg, #45406e 0%, var(--rubber) 100%);
+}
+.pad-cross .u,
+.pad-cross .d {
+  left: var(--arm);
+  width: var(--arm);
+  height: calc(var(--arm) + 4px);
+}
+.pad-cross .u {
+  top: 0;
+  border-radius: 6px 6px 0 0;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.22);
+}
+.pad-cross .d {
+  bottom: 0;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, var(--rubber) 0%, #1a1731 100%);
+}
+.pad-cross .l,
+.pad-cross .r {
+  top: var(--arm);
+  height: var(--arm);
+  width: calc(var(--arm) + 4px);
+  background: linear-gradient(180deg, #37325c 0%, var(--rubber) 100%);
+}
+.pad-cross .l {
+  left: 0;
+  border-radius: 6px 0 0 6px;
+}
+.pad-cross .r {
+  right: 0;
+  border-radius: 0 6px 6px 0;
+}
+.pad-cross b {
+  left: var(--arm);
+  top: var(--arm);
+  width: var(--arm);
+  height: var(--arm);
+  background:
+    radial-gradient(circle, rgba(8, 5, 30, 0.55) 0 28%, rgba(8, 5, 30, 0) 34%),
+    linear-gradient(180deg, #34305a, var(--rubber));
+}
+.pad-cross i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+.pad-cross .u::after {
+  border-bottom-color: rgba(8, 5, 30, 0.55);
+  border-top: 0;
+  top: -6px;
+}
+.pad-cross .d::after {
+  border-top-color: rgba(8, 5, 30, 0.55);
+  border-bottom: 0;
+  top: 6px;
+}
+.pad-cross .l::after {
+  border-right-color: rgba(8, 5, 30, 0.55);
+  border-left: 0;
+  left: -6px;
+}
+.pad-cross .r::after {
+  border-left-color: rgba(8, 5, 30, 0.55);
+  border-right: 0;
+  left: 6px;
+}
+.pad-cross[data-dir='up'] .u,
+.pad-cross[data-dir='down'] .d,
+.pad-cross[data-dir='left'] .l,
+.pad-cross[data-dir='right'] .r {
+  background: linear-gradient(180deg, #1a1731, #14122a);
+  box-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.45);
+}
+.pad-cross[data-dir='up'] {
+  transform: perspective(300px) rotateX(10deg);
+}
+.pad-cross[data-dir='down'] {
+  transform: perspective(300px) rotateX(-10deg);
+}
+.pad-cross[data-dir='left'] {
+  transform: perspective(300px) rotateY(-10deg);
+}
+.pad-cross[data-dir='right'] {
+  transform: perspective(300px) rotateY(10deg);
+}
+
+/* ───────────── SELECT / START ───────────── */
+
+.pad-mid {
+  grid-area: mid;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 18px;
+}
+.pad-pill {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  background: none;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  font: 8px/1 var(--font-hd);
+  color: var(--print);
+  opacity: 0.85;
+  touch-action: none;
+  cursor: pointer;
+}
+.pad-pill span {
+  width: 40px;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--rubber-hi), var(--rubber) 60%, #16132b);
+  box-shadow:
+    0 0 0 3px rgba(16, 8, 70, 0.3),
+    0 3px 0 #0f0b2c,
+    inset 0 2px 0 rgba(255, 255, 255, 0.18);
+  transition:
+    transform 50ms,
+    box-shadow 50ms;
+}
+.pad-pill.down span {
+  transform: translateY(2px);
+  background: linear-gradient(180deg, #1a1731, #14122a);
+  box-shadow:
+    0 0 0 3px rgba(16, 8, 70, 0.3),
+    0 1px 0 #0f0b2c,
+    0 0 10px 2px rgba(190, 180, 255, 0.45);
+}
+
+/* ───────────── A / B ───────────── */
+
+.pad-ab {
+  grid-area: ab;
+  place-self: center;
+  position: relative;
+  width: calc(var(--ab) * 2 + 28px);
+  height: calc(var(--ab) * 1.7);
+}
+/* The recessed pill both buttons sit in, tilted along the diagonal like the real thing. */
+.pad-ab::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--ab) * 2 + 40px);
+  height: calc(var(--ab) + 18px);
+  border-radius: 999px;
+  translate: -50% -50%;
+  rotate: -27deg;
+  background: rgba(16, 8, 70, 0.22);
+  box-shadow:
+    inset 0 4px 8px rgba(10, 4, 50, 0.4),
+    0 2px 0 rgba(255, 255, 255, 0.22);
+}
+.pad-btn {
+  appearance: none;
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  width: var(--ab);
+  height: var(--ab);
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px #120d33,
+    0 5px 0 #0f0b2c,
+    0 9px 14px rgba(5, 2, 30, 0.5),
+    inset 0 3px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.22);
+  transition:
+    transform 50ms,
+    box-shadow 50ms;
+}
+.pad-btn em {
+  font: 16px/1 var(--font-hd);
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 -2px 0 rgba(0, 0, 0, 0.3);
+}
+.pad-a {
+  right: 0;
+  top: 0;
+  background: radial-gradient(circle at 36% 30%, #8fb0ff 0, #2f6bff 36%, #0052ff 60%, #0a2fa8 100%);
+}
+.pad-b {
+  left: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 36% 30%, #ffb0da 0, #ff4f9e 36%, #e0287e 60%, #8c0f4c 100%);
+}
+.pad-btn.down {
+  transform: translateY(4px);
+  box-shadow:
+    0 0 0 2px #120d33,
+    0 1px 0 #0f0b2c,
+    0 0 16px 4px rgba(200, 220, 255, 0.4),
+    inset 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+/* Mouse users get a hint that the hardware is clickable. */
+@media (hover: hover) {
+  .desktop .pad-btn:hover,
+  .desktop .pad-pill:hover span,
+  .desktop .pad-dpad:hover {
+    filter: brightness(1.12);
+  }
+}
+
+/* ═════════════════════════ Desktop: horizontal handheld ═════════════════════════ */
+
+html.desktop:not(.embedded) {
+  --page: max(24px, 4vmin);
+  --wing: 210px;
+  --bz-x: 28px;
+  --bz-t: 24px;
+  --bz-b: 44px;
+  --dev-y: 24px;
+  --sh-h: 14px;
+  --keys-h: 22px;
+  --gap: 18px;
+  --dp: 114px;
+  --ab: 58px;
+  /* What is left for the slot once the chrome is paid for; the slot keeps a 1.5–1.6 aspect (a GBA-ish 300×200). */
+  --aw: calc(100vw - 2 * var(--page) - 2 * var(--wing) - 2 * var(--bz-x));
+  --ah: calc(
+    100vh - 2 * var(--page) - var(--sh-h) - 2 * var(--dev-y) - var(--bz-t) - var(--bz-b) - var(--gap) - var(--keys-h)
+  );
+  --sw: min(var(--aw), var(--ah) * 1.6);
+  --sh: min(var(--ah), var(--sw) / 1.5);
+}
+
+.desktop:not(.embedded) #quest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap);
+  padding: calc(var(--page) + var(--sh-h)) var(--page) var(--page);
+}
+.desktop:not(.embedded) .dev {
+  grid-template-columns: var(--wing) auto var(--wing);
+  grid-template-rows: 1fr auto;
+  grid-template-areas: 'dpad bezel ab' 'mid bezel spk';
+  padding: var(--dev-y) 0;
+  border-radius: 72px 72px 132px 132px / 64px 64px 110px 110px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -8px 0 rgba(16, 8, 70, 0.35),
+    inset 8px 0 18px rgba(255, 255, 255, 0.07),
+    inset -8px 0 18px rgba(16, 8, 70, 0.25),
+    0 4px 0 var(--plastic-edge),
+    0 34px 60px -16px rgba(0, 0, 30, 0.75),
+    0 0 140px rgba(80, 90, 255, 0.22);
+}
+.desktop:not(.embedded) .bezel {
+  padding: 0 var(--bz-x);
+}
+.desktop:not(.embedded) .bezel-top {
+  height: var(--bz-t);
+  padding: 0 2px;
+}
+.desktop:not(.embedded) .slot {
+  width: var(--sw);
+  height: var(--sh);
+}
+.desktop:not(.embedded) .brand {
+  height: var(--bz-b);
+}
+.desktop:not(.embedded) .pad-mid {
+  padding: 0 0 6px 18px;
+}
+
+.desktop:not(.embedded) .dev-sh {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  top: calc(-1 * var(--sh-h) - 2px);
+  width: 170px;
+  height: 60px;
+  background: linear-gradient(180deg, #4a3fc8, #2d2196);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    0 2px 0 var(--plastic-edge);
+}
+.dev-sh.l {
+  left: 38px;
+  border-radius: 60px 22px 0 0 / 40px 22px 0 0;
+}
+.dev-sh.r {
+  right: 38px;
+  border-radius: 22px 60px 0 0 / 22px 40px 0 0;
+}
+.dev-sh b {
+  position: absolute;
+  top: 5px;
+  font: 8px/1 var(--font-hd);
+  color: rgba(215, 211, 255, 0.6);
+}
+.dev-sh.l b {
+  left: 34px;
+}
+.dev-sh.r b {
+  right: 34px;
+}
+
+.desktop:not(.embedded) .grille {
+  display: block;
+  position: relative;
+  grid-area: spk;
+  place-self: end center;
+  margin: 0 0 10px 6px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #120c3e 0 2px, transparent 2.5px) 0 0 / 9px 9px;
+  -webkit-mask: radial-gradient(closest-side, #000 92%, transparent 100%);
+  mask: radial-gradient(closest-side, #000 92%, transparent 100%);
+  opacity: 0.8;
+}
+
+/* ───────────── Keyboard hints ───────────── */
+
+.desktop .keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 22px;
+  min-height: var(--keys-h);
+  font: 8px/1 var(--font-hd);
+  color: #8e8ccc;
+  letter-spacing: 1px;
+}
+.kg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.kx {
+  font-style: normal;
+  color: #55538f;
+}
+.kh {
+  font-style: normal;
+  color: #5d5b9c;
+  margin-left: 4px;
+}
+.keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px 2px;
+  font: inherit;
+  letter-spacing: 0;
+  color: #efeaff;
+  background: #2d2862;
+  border: 2px solid #0c0a24;
+  box-shadow:
+    inset 0 2px 0 #4a43a0,
+    inset 0 -4px 0 #1b1745;
+  clip-path: polygon(
+    2px 0,
+    calc(100% - 2px) 0,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    0 calc(100% - 2px),
+    0 2px
+  );
+}
+.keys kbd.on {
+  color: #10132e;
+  background: var(--gold, #ffd34a);
+  box-shadow:
+    inset 0 2px 0 #fff0a8,
+    inset 0 -2px 0 var(--gold2, #e5961c);
+  padding-bottom: 0;
+  translate: 0 2px;
+}
+/* Odd-sized content boxes (17×13) centre the 7px arrow on whole pixels. */
+.keys kbd.ar {
+  width: 21px;
+  padding: 0 0 3px;
+  margin-right: -4px;
+}
+.keys kbd.ar.on {
+  padding-bottom: 1px;
+}
+.keys kbd.ar::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: var(--kb-arrow);
+  image-rendering: pixelated;
+}
+.keys kbd.ar.on::before {
+  filter: brightness(0.1);
+}
+.keys kbd.d::before {
+  rotate: 180deg;
+}
+.keys kbd.l::before {
+  rotate: -90deg;
+}
+.keys kbd.r::before {
+  rotate: 90deg;
+}
+
+/* XL: on big monitors the screen scales up, so the hardware grows with it to keep the handheld's proportions.
+   Pixel-font print only takes whole multiples of its 8px grid. */
+@media (min-width: 1600px) and (min-height: 960px) {
+  html.desktop:not(.embedded) {
+    --page: 5vmin;
+    --wing: 280px;
+    --bz-x: 36px;
+    --bz-t: 32px;
+    --bz-b: 64px;
+    --dev-y: 32px;
+    --sh-h: 20px;
+    --keys-h: 40px;
+    --gap: 24px;
+    --dp: 150px;
+    --ab: 78px;
+  }
+  .desktop:not(.embedded) .dev {
+    border-radius: 96px 96px 176px 176px / 86px 86px 148px 148px;
+  }
+  .desktop:not(.embedded) .bezel {
+    border-radius: 18px;
+  }
+  .desktop:not(.embedded) .brand {
+    font-size: 24px;
+    gap: 24px;
+    letter-spacing: 3px;
+  }
+  .desktop:not(.embedded) .dev-sh {
+    width: 230px;
+    height: 80px;
+  }
+  .desktop:not(.embedded) .dev-sh.l {
+    left: 52px;
+  }
+  .desktop:not(.embedded) .dev-sh.r {
+    right: 52px;
+  }
+  .desktop:not(.embedded) .grille {
+    width: 84px;
+    height: 84px;
+    margin: 0 0 16px 8px;
+  }
+  .desktop:not(.embedded) .pad-pill span {
+    width: 54px;
+    height: 18px;
+    border-radius: 9px;
+  }
+  .desktop:not(.embedded) .pad-btn em {
+    font-size: 24px;
+  }
+  .desktop:not(.embedded) .pad-pill,
+  .desktop:not(.embedded) .bezel-top,
+  .desktop:not(.embedded) .dev-sh b {
+    font-size: 16px;
+  }
+  .desktop:not(.embedded) .pad-mid {
+    gap: 12px;
+    padding: 0 0 10px 26px;
+  }
+  .desktop .keys {
+    zoom: 2;
+    min-height: calc(var(--keys-h) / 2);
+  }
+}
+
+/* Lite: a smaller window drops the shoulders, speaker and POWER label and slims the bezel before it gives up scale. */
+@media (max-width: 1027px), (max-height: 553px) {
+  html.desktop:not(.embedded) {
+    --page: 16px;
+    --wing: 150px;
+    --bz-x: 14px;
+    --bz-t: 14px;
+    --bz-b: 26px;
+    --dev-y: 14px;
+    --sh-h: 0px;
+    --gap: 12px;
+    --dp: 96px;
+    --ab: 46px;
+  }
+  .desktop:not(.embedded) .dev-sh,
+  .desktop:not(.embedded) .grille,
+  .desktop:not(.embedded) .bezel-top span,
+  .desktop .keys .kh,
+  .desktop .keys .kx,
+  .desktop .keys .kx + kbd {
+    display: none;
+  }
+  .desktop:not(.embedded) .dev {
+    border-radius: 48px 48px 84px 84px / 44px 44px 72px 72px;
+  }
+  .desktop:not(.embedded) .brand {
+    font-size: 8px;
+    gap: 8px;
+  }
+  .desktop:not(.embedded) .pad-mid {
+    padding: 0;
+    gap: 10px;
+  }
+}
+
+/* Bare: too small for any chrome at a readable scale; the screen takes the window, hints stay if they fit. */
+@media (max-width: 863px), (max-height: 475px) {
+  .desktop:not(.embedded) #quest {
+    padding: 8px;
+    gap: 8px;
+  }
+  .desktop:not(.embedded) .dev,
+  .desktop:not(.embedded) .bezel {
+    display: contents;
+  }
+  .desktop:not(.embedded) .slot {
+    flex: 1;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .desktop:not(.embedded) .dev-sh,
+  .desktop:not(.embedded) .grille,
+  .desktop:not(.embedded) .bezel-top,
+  .desktop:not(.embedded) .brand,
+  .desktop .pad-dpad,
+  .desktop .pad-mid,
+  .desktop .pad-ab {
+    display: none;
+  }
+}
+@media (max-height: 360px) {
+  .desktop .keys {
+    display: none;
+  }
+}
+
+/* Embedded in Remy OS: the window is the frame; the screen goes edge to edge. */
+.desktop.embedded .dev,
+.desktop.embedded .bezel {
+  display: contents;
+}
+.desktop.embedded .slot {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.desktop.embedded .bezel-top,
+.desktop.embedded .brand,
+.desktop.embedded .keys,
+.desktop.embedded .pad-dpad,
+.desktop.embedded .pad-mid,
+.desktop.embedded .pad-ab {
+  display: none;
+}
+
+/* ═════════════════════════ Phones: the whole viewport is the device ═════════════════════════ */
+
+.touch #quest {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --vh: 100vh;
+  --dp: 132px;
+  --ab: 68px;
+}
+@supports (height: 100dvh) {
+  .touch #quest {
+    --vh: 100dvh;
+  }
+}
+.touch .dev {
+  position: absolute;
+  inset: 0;
+}
+.touch .dev::before {
+  opacity: 0.16;
+}
+.touch .bezel-top span {
+  display: none;
+}
+.touch .pad-btn {
+  cursor: default;
+}
+
+/*
+ * Portrait, laid out like the original vertical Game Boy: screen on top, the embossed logo on the body, controls in
+ * thumb reach at the bottom. Spare height is shared between the logo band and the control row, never left as a gap
+ * inside the bezel.
+ */
+.layout-portrait .dev {
+  --g: 10px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto minmax(36px, 1fr) 1.4fr auto;
+  grid-template-areas: 'bezel bezel' 'logo logo' 'dpad ab' 'mid mid';
+  padding: calc(var(--safe-t) + var(--g)) calc(var(--safe-r) + var(--g)) calc(var(--safe-b) + 14px)
+    calc(var(--safe-l) + var(--g));
+}
+.layout-portrait .bezel {
+  padding: 0 8px 10px;
+  border-radius: 12px 12px 34px 12px;
+}
+.layout-portrait .bezel-top {
+  align-self: stretch;
+  height: 18px;
+  padding: 0 2px;
+}
+.layout-portrait .slot {
+  align-self: stretch;
+  /* view.ts never shows more than W×1.1 of height, so anything taller would just be dead bezel. The subtracted
+     296px is the rest of the device at its most compact (bezel strips, logo band, controls, SELECT/START). */
+  height: min(
+    calc((100vw - var(--safe-l) - var(--safe-r) - 2 * var(--g) - 16px) * 1.1),
+    calc(var(--vh) - var(--safe-t) - var(--safe-b) - 296px)
+  );
+}
+.layout-portrait .brand {
+  display: none;
+}
+.layout-portrait .logo {
+  grid-area: logo;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  overflow: hidden;
+  font: 16px/1 var(--font-hd);
+  letter-spacing: 2px;
+}
+.logo span {
+  color: #2a1f8e;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+.logo b {
+  font-weight: 400;
+  color: #d9deff;
+  text-shadow: 0 2px 0 rgba(20, 10, 90, 0.55);
+}
+.layout-portrait .pad-dpad {
+  place-self: center start;
+  margin-left: 2px;
+}
+.layout-portrait .pad-ab {
+  place-self: center end;
+  margin-right: 2px;
+}
+.layout-portrait .pad-mid {
+  padding-top: 4px;
+}
+.layout-portrait .grille {
+  display: block;
+  position: absolute;
+  right: calc(var(--safe-r) + 22px);
+  bottom: calc(var(--safe-b) + 18px);
+  width: 44px;
+  height: 30px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg, rgba(18, 12, 62, 0.55) 0 4px, transparent 4px 9px);
+  rotate: -27deg;
+}
+
+/* Landscape: a real horizontal handheld; D-pad and SELECT/START left, A/B right. */
+.layout-landscape .dev {
+  --ab: 64px;
+  --wing: calc(var(--dp) + 30px);
+  --g: 6px;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas: 'dpad bezel ab' 'mid bezel ab';
+  padding: calc(var(--safe-t) + var(--g)) calc(var(--safe-r) + 8px) calc(var(--safe-b) + var(--g))
+    calc(var(--safe-l) + 8px);
+}
+.layout-landscape .bezel {
+  padding: 6px;
+  border-radius: 12px;
+}
+.layout-landscape .stripe {
+  display: none;
+}
+.layout-landscape .slot {
+  --ah: calc(var(--vh) - var(--safe-t) - var(--safe-b) - 2 * var(--g) - 12px);
+  width: min(calc(100vw - var(--safe-l) - var(--safe-r) - 2 * var(--wing) - 28px), calc(var(--ah) * 1.6));
+  height: var(--ah);
+}
+.layout-landscape .bezel-top {
+  position: absolute;
+  left: -16px;
+  top: 12px;
+}
+.layout-landscape .brand {
+  display: none;
+}
+.layout-landscape .pad-mid {
+  padding-bottom: 8px;
+  gap: 10px;
+}

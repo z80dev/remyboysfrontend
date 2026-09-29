@@ -1,8 +1,8 @@
 /** DOM UI primitives on top of the game screen: text box, choices, banners, fades. Sizes are in rem = 1 logical px. */
 import { audio } from './audio'
-import { artSrc } from './data'
 import { type Btn, input } from './input'
-import { S } from './state'
+import { remyBust } from './skin'
+import { S, textMs } from './state'
 
 export let uiRoot: HTMLElement
 
@@ -68,25 +68,39 @@ function typeSpans(target: HTMLElement, html: string): HTMLElement[] {
 let box: HTMLElement | null = null
 let boxText: HTMLElement
 let boxName: HTMLElement
-let boxPortrait: HTMLImageElement
+let boxPortrait: HTMLElement
 let boxArrow: HTMLElement
+let portraitIdx = -1
 
 function ensureBox() {
   if (box) return
-  box = el('div', 'tbox enter')
-  box.innerHTML = `<div class="tbox-name"></div><div class="tbox-portrait"><img alt=""></div><div class="tbox-text"><div class="tbox-inner"></div></div><div class="tbox-arrow"></div>`
+  box = el('div', 'tbox')
+  box.innerHTML = `<div class="tbox-portrait"></div><div class="tbox-name"></div><div class="tbox-text"><div class="tbox-inner"></div></div><div class="tbox-arrow"></div>`
   boxText = box.querySelector('.tbox-inner') as HTMLElement
   boxName = box.querySelector('.tbox-name') as HTMLElement
-  boxPortrait = box.querySelector('.tbox-portrait img') as HTMLImageElement
+  boxPortrait = box.querySelector('.tbox-portrait') as HTMLElement
   boxArrow = box.querySelector('.tbox-arrow') as HTMLElement
+  portraitIdx = -1
   box.addEventListener('pointerdown', (e) => {
     e.preventDefault()
     textTap?.()
   })
   uiRoot.appendChild(box)
-  requestAnimationFrame(() => box?.classList.remove('enter'))
 }
 let textTap: (() => void) | null = null
+
+/** Swaps the floating portrait only when the speaker's Remy changes, replaying its pop-in. */
+function setPortrait(idx: number | undefined) {
+  if (idx === undefined || idx === portraitIdx) return
+  portraitIdx = idx
+  boxPortrait.replaceChildren(remyBust(idx, 40, 40, { backdrop: true }))
+  boxPortrait.style.animation = 'none'
+  void boxPortrait.offsetWidth
+  boxPortrait.style.animation = ''
+}
+
+/** Typing ticks to hold after punctuation, so sentences breathe like spoken lines. */
+const BEAT: Record<string, number> = { '.': 5, '!': 5, '?': 5, '…': 6, ',': 2, ';': 2, ':': 2 }
 
 export interface SayOpts {
   speaker?: string
@@ -104,7 +118,7 @@ export function say(text: string, o: SayOpts = {}): Promise<void> {
   b.classList.toggle('has-portrait', o.portrait !== undefined)
   b.classList.toggle('has-name', !!o.speaker)
   boxName.textContent = o.speaker ?? ''
-  if (o.portrait !== undefined) boxPortrait.src = artSrc(o.portrait)
+  setPortrait(o.portrait)
   boxText.style.transition = 'none'
   boxText.style.transform = ''
   const spans = typeSpans(boxText, fmt(text))
@@ -119,11 +133,27 @@ export function say(text: string, o: SayOpts = {}): Promise<void> {
     let paused = false
     let done = false
     let timer = 0
-    let blip = 0
+    let hold = 0
     const pageEnd = () => i < spans.length && lineOf[i] >= (page + 1) * 2
     const tick = () => {
-      for (let k = 0; k < 2 && i < spans.length && !pageEnd(); k++, i++) spans[i].classList.add('on')
-      if (++blip % 3 === 0) audio.sfx('text')
+      if (hold > 0) {
+        hold--
+        return
+      }
+      let voiced = false
+      for (let k = 0; k < 2 && i < spans.length && !pageEnd(); k++, i++) {
+        const ch = spans[i].textContent ?? ''
+        spans[i].classList.add('on')
+        if (ch.trim()) voiced = true
+        const beat = BEAT[ch]
+        // A beat only lands at a real sentence break, not inside "3.5" or "...".
+        if (beat && (spans[i + 1]?.textContent ?? ' ') === ' ') {
+          hold = beat
+          i++
+          break
+        }
+      }
+      if (voiced) audio.sfx('text')
       if (i >= spans.length) finish()
       else if (pageEnd()) pause()
     }
@@ -138,7 +168,7 @@ export function say(text: string, o: SayOpts = {}): Promise<void> {
       boxArrow.classList.remove('on')
       boxText.style.transition = 'transform 120ms steps(3)'
       boxText.style.transform = `translateY(${-page * 2 * lineH}px)`
-      timer = window.setInterval(tick, 36)
+      timer = startTyping()
     }
     const finish = () => {
       // Skip to the end of the current page only; later pages still need a press each.
@@ -158,7 +188,13 @@ export function say(text: string, o: SayOpts = {}): Promise<void> {
       textTap = null
       resolve()
     }
-    timer = window.setInterval(tick, 36)
+    const startTyping = () => {
+      const ms = textMs()
+      if (ms) return window.setInterval(tick, ms)
+      queueMicrotask(finish)
+      return 0
+    }
+    timer = startTyping()
     const advance = () => {
       if (paused) {
         audio.sfx('cursor')
@@ -186,7 +222,7 @@ export function closeText() {
   const b = box
   box = null
   b.classList.add('leave')
-  setTimeout(() => b.remove(), 160)
+  setTimeout(() => b.remove(), 130)
 }
 
 export interface ChooseOpts {
@@ -201,13 +237,15 @@ export interface ChooseOpts {
   disabled?: boolean[]
   /** Lay options out in a row (left/right also move the cursor). */
   horizontal?: boolean
+  /** Leading html per option (pixel icons). */
+  icons?: string[]
 }
 
 /** Vertical menu with ▶ cursor. Keyboard/pad or tap. */
 export function choose(options: string[], o: ChooseOpts = {}): Promise<number> {
   const m = el('div', `menu ${o.cls ?? 'menu-right'}${o.horizontal ? ' menu-row' : ''}`)
   const items = options.map((label, i) => {
-    const it = el('div', 'menu-item', `<span class="menu-cursor"></span><span class="menu-label">${fmt(label)}</span>${o.details?.[i] ? `<span class="menu-detail">${o.details[i]}</span>` : ''}`)
+    const it = el('div', 'menu-item', `<span class="menu-cursor"></span>${o.icons?.[i] ?? ''}<span class="menu-label">${fmt(label)}</span>${o.details?.[i] ? `<span class="menu-detail">${o.details[i]}</span>` : ''}`)
     if (o.disabled?.[i]) it.classList.add('disabled')
     m.appendChild(it)
     return it
@@ -264,13 +302,14 @@ export async function ask(text: string, o: SayOpts = {}): Promise<boolean> {
   return (await choose(['YES', 'NO'], { cancel: 1, cls: 'menu-right menu-yesno' })) === 0
 }
 
-/** Area name plate that slides in at the top-left. */
-export function banner(name: string) {
+/** Area name plate that drops in on chains at the top-left; `theme` picks the plate material (world.css). */
+export function banner(name: string, theme = '', kicker = '', glyph: 'sun' | 'moon' | 'dusk' | '' = '') {
   for (const old of uiRoot.querySelectorAll('.banner')) old.remove()
-  const b = el('div', 'banner', `<span>${name}</span>`)
+  const kick = kicker ? `<i class="kicker">${glyph ? `<b class="glyph ${glyph}"></b>` : ''}${kicker}</i>` : ''
+  const b = el('div', `banner${theme ? ` theme-${theme}` : ''}`, `${kick}<span class="name">${name}</span><i class="rule"></i>`)
   uiRoot.appendChild(b)
-  setTimeout(() => b.classList.add('out'), 2300)
-  setTimeout(() => b.remove(), 2800)
+  setTimeout(() => b.classList.add('out'), 2600)
+  setTimeout(() => b.remove(), 2900)
 }
 
 let fader: HTMLElement | null = null
@@ -281,7 +320,8 @@ export async function fade(to: boolean, ms = 260, color = '#000') {
     uiRoot.parentElement?.appendChild(fader)
   }
   fader.style.background = color
-  fader.style.transition = `opacity ${ms}ms linear`
+  // Stepped like a GBA palette fade (~30ms per step) instead of a smooth video crossfade.
+  fader.style.transition = `opacity ${ms}ms steps(${Math.max(4, Math.round(ms / 30))})`
   fader.style.opacity = to ? '0' : '1'
   void fader.offsetWidth
   fader.style.opacity = to ? '1' : '0'
@@ -332,6 +372,10 @@ export function itemIcon(kind: string): string {
     seed: [
       ['            ', '  kkkkkkkk  ', '  kwwwwwwk  ', '  kwllllwk  ', '  kwwwwwwk  ', '  kwllllwk  ', '  kwwwwwwk  ', '  kwlllwwk  ', '  kwwwwwwk  ', '  kkkkkkkk  ', '            ', '            '],
       { k: '#3b2a12', w: '#fff3cf', l: '#b08a4a' },
+    ],
+    mempool: [
+      ['            ', '   kkkkkk   ', '  kssssssk  ', ' ksSSSSSSsk ', ' ksSwwwwSsk ', ' ksSwkkwSsk ', ' ksSwkkwSsk ', ' ksSwwwwSsk ', '  ksSSSSsk  ', '   kssssk   ', '    kkkk    ', '            '],
+      { k: '#10162e', s: '#3d7bff', S: '#8fb4ff', w: '#e6eeff' },
     ],
   }
   const icon = ICONS[kind]

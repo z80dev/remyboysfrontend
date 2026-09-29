@@ -2,6 +2,8 @@
 import { audio } from './audio'
 import { type BattleResult, battle } from './battle'
 import { type Remy, makeRemy, randomRemyIdx, remyName, rng, species, statsOf } from './data'
+import { type Phase, sky, updateSky } from './gfx/daylight'
+import { type Light, openDoors } from './gfx/objects'
 import { drawRemyActor } from './gfx/remyactor'
 import {
   buildMapLayers,
@@ -9,19 +11,22 @@ import {
   drawAmbient,
   drawAnimated,
   drawEmote,
+  drawFootprint,
   drawGrassRustle,
   drawItemBall,
   drawLedgeDust,
   drawShadow,
+  drawStepDust,
   drawTallGrassFront,
 } from './gfx/world'
 import { input } from './input'
-import { MAPS, type MapDef, type NpcDef, RESERVED, type TrainerDef, finale, itemLine } from './maps'
+import { MAPS, type MapDef, type NpcDef, type TrainerDef, castTrainer, finale, itemLine, reserved } from './maps'
 import { startMenu } from './menus'
 import { S, addItem, healParty, save } from './state'
-import { type ActorLook, type Dir, type Emote, OBJ_SIZE, TILE } from './types'
+import { type ActorLook, type Dir, type Emote, type MapObject, OBJ_SIZE, TILE } from './types'
 import { banner, closeText, fade, flash, say, sleep, talk } from './ui'
 import { present, view } from './view'
+import './world.css'
 
 export interface Actor {
   id: string
@@ -54,10 +59,9 @@ function mkActor(id: string, x: number, y: number, dir: Dir, look: ActorLook): A
   return { id, x, y, px: x * TILE, py: y * TILE, dir, look, move: null, step: 0, frame: 0, emote: null }
 }
 
-/** The classic Remy: bald, white tee, jeans. */
-const PLAYER_LOOK: ActorLook = { skin: '#f6d2b3', hair: 'bald', hairColor: '#3a2a1a', shirt: '#ffffff', pants: '#2f4f9a' }
+/** Roamers and the follower draw from their Remy index; this look only backs a missing atlas. */
+const PLAYER_LOOK: ActorLook = { skin: '#f6d2b3', hair: 'short', hairColor: '#3a2a1a', shirt: '#ffffff', pants: '#2f4f9a' }
 export const player: Actor = mkActor('player', 0, 0, 'down', PLAYER_LOOK)
-player.idx = 0
 const follower = mkActor('follower', 0, 0, 'down', PLAYER_LOOK)
 let lead: Remy | undefined
 let followerHidden = false
@@ -73,9 +77,9 @@ let map: MapDef
 let layers: { below: HTMLCanvasElement; above: HTMLCanvasElement }
 const layerCache = new Map<string, { below: HTMLCanvasElement; above: HTMLCanvasElement }>()
 let npcs: Actor[] = []
-/** footprint occupancy: key → 'solid' | door index */
+/** Footprint occupancy: solid tiles, and walkable door tiles → the building they open. */
 let solidObj = new Set<number>()
-let doorAt = new Map<number, number>()
+let doorAt = new Map<number, MapObject>()
 let busy = 0
 let clock = 0
 let camX = 0
@@ -84,8 +88,14 @@ let bumpT = 0
 let grassSteps = 0
 let turnHold = 0
 let running = false
-const effects: { kind: 'rustle' | 'dust'; x: number; y: number; t0: number }[] = []
-let wipe: { t0: number; dur: number; style: 'wild' | 'trainer' | 'boss' } | null = null
+type Effect = { kind: 'rustle' | 'dust' | 'step' | 'print'; x: number; y: number; t0: number; dir: Dir }
+const effects: Effect[] = []
+/** Seconds each effect stays on screen (footprints linger in the sand). */
+const EFFECT_LIFE: Record<Effect['kind'], number> = { rustle: 0.4, dust: 0.4, step: 0.36, print: 2.6 }
+type WipeStyle = 'wild' | 'trainer' | 'boss' | 'cabald'
+let wipe: { t0: number; dur: number; style: WipeStyle } | null = null
+/** Dithered map-transition veil: coverage eases from `from` to `to` (0 clear → 1 black). */
+let veil = { from: 0, to: 0, t0: 0, dur: 0 }
 const encounterRng = rng(Date.now() & 0xffffffff)
 
 const key = (x: number, y: number) => y * 1024 + x
@@ -130,6 +140,7 @@ function blocked(x: number, y: number, self?: Actor) {
 
 export function loadMap(id: string, x: number, y: number, dir: Dir) {
   map = MAPS[id]
+  player.idx = S.avatar
   // Saves predating the occupation keep their earned access; no retroactive gym gate.
   if (S.flags.badge_mm || S.flags.rug || S.flags['t:cabald_escrow']) S.flags.cabald_city = true
   const w = map.grid[0].length
@@ -142,11 +153,12 @@ export function loadMap(id: string, x: number, y: number, dir: Dir) {
   layers = l
   solidObj = new Set()
   doorAt = new Map()
+  openDoors.clear()
   for (const o of map.objects) {
     const sz = OBJ_SIZE[o.kind]
     for (let dy = 0; dy < sz.h; dy++)
       for (let dx = 0; dx < sz.w; dx++) {
-        if (sz.door && sz.door.x === dx && sz.door.y === dy) doorAt.set(key(o.x + dx, o.y + dy), 1)
+        if (sz.door && sz.door.x === dx && sz.door.y === dy) doorAt.set(key(o.x + dx, o.y + dy), o)
         else solidObj.add(key(o.x + dx, o.y + dy))
       }
   }
@@ -189,15 +201,38 @@ export async function warpTo(to: string, x: number, y: number, dir: Dir) {
 async function changeMap(to: string, x: number, y: number, dir: Dir) {
   busy++
   audio.sfx('door')
-  await fade(true, 220)
+  await veilTo(1, 240)
   const prev = map.id
   loadMap(to, x, y, dir)
   if (audio.current !== map.music) audio.play(map.music)
   render()
   save()
-  await fade(false, 220)
-  if (prev !== to) banner(map.name)
+  await veilTo(0, 280)
+  if (prev !== to) areaBanner()
   busy--
+}
+
+const PHASE_PLATE: Record<Phase, readonly [string, 'sun' | 'moon' | 'dusk']> = {
+  morning: ['MORNING', 'sun'],
+  day: ['DAYTIME', 'sun'],
+  golden: ['GOLDEN HOUR', 'dusk'],
+  night: ['NIGHT', 'moon'],
+}
+
+/** Area plate: map name, plus the time of day on the player's real clock. */
+function areaBanner() {
+  banner(map.name, map.theme, ...PHASE_PLATE[sky.phase])
+}
+
+function veilAt(): number {
+  const k = veil.dur ? Math.min(1, (clock - veil.t0) / veil.dur) : 1
+  return veil.from + (veil.to - veil.from) * k
+}
+
+/** Ordered-dither the world canvas to (1) or from (0) black; UI overlays stay untouched. */
+async function veilTo(to: number, ms: number) {
+  veil = { from: veilAt(), to, t0: clock, dur: ms / 1000 }
+  await sleep(ms + 20)
 }
 
 // ─────────── Actor movement ───────────
@@ -212,6 +247,10 @@ function startMove(a: Actor, dir: Dir, dur: number) {
   a.step++
   if (a === player && !followerHidden) followPreviousTile(dur)
   if (hop) audio.sfx('ledge')
+  if (a === player) {
+    const door = doorAt.get(key(tx, ty))
+    if (door) openDoors.set(door, clock)
+  }
 }
 
 function canStep(a: Actor, dir: Dir) {
@@ -269,8 +308,15 @@ function updateActor(a: Actor, dt: number) {
     a.py = a.y * TILE
     a.move = null
     a.frame = 0
-    if (m.hop) effects.push({ kind: 'dust', x: a.x, y: a.y, t0: clock })
-    if (tileAt(a.x, a.y) === '"') effects.push({ kind: 'rustle', x: a.x, y: a.y, t0: clock })
+    const px = a.x * TILE
+    const py = a.y * TILE
+    const ground = tileAt(a.x, a.y)
+    if (m.hop) effects.push({ kind: 'dust', x: px, y: py, t0: clock, dir: a.dir })
+    if (ground === '"') effects.push({ kind: 'rustle', x: px, y: py, t0: clock, dir: a.dir })
+    else if (ground === 's') effects.push({ kind: 'print', x: px, y: py, t0: clock, dir: a.dir })
+    // quick feet kick up dust on bare ground
+    if (m.dur < 0.16 && !m.hop && (ground === ':' || ground === 's' || ground === 'd'))
+      effects.push({ kind: 'step', x: px - DV[a.dir][0] * 6, y: py - DV[a.dir][1] * 6, t0: clock, dir: a.dir })
     if (a === player) arrived()
   }
 }
@@ -295,6 +341,11 @@ function arrived() {
   if (checkTrainers()) return
   if (checkRoamers()) return
   if (tileAt(player.x, player.y) === '"' && map.encounters && S.party.length) {
+    if (S.repel) {
+      S.repel--
+      if (!S.repel) void run(() => say('Your *Private Mempool* expired. Wild Remys can see your transactions again.'))
+      return
+    }
     grassSteps++
     if (grassSteps > 2 && encounterRng() < map.encounters.rate / 2) {
       grassSteps = 0
@@ -306,10 +357,11 @@ function arrived() {
 async function enterDoor(x: number, y: number) {
   const d = map.doors.find((dd) => dd.x === x && dd.y === y)
   audio.sfx('door')
-  await fade(true, 200)
+  await veilTo(1, 200)
+  openDoors.clear()
   placePlayer(x, y + 1, 'down')
   render()
-  await fade(false, 200)
+  await veilTo(0, 220)
   if (d) await d.run()
   closeText()
 }
@@ -317,7 +369,8 @@ async function enterDoor(x: number, y: number) {
 function playerUpdate(dt: number) {
   if (busy || input.focused || player.move) return
   const d = input.dir()
-  running = input.held('b')
+  // Running shoes come laced: hold B to stroll.
+  running = !input.held('b')
   if (!d) {
     turnHold = 0
     player.frame = 0
@@ -391,7 +444,7 @@ async function talkTo(a: Actor) {
   closeText()
 }
 
-const resolveTrainer = (t: TrainerDef | (() => TrainerDef)) => (typeof t === 'function' ? t() : t)
+const resolveTrainer = (t: TrainerDef | (() => TrainerDef)) => castTrainer(typeof t === 'function' ? t() : t)
 
 /** Runs a script with the world paused; always closes the text box after. */
 export async function run(fn: () => Promise<unknown>) {
@@ -451,8 +504,9 @@ async function trainerEncounter(a: Actor, tr: TrainerDef) {
 }
 
 /** Full trainer battle incl. transition, music restore and blackout. */
-export async function trainerBattle(tr: TrainerDef, id: string, opts: { noBlackout?: boolean } = {}): Promise<BattleResult> {
-  const style = tr.music === 'boss' ? 'boss' : 'trainer'
+export async function trainerBattle(authored: TrainerDef, id: string, opts: { noBlackout?: boolean } = {}): Promise<BattleResult> {
+  const tr = castTrainer(authored)
+  const style = tr.music === 'boss' ? 'boss' : tr.music === 'cabald' ? 'cabald' : 'trainer'
   await battleTransition(style)
   const foes: Remy[] = tr.party.map(([idx, lv]) => makeRemy(idx, lv))
   const res = await battle({
@@ -477,7 +531,7 @@ export async function wildBattle(r: Remy, bg = map.theme): Promise<BattleResult>
 async function wildEncounter() {
   const e = map.encounters
   if (!e) return
-  const idx = randomRemyIdx(encounterRng, e.weights, RESERVED)
+  const idx = randomRemyIdx(encounterRng, e.weights, reserved())
   const lv = e.levels[0] + Math.floor(encounterRng() * (e.levels[1] - e.levels[0] + 1))
   const gold = encounterRng() < 1 / 40
   await wildBattle(makeRemy(idx, lv, gold))
@@ -514,58 +568,129 @@ export async function blackout() {
 
 // ─────────── Transitions ───────────
 
-async function battleTransition(style: 'wild' | 'trainer' | 'boss') {
+const WIPE_DUR: Record<WipeStyle, number> = { wild: 0.8, trainer: 0.75, boss: 1.15, cabald: 1 }
+const WIPE_MUSIC: Record<WipeStyle, 'battle' | 'trainer' | 'boss' | 'cabald'> = {
+  wild: 'battle',
+  trainer: 'trainer',
+  boss: 'boss',
+  cabald: 'cabald',
+}
+
+async function battleTransition(style: WipeStyle) {
   audio.sfx('encounter')
-  audio.play(style === 'wild' ? 'battle' : style === 'boss' ? 'boss' : 'trainer')
+  audio.play(WIPE_MUSIC[style])
   await flash(2, 70)
-  wipe = { t0: clock, dur: style === 'boss' ? 0.9 : 0.6, style }
+  wipe = { t0: clock, dur: WIPE_DUR[style], style }
   await sleep(wipe.dur * 1000 + 60)
   wipe = null
   await fade(true, 1)
 }
 
-function drawWipe(ctx: CanvasRenderingContext2D) {
+/** Boss entries shake the world for their opening beat. */
+function wipeShake(): number {
+  if (wipe?.style !== 'boss') return 0
+  const p = (clock - wipe.t0) / wipe.dur
+  return p < 0.4 ? Math.round(Math.sin(clock * 90) * 3 * (1 - p / 0.4)) : 0
+}
+
+const dotCache = new Map<number, HTMLCanvasElement>()
+/** Halftone dot of radius `r` px centred in an 8px cell; gold while small (the seal's rim), ink once grown. */
+function halftoneDot(r: number): HTMLCanvasElement {
+  let c = dotCache.get(r)
+  if (!c) {
+    c = document.createElement('canvas')
+    c.width = c.height = 8
+    const x = c.getContext('2d') as CanvasRenderingContext2D
+    x.fillStyle = r <= 1.5 ? '#e0a82c' : '#12061c'
+    for (let j = 0; j < 8; j++)
+      for (let i = 0; i < 8; i++) if ((i - 3.5) ** 2 + (j - 3.5) ** 2 <= r * r) x.fillRect(i, j, 1, 1)
+    dotCache.set(r, c)
+  }
+  return c
+}
+
+function drawWipe(ctx: CanvasRenderingContext2D, ox: number, oy: number) {
   if (!wipe) return
   const p = Math.min(1, (clock - wipe.t0) / wipe.dur)
   const { W, H } = view
+  const INK = '#05060f'
   if (wipe.style === 'wild') {
-    // Pixel-block spiral closing in.
-    const B = 12
-    const cols = Math.ceil(W / B)
-    const rowsN = Math.ceil(H / B)
-    const total = cols * rowsN
-    const n = Math.floor(total * p)
-    ctx.fillStyle = '#05060f'
-    let x0 = 0
-    let y0 = 0
-    let x1 = cols - 1
-    let y1 = rowsN - 1
-    let drawn = 0
-    while (drawn < n && x0 <= x1 && y0 <= y1) {
-      for (let x = x0; x <= x1 && drawn < n; x++, drawn++) ctx.fillRect(x * B, y0 * B, B, B)
-      y0++
-      for (let y = y0; y <= y1 && drawn < n; y++, drawn++) ctx.fillRect(x1 * B, y * B, B, B)
-      x1--
-      for (let x = x1; x >= x0 && drawn < n; x--, drawn++) ctx.fillRect(x * B, y1 * B, B, B)
-      y1--
-      for (let y = y1; y >= y0 && drawn < n; y--, drawn++) ctx.fillRect(x0 * B, y * B, B, B)
-      x0++
+    // Twin pinwheel arms spiral in from the edges toward the player, trailed by Base-blue and ice-white blocks.
+    const B = 8
+    const maxD = Math.hypot(Math.max(ox, W - ox), Math.max(oy, H - oy))
+    const reach = p * 1.4
+    const colors = ['#d6e4ff', '#0052ff', INK]
+    for (let pass = 0; pass < 3; pass++) {
+      ctx.fillStyle = colors[pass]
+      for (let by = 0; by < H; by += B)
+        for (let bx = 0; bx < W; bx += B) {
+          const dx = bx + B / 2 - ox
+          const dy = by + B / 2 - oy
+          const ang = (Math.atan2(dx, -dy) + Math.PI * 2) % Math.PI
+          const lead = reach - ang / Math.PI - (1 - Math.hypot(dx, dy) / maxD) * 0.4
+          const band = lead < 0 ? -1 : lead < 0.05 ? 0 : lead < 0.12 ? 1 : 2
+          if (band === pass) ctx.fillRect(bx, by, B, B)
+        }
     }
-  } else {
-    // Interleaved bars sweeping in from both sides; the boss gets a blood-red edge.
-    const bars = 10
-    const bh = Math.ceil(H / bars)
-    for (let i = 0; i < bars; i++) {
-      const w = Math.ceil(W * Math.min(1, p * 1.25 - (i % 2) * 0.12))
-      if (w <= 0) continue
-      const x = i % 2 ? W - w : 0
-      if (wipe.style === 'boss') {
-        ctx.fillStyle = '#b3123a'
-        ctx.fillRect(i % 2 ? x - 3 : x + w, i * bh, 3, bh)
+  } else if (wipe.style === 'trainer') {
+    // Bands race in from alternating sides, each tipped with a stepped chevron in white and Base blue.
+    const bands = 11
+    const bh = Math.ceil(H / bands)
+    for (let i = 0; i < bands; i++) {
+      const delay = (i % 2 ? 0.1 : 0) + Math.abs(i - (bands - 1) / 2) * 0.018
+      const q = Math.max(0, Math.min(1, (p - delay) / 0.7))
+      const reach = Math.round((W + bh) * q * q)
+      if (reach <= 0) continue
+      for (let r = 0; r < bh && i * bh + r < H; r++) {
+        const y = i * bh + r
+        const tip = reach - Math.round(Math.abs(r - (bh - 1) / 2))
+        if (tip <= 0) continue
+        // left bands: ink | blue | white → ; right bands mirror it
+        const x0 = i % 2 === 0 ? 0 : W - tip
+        const ink = Math.max(0, tip - 5)
+        ctx.fillStyle = INK
+        ctx.fillRect(i % 2 === 0 ? x0 : x0 + 5, y, ink, 1)
+        ctx.fillStyle = '#0052ff'
+        ctx.fillRect(i % 2 === 0 ? x0 + tip - 5 : x0 + 2, y, 3, 1)
+        ctx.fillStyle = '#eaf2ff'
+        ctx.fillRect(i % 2 === 0 ? x0 + tip - 2 : x0, y, 2, 1)
       }
-      ctx.fillStyle = '#05060f'
-      ctx.fillRect(x, i * bh, w, bh)
     }
+  } else if (wipe.style === 'boss') {
+    // Blood-red pulses while the world shakes, then saw-toothed jaws bite shut from above and below.
+    if (p < 0.45 && Math.floor(p * 14) % 2 === 0) {
+      ctx.fillStyle = 'rgba(179,18,58,0.28)'
+      ctx.fillRect(0, 0, W, H)
+    }
+    const q = Math.max(0, Math.min(1, (p - 0.3) / 0.7))
+    const close = Math.round((H / 2 + 8) * q ** 1.6)
+    if (close > 0)
+      for (let x = 0; x < W; x += 2) {
+        const tooth = Math.round(Math.abs(((x / 14) % 1) - 0.5) * 12)
+        const top = close - tooth
+        const bot = H - close + 6 - tooth
+        ctx.fillStyle = INK
+        if (top > 0) ctx.fillRect(x, 0, 2, top)
+        ctx.fillRect(x, bot, 2, H - bot)
+        ctx.fillStyle = '#b3123a'
+        ctx.fillRect(x, Math.max(0, top), 2, 2)
+        ctx.fillRect(x, bot - 2, 2, 2)
+      }
+  } else {
+    // Cabald: a comic-book halftone swallows the screen from the edges in, its growing front ringed in seal gold.
+    const B = 8
+    const maxD = Math.hypot(Math.max(ox, W - ox), Math.max(oy, H - oy))
+    ctx.fillStyle = `rgba(90,26,154,${(0.3 * p).toFixed(3)})`
+    ctx.fillRect(0, 0, W, H)
+    ctx.fillStyle = '#12061c'
+    for (let by = 0; by < H; by += B)
+      for (let bx = 0; bx < W; bx += B) {
+        const d = Math.hypot(bx + B / 2 - ox, by + B / 2 - oy) / maxD
+        const r = Math.round((p * 1.7 - (1 - d)) * 12) / 2
+        if (r <= 0) continue
+        if (r >= 4.5) ctx.fillRect(bx, by, B, B)
+        else ctx.drawImage(halftoneDot(r), bx, by)
+      }
   }
 }
 
@@ -730,8 +855,7 @@ function spawnRoamer() {
     // Prefer nearby patches so each route feels alive, but never materialize under the player.
     if (distance < 3 || (attempt < 50 && distance > 12) || blocked(x, y)) continue
     if (roamers.some((a) => a.x === x && a.y === y)) continue
-    let idx = randomRemyIdx(encounterRng, e.weights, RESERVED)
-    while (RESERVED.has(idx)) idx = randomRemyIdx(encounterRng, e.weights, RESERVED)
+    const idx = randomRemyIdx(encounterRng, e.weights, reserved())
     const lv = e.levels[0] + Math.floor(encounterRng() * (e.levels[1] - e.levels[0] + 1))
     const a = mkActor(`wild:${idx}`, x, y, 'down', PLAYER_LOOK)
     a.idx = idx
@@ -744,7 +868,7 @@ function spawnRoamer() {
 }
 
 function checkRoamers() {
-  if (busy || input.focused || !lead) return false
+  if (busy || input.focused || !lead || S.repel) return false
   for (let i = 0; i < roamers.length; i++) {
     const a = roamers[i]
     if (player.move?.hop) continue
@@ -811,25 +935,101 @@ function npcIdle(a: Actor) {
 
 // ─────────── Camera + render ───────────
 
+/** Camera locked to the player's rounded pixel position, so the hero never shimmers against the scrolling world. */
 function snapCamera() {
   const mw = map.grid[0].length * TILE
   const mh = map.grid.length * TILE
-  const cx = player.px + TILE / 2 - view.W / 2
-  const cy = player.py + TILE / 2 - view.H / 2 - 4
-  camX = mw <= view.W ? (mw - view.W) / 2 : Math.max(0, Math.min(mw - view.W, cx))
-  camY = mh <= view.H ? (mh - view.H) / 2 : Math.max(0, Math.min(mh - view.H, cy))
+  const cx = Math.round(player.px) + TILE / 2 - (view.W >> 1)
+  const cy = Math.round(player.py) + TILE / 2 - (view.H >> 1) - 4
+  camX = mw <= view.W ? (mw - view.W) >> 1 : Math.max(0, Math.min(mw - view.W, cx))
+  camY = mh <= view.H ? (mh - view.H) >> 1 : Math.max(0, Math.min(mh - view.H, cy))
 }
+
+const isWater = (x: number, y: number) => map.grid[y]?.[x] === '~'
+
+let mirror: HTMLCanvasElement | undefined
+let mirrorCtx: CanvasRenderingContext2D | undefined
+/**
+ * Actors standing at the water's edge ripple upside-down in it: the sprite is flipped row by row onto the water
+ * tiles below, each row nudged by a slow wave and clipped to water so it never spills onto the shore.
+ */
+function drawReflection(ctx: CanvasRenderingContext2D, a: Actor, x: number, y: number, cx: number, cy: number) {
+  const tx = Math.floor((Math.round(a.px) + 8) / TILE)
+  const ty = Math.floor((Math.round(a.py) + 8) / TILE)
+  if (!isWater(tx, ty + 1)) return
+  if (!mirror) {
+    mirror = document.createElement('canvas')
+    mirror.width = 16
+    mirror.height = 24
+    mirrorCtx = mirror.getContext('2d') as CanvasRenderingContext2D
+  }
+  const mc = mirrorCtx as CanvasRenderingContext2D
+  mc.clearRect(0, 0, 16, 24)
+  if (a.idx !== undefined) drawRemyActor(mc, a.idx, a.dir, a.frame, 0, 8, a.def?.outfit)
+  else drawActor(mc, a.look, a.dir, a.frame, 0, 8)
+  ctx.save()
+  ctx.beginPath()
+  for (let dx = -1; dx <= 1; dx++)
+    for (let dy = 1; dy <= 2; dy++)
+      if (isWater(tx + dx, ty + dy)) ctx.rect((tx + dx) * TILE - cx, (ty + dy) * TILE - cy + 2, TILE, TILE - 2)
+  ctx.clip()
+  ctx.globalAlpha = 0.42
+  const surface = y + 16
+  for (let r = 0; r < 24; r++) {
+    const wob = Math.round(Math.sin(clock * 2.6 + r * 0.7) * 0.7)
+    ctx.drawImage(mirror, 0, 23 - r, 16, 1, x + wob, surface + r, 16, 1)
+  }
+  ctx.restore()
+}
+
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+const veilPatterns: CanvasPattern[] = []
+/** 2px-cell ordered dither at 17 coverage levels, the GBA-style fade. */
+function drawVeil(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  const level = Math.round(veilAt() * 16)
+  if (level <= 0) return
+  if (level >= 16) {
+    ctx.fillStyle = '#05060f'
+    ctx.fillRect(0, 0, W, H)
+    return
+  }
+  let pat = veilPatterns[level]
+  if (!pat) {
+    const c = document.createElement('canvas')
+    c.width = c.height = 8
+    const x = c.getContext('2d') as CanvasRenderingContext2D
+    x.fillStyle = '#05060f'
+    for (let i = 0; i < 16; i++) if (BAYER[i] < level) x.fillRect((i & 3) * 2, (i >> 2) * 2, 2, 2)
+    pat = ctx.createPattern(c, 'repeat') as CanvasPattern
+    veilPatterns[level] = pat
+  }
+  ctx.fillStyle = pat
+  ctx.fillRect(0, 0, W, H)
+}
+
+/** At night a faint moonlit halo keeps the hero and partner readable without flattening the dark. */
+const heroLights: Light[] = [
+  { x: 0, y: 0, r: 22, rgb: '150,160,210', a: 0.4 },
+  { x: 0, y: 0, r: 16, rgb: '150,160,210', a: 0.25 },
+]
 
 export function render() {
   const ctx = view.ctx
   const { W, H } = view
   snapCamera()
-  const cx = Math.round(camX)
+  const shake = wipeShake()
+  const cx = Math.round(camX) + shake
   const cy = Math.round(camY)
-  ctx.fillStyle = map.theme === 'canyon' ? '#2a1410' : '#0e2a12'
+  ctx.fillStyle = map.theme === 'canyon' ? '#2a1410' : map.theme === 'gallery' ? '#140c18' : '#0e2a12'
   ctx.fillRect(0, 0, W, H)
   ctx.drawImage(layers.below, -cx, -cy)
   drawAnimated(ctx, map.grid, map.objects, map.theme, cx, cy, W, H, clock)
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const e = effects[i]
+    const t = clock - e.t0
+    if (t > EFFECT_LIFE[e.kind]) effects.splice(i, 1)
+    else if (e.kind === 'print') drawFootprint(ctx, e.x - cx, e.y - cy, e.dir, t / EFFECT_LIFE.print)
+  }
   for (const it of map.items) {
     if (S.flags[`i:${it.id}`]) continue
     const x = it.x * TILE - cx
@@ -839,7 +1039,8 @@ export function render() {
   drawOrder.length = 0
   for (const a of npcs) drawOrder.push(a)
   for (const a of roamers) drawOrder.push(a)
-  if (lead && !followerHidden && (follower.px !== player.px || follower.py !== player.py)) drawOrder.push(follower)
+  const showFollower = lead && !followerHidden && (follower.px !== player.px || follower.py !== player.py)
+  if (showFollower) drawOrder.push(follower)
   drawOrder.push(player)
   drawOrder.sort(byY)
   const actors = drawOrder
@@ -847,8 +1048,15 @@ export function render() {
     const x = Math.round(a.px) - cx
     const y = Math.round(a.py) - cy
     if (x < -TILE * 2 || y < -TILE * 3 || x > W + TILE || y > H + TILE) continue
-    const hopY = a.move?.hop ? Math.round(-Math.sin(Math.PI * a.move.t) * 10) : 0
-    drawShadow(ctx, x, y)
+    drawReflection(ctx, a, x, y, cx, cy)
+  }
+  for (const a of actors) {
+    const x = Math.round(a.px) - cx
+    const y = Math.round(a.py) - cy
+    if (x < -TILE * 2 || y < -TILE * 3 || x > W + TILE || y > H + TILE) continue
+    const lift = a.move?.hop ? Math.sin(Math.PI * a.move.t) : 0
+    const hopY = Math.round(-lift * 10)
+    drawShadow(ctx, x, y, lift)
     if (a.idx !== undefined) drawRemyActor(ctx, a.idx, a.dir, a.frame, x, y + hopY, a.def?.outfit)
     else drawActor(ctx, a.look, a.dir, a.frame, x, y + hopY)
     if ((a.remy?.gold || (a === follower && lead?.gold)) && Math.floor(clock * 5) % 4 < 2) {
@@ -863,23 +1071,25 @@ export function render() {
     const onGrass = !a.move ? tileAt(a.x, a.y) === '"' : a.move.t > 0.5 && tileAt(a.move.tx, a.move.ty) === '"'
     if (onGrass && !a.move?.hop) drawTallGrassFront(ctx, x, y, clock)
   }
-  for (let i = effects.length - 1; i >= 0; i--) {
-    const e = effects[i]
+  for (const e of effects) {
     const t = clock - e.t0
-    if (t > 0.4) {
-      effects.splice(i, 1)
-      continue
-    }
-    if (e.kind === 'rustle') drawGrassRustle(ctx, e.x * TILE - cx, e.y * TILE - cy, t)
-    else drawLedgeDust(ctx, e.x * TILE - cx, e.y * TILE - cy, t)
+    if (e.kind === 'rustle') drawGrassRustle(ctx, e.x - cx, e.y - cy, t)
+    else if (e.kind === 'dust') drawLedgeDust(ctx, e.x - cx, e.y - cy, t)
+    else if (e.kind === 'step') drawStepDust(ctx, e.x - cx, e.y - cy, t / EFFECT_LIFE.step)
   }
   ctx.drawImage(layers.above, -cx, -cy)
+  heroLights[0].x = Math.round(player.px) - cx + 8
+  heroLights[0].y = Math.round(player.py) - cy + 6
+  heroLights[1].x = Math.round(follower.px) - cx + 8
+  heroLights[1].y = Math.round(follower.py) - cy + 6
+  heroLights[1].a = showFollower ? 0.25 : 0
+  drawAmbient(ctx, map.theme, W, H, cx, cy, clock, heroLights)
   for (const a of actors) {
     if (!a.emote) continue
     drawEmote(ctx, a.emote.kind, Math.round(a.px) - cx, Math.round(a.py) - cy, clock - a.emote.t0)
   }
-  drawAmbient(ctx, map.theme, W, H, cx, cy, clock)
-  drawWipe(ctx)
+  drawVeil(ctx, W, H)
+  drawWipe(ctx, Math.round(player.px) - cx + 8, Math.round(player.py) - cy + 8)
   present()
 }
 
@@ -893,6 +1103,7 @@ function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0)
   last = now
   clock += dt
+  updateSky(now)
   if (!document.hidden) S.playMs += dt * 1000
   syncFollower()
   playerUpdate(dt)
@@ -927,5 +1138,5 @@ export async function enterWorld() {
   render()
   audio.play(map.music)
   await fade(false, 500)
-  banner(map.name)
+  areaBanner()
 }

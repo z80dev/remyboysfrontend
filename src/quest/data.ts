@@ -256,6 +256,41 @@ const TYPE_OVERRIDE: Record<number, Exclude<RType, 'MEME'>> = {
 }
 
 const CACHE = new Map<number, Species>()
+
+/** A story seed keeps its authored type when the cast resolver swaps a different Remy into its role. */
+function inheritType(seed: number, idx: number) {
+  const t = TYPE_OVERRIDE[seed]
+  if (idx === seed || !t || TYPE_OVERRIDE[idx] === t) return
+  TYPE_OVERRIDE[idx] = t
+  CACHE.delete(idx)
+}
+
+/** Bald ⇔ Cabald: the catalogue's bald flag is the membership roll. */
+export const isCabald = (idx: number) => art.get(idx).bald
+
+/** Remys a trainer can ever mint: the whole collection minus the Cabald, who only fight for their bosses. */
+export const mintableCount = () => REMY_COUNT - art.baldList().length
+
+/** Deterministic Cabald member for a story seed, drawn from whoever the catalogue says is bald. */
+export function cabaldRemy(seed: number): number {
+  const members = art.baldList()
+  if (!members.length || (seed >= 0 && seed < REMY_COUNT && isCabald(seed))) return seed
+  const idx = members[hash(seed ^ 0x0cab41d) % members.length]
+  inheritType(seed, idx)
+  return idx
+}
+
+/** A non-member for a story seed: the seed itself, or the next Remy up the collection with hair. */
+export function civRemy(seed: number): number {
+  for (let i = 0; i < REMY_COUNT; i++) {
+    const idx = (seed + i) % REMY_COUNT
+    if (isCabald(idx)) continue
+    inheritType(seed, idx)
+    return idx
+  }
+  return seed
+}
+
 export function species(idx: number): Species {
   const hit = CACHE.get(idx)
   if (hit) return hit
@@ -339,7 +374,7 @@ export const expGain = (foe: Remy, trainer: boolean) =>
 
 export const stageMult = (s: number) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s))
 
-/** Random wild Remy of a weighted type (types rerolled from the whole collection). */
+/** Random wild Remy of a weighted type (types rerolled from the whole collection). Cabald members never roam. */
 export function randomRemyIdx(rand: () => number, weights: Partial<Record<RType, number>>, avoid: Set<number>): number {
   const entries = Object.entries(weights) as [RType, number][]
   const total = entries.reduce((a, [, w]) => a + w, 0)
@@ -354,27 +389,27 @@ export function randomRemyIdx(rand: () => number, weights: Partial<Record<RType,
   }
   for (let i = 0; i < 200; i++) {
     const idx = Math.floor(rand() * REMY_COUNT)
-    if (!avoid.has(idx) && species(idx).type === want) return idx
+    if (!avoid.has(idx) && !isCabald(idx) && species(idx).type === want) return idx
   }
-  // A depleted pool (or an unlucky RNG) must never leak a story-reserved Remy.
+  // A depleted pool (or an unlucky RNG) must never leak a story-reserved Remy or a Cabald member.
   const start = Math.floor(rand() * REMY_COUNT)
   let fallback = -1
   for (let offset = 0; offset < REMY_COUNT; offset++) {
     const idx = (start + offset) % REMY_COUNT
-    if (avoid.has(idx)) continue
+    if (avoid.has(idx) || isCabald(idx)) continue
     if (species(idx).type === want) return idx
     if (fallback < 0) fallback = idx
   }
   if (fallback >= 0) return fallback
-  throw new Error('No wild Remys remain outside the reserved collection')
+  throw new Error('No wild Remys remain outside the reserved collection and the Cabald')
 }
 
-export type ItemId = 'wallet' | 'ledger' | 'hopium' | 'max_hopium' | 'seed'
+export type ItemId = 'wallet' | 'ledger' | 'hopium' | 'max_hopium' | 'seed' | 'mempool'
 export interface Item {
   name: string
   price: number
   desc: string
-  kind: 'ball' | 'heal' | 'revive'
+  kind: 'ball' | 'heal' | 'revive' | 'repel'
   amount?: number
   ballMult?: number
 }
@@ -384,5 +419,6 @@ export const ITEMS: Record<ItemId, Item> = {
   hopium: { name: 'Hopium', price: 300, kind: 'heal', amount: 30, desc: 'A whiff of hope. Restores 30 HP.' },
   max_hopium: { name: 'Max Hopium', price: 800, kind: 'heal', amount: 999, desc: 'Bottled onchain summer. Fully restores HP.' },
   seed: { name: 'Seed Phrase', price: 1500, kind: 'revive', desc: 'Revives a fainted Remy at half its max HP.' },
+  mempool: { name: 'Private Mempool', price: 350, kind: 'repel', amount: 120, desc: 'Hides you from wild Remys for 120 grass steps.' },
 }
-export const ITEM_ORDER: ItemId[] = ['wallet', 'ledger', 'hopium', 'max_hopium', 'seed']
+export const ITEM_ORDER: ItemId[] = ['wallet', 'ledger', 'hopium', 'max_hopium', 'seed', 'mempool']

@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "lint": "biome check .",
     "preview": "vite preview",
-    "quest:art": "node scripts/quest-art.mjs"
+    "quest:art": "node scripts/quest-art.mjs && uv run --python 3.12 --with 'rembg[cpu]' --with numpy --with pillow python scripts/quest-art.py"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.4.0",

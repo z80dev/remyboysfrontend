@@ -1,0 +1,359 @@
+/* Battle splashes. 1rem = 1 logical pixel; every size, offset and shadow is a whole rem with no blur or radius. */
+.sp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: auto;
+  font: 400 8rem / 1 var(--font-hd);
+  color: #fff;
+  -webkit-font-smoothing: none;
+  user-select: none;
+}
+.sp-cv,
+.sp canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+.sp-cv {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.sp.out > :not(.sp-cv) {
+  visibility: hidden;
+}
+
+/* Kicker / footer strips: ink bars with an accent rule, stepping in from off-screen. */
+.sp-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12rem;
+  padding-top: 2rem;
+  background: #1a1222;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0;
+  text-shadow: 1rem 1rem 0 #3a2a4a;
+}
+.sp .sp-bar.narrow {
+  padding-top: 1rem;
+  font: 400 10rem/10rem var(--font);
+}
+.sp-kicker {
+  top: 0;
+  border-bottom: 1rem solid #fff6d0;
+  color: #fff27a;
+  animation: sp-drop 120ms steps(3) both;
+}
+.sp-footer {
+  bottom: 0;
+  padding-top: 3rem;
+  border-top: 1rem solid #fff6d0;
+  color: #d6e4ff;
+  animation: sp-rise 120ms steps(3) both;
+}
+@keyframes sp-drop {
+  from {
+    transform: translateY(-12rem);
+  }
+}
+@keyframes sp-rise {
+  from {
+    transform: translateY(12rem);
+  }
+}
+
+/* Name plates: cream card, 1rem ink border, 1rem stepped corner notches. */
+.sp-plate {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  max-width: 132rem;
+  padding: 4rem 6rem 4rem;
+  background: #fbfaf0;
+  color: #1a1222;
+  border: 1rem solid #1a1222;
+  box-shadow: inset -2rem -2rem 0 #d8d2bc;
+  clip-path: polygon(
+    1rem 0,
+    calc(100% - 1rem) 0,
+    calc(100% - 1rem) 1rem,
+    100% 1rem,
+    100% calc(100% - 1rem),
+    calc(100% - 1rem) calc(100% - 1rem),
+    calc(100% - 1rem) 100%,
+    1rem 100%,
+    1rem calc(100% - 1rem),
+    0 calc(100% - 1rem),
+    0 1rem,
+    1rem 1rem
+  );
+  white-space: nowrap;
+}
+.sp-plate b,
+.sp-plate small {
+  overflow: hidden;
+  text-overflow: clip;
+  font: inherit;
+}
+.sp-plate small {
+  color: #7a3a52;
+}
+.sp-rival {
+  left: 6rem;
+  top: 17rem;
+  animation: sp-in-l 160ms 380ms steps(4) both;
+}
+.sp-rival small {
+  color: #c41830;
+}
+.sp-me {
+  right: 6rem;
+  bottom: 17rem;
+  align-items: flex-end;
+  animation: sp-in-r 160ms 440ms steps(4) both;
+}
+.sp-me small {
+  color: #0036b0;
+}
+.sp-versus.boss .sp-kicker {
+  color: #ff4a5a;
+  animation: sp-drop 120ms steps(3) both, sp-blink 280ms 500ms steps(2) 3;
+}
+@keyframes sp-in-l {
+  from {
+    transform: translateX(-160rem);
+  }
+}
+@keyframes sp-in-r {
+  from {
+    transform: translateX(160rem);
+  }
+}
+@keyframes sp-blink {
+  50% {
+    visibility: hidden;
+  }
+}
+
+/* Cabald poster. */
+.sp-cabald .sp-kicker {
+  color: #ff9fc6;
+  border-color: #ff5fa2;
+}
+.sp-cabald .sp-footer {
+  color: #ffd6e6;
+  border-color: #ff5fa2;
+}
+.sp-cabald.boss .sp-kicker,
+.sp-cabald.boss .sp-footer {
+  color: #ff4a5a;
+  border-color: #c41830;
+}
+.sp-cplate {
+  right: 6rem;
+  animation: sp-in-r 160ms 520ms steps(4) both;
+}
+.sp-cplate small {
+  color: #b0206a;
+}
+.sp-slab {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rem;
+  padding-top: 4rem;
+  background: #120818;
+  border-top: 1rem solid #ff5fa2;
+  border-bottom: 1rem solid #ff5fa2;
+  animation: sp-in-l 160ms 420ms steps(4) both;
+}
+.sp-cabald.boss .sp-slab {
+  border-color: #c41830;
+}
+.sp-pre {
+  color: #ff9fc6;
+  animation: sp-show 1ms calc(var(--sp-slam) - 120ms) both;
+}
+.sp-big {
+  font-size: 24rem;
+  line-height: 24rem;
+  height: 24rem;
+  color: #fff;
+  text-shadow: 2rem 2rem 0 #ff5fa2, 3rem 3rem 0 #1a1222;
+  animation: sp-slam 100ms var(--sp-slam) step-end both, sp-shake 66ms calc(var(--sp-slam) + 100ms) step-end 2;
+}
+.sp-cabald.boss .sp-big {
+  text-shadow: 2rem 2rem 0 #c41830, 3rem 3rem 0 #000;
+}
+.sp-love {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  height: 8rem;
+  color: #ffd6e6;
+}
+.sp-heart {
+  width: 7rem;
+  height: 6rem;
+}
+@keyframes sp-show {
+  from {
+    visibility: hidden;
+  }
+}
+@keyframes sp-slam {
+  0% {
+    visibility: visible;
+    transform: scale(3);
+  }
+  50% {
+    visibility: visible;
+    transform: scale(2);
+  }
+  100% {
+    visibility: visible;
+    transform: none;
+  }
+}
+@keyframes sp-shake {
+  0% {
+    transform: translateX(2rem);
+  }
+  50% {
+    transform: translateX(-2rem);
+  }
+  100% {
+    transform: none;
+  }
+}
+.sp-big {
+  visibility: hidden;
+}
+
+/* Denial breaking. */
+.sp-lie,
+.sp-dlove {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  text-shadow: 1rem 1rem 0 #1a1222;
+  visibility: hidden;
+}
+.sp-lie {
+  color: #fff;
+}
+.sp-dlove {
+  color: #ff9fc6;
+}
+
+/* Mint certificate. */
+.sp-mint {
+  cursor: pointer;
+}
+.sp-mhead {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff27a;
+  text-shadow: 1rem 1rem 0 #1a1222;
+  animation: sp-drop 120ms steps(3) both;
+}
+.sp-mint.gold .sp-mhead {
+  color: #ffd24a;
+}
+.sp-card {
+  position: absolute;
+  color: #1a1222;
+  animation: sp-card 280ms steps(7) both;
+}
+.sp-card > canvas:first-child {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+@keyframes sp-card {
+  from {
+    transform: translateY(-210rem);
+  }
+}
+.sp-card > * {
+  position: absolute;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sp-ed {
+  text-align: right;
+  font: inherit;
+  color: #1a1222;
+}
+.sp-name {
+  font: inherit;
+  color: #1a1222;
+  text-shadow: 1rem 1rem 0 #d8cca8;
+}
+.sp-mint.gold .sp-name {
+  color: #9a5a10;
+  text-shadow: 1rem 1rem 0 #ffe79a;
+}
+.sp-epi {
+  font: 400 10rem / 9rem var(--font);
+  color: #5a3a6a;
+  white-space: normal !important;
+  height: 18rem;
+}
+.sp-chip {
+  padding: 2rem 4rem 2rem;
+  color: #fff;
+  text-shadow: 1rem 1rem 0 rgba(26, 18, 34, 0.55);
+  clip-path: polygon(
+    1rem 0,
+    calc(100% - 1rem) 0,
+    100% 1rem,
+    100% calc(100% - 1rem),
+    calc(100% - 1rem) 100%,
+    1rem 100%,
+    0 calc(100% - 1rem),
+    0 1rem
+  );
+}
+.sp-lv {
+  font: inherit;
+  color: #1a1222;
+}
+.sp-place {
+  font: 400 10rem / 9rem var(--font);
+  color: #5a3a6a;
+  white-space: normal !important;
+  height: 20rem;
+}
+.sp-stamp {
+  visibility: hidden;
+  animation: sp-slam 100ms 640ms step-end both;
+}
+.sp-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff;
+  text-shadow: 1rem 1rem 0 #1a1222;
+  visibility: hidden;
+}
+.sp-mint.ready .sp-hint {
+  visibility: visible;
+  animation: sp-blink 900ms steps(2) infinite;
+}

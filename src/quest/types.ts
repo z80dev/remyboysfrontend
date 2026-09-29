@@ -56,6 +56,17 @@ export type ObjKind =
   | 'departure_board'
   | 'bridge_gate'
   | 'bag_scanner'
+  /** Street / interior dressing. `sconce` hangs on a wall tile. */
+  | 'planter'
+  | 'vending'
+  | 'bin'
+  | 'hydrant'
+  | 'cafe'
+  | 'palm'
+  | 'stanchion'
+  | 'sconce'
+  | 'crate'
+  | 'barrel'
 
 /**
  * Footprints in tiles. (x, y) of a MapObject is its top-left footprint tile. Every footprint tile is solid,
@@ -89,6 +100,16 @@ export const OBJ_SIZE: Record<ObjKind, { w: number; h: number; door?: { x: numbe
   departure_board: { w: 8, h: 3 },
   bridge_gate: { w: 4, h: 2 },
   bag_scanner: { w: 2, h: 1 },
+  planter: { w: 1, h: 1 },
+  vending: { w: 1, h: 1 },
+  bin: { w: 1, h: 1 },
+  hydrant: { w: 1, h: 1 },
+  cafe: { w: 1, h: 1 },
+  palm: { w: 1, h: 1 },
+  stanchion: { w: 1, h: 1 },
+  sconce: { w: 1, h: 1 },
+  crate: { w: 1, h: 1 },
+  barrel: { w: 1, h: 1 },
 }
 
 export interface MapObject {

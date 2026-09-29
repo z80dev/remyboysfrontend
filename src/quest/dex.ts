@@ -1,41 +1,51 @@
-/** Virtualized collection: only the visible rows own DOM/canvases, regardless of collection size. */
+/** Remydex: a virtualized grid of all originals (only visible rows own DOM) plus per-Remy entries. */
 import { art } from './art'
 import { audio } from './audio'
-import { REMY_COUNT, TYPE_COLOR, artSrc, species } from './data'
-import { input } from './input'
-import { MAPS, RESERVED, STARTERS } from './maps'
+import { REMY_COUNT, artSrc, isCabald, mintableCount, species } from './data'
+import { hex, shade } from './gfx/px'
+import { input, tap } from './input'
+import { MAPS, reserved, starters } from './maps'
+import { icon, remySprite, stageStyle, typeBadge } from './skin'
 import { S } from './state'
-import { el, uiRoot } from './ui'
+import { el, fmt, uiRoot } from './ui'
 import { viewArt } from './viewer'
 import './dex.css'
 import { view } from './view'
 
-const FILTERS = ['ALL', 'SEEN', 'MINTED', 'BULL', 'BEAR', 'WHALE', 'DEGEN'] as const
+const FILTERS = ['ALL', 'SEEN', 'MINTED', 'BULL', 'BEAR', 'WHALE', 'DEGEN', 'CABALD'] as const
 const ALL = Array.from({ length: REMY_COUNT }, (_, i) => i)
+const no = (idx: number) => String(idx).padStart(4, '0')
 
+/** Pixel "?" drawn over undiscovered portraits (5×7, 2px scale). */
+const QUESTION = ['.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..']
+
+/** 32px posterized portrait; undiscovered ones are sunk into a dithered navy veil with a pixel "?". */
 export function miniPortrait(idx: number, hidden = false): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 32
   canvas.className = 'remy-mini'
-  const c = canvas.getContext('2d')
-  if (!c) return canvas
+  const c = canvas.getContext('2d') as CanvasRenderingContext2D
   c.imageSmoothingEnabled = false
   const rect = art.mini(idx)
-  if (rect) {
-    c.drawImage(rect.img, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, 32, 32)
-    if (hidden) {
-      c.fillStyle = '#060d24e8'
-      c.fillRect(0, 0, 32, 32)
-    }
-  } else {
-    c.fillStyle = '#111f43'
-    c.fillRect(0, 0, 32, 32)
-  }
+  if (rect) c.drawImage(rect.img, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, 32, 32)
   if (hidden || !rect) {
-    c.fillStyle = '#8397c4'
-    c.font = 'bold 18px monospace'
-    c.textAlign = 'center'
-    c.fillText('?', 16, 23)
+    const veil = c.getImageData(0, 0, 32, 32)
+    const d = veil.data
+    for (let y = 0; y < 32; y++)
+      for (let x = 0; x < 32; x++) {
+        const i = (y * 32 + x) * 4
+        // A 2×2 checker keeps a ghost of the silhouette readable through the veil.
+        const k = (x + y) % 2 ? 0.12 : 0.22
+        d[i] = 14 + d[i] * k
+        d[i + 1] = 20 + d[i + 1] * k
+        d[i + 2] = 58 + d[i + 2] * k
+        d[i + 3] = 255
+      }
+    c.putImageData(veil, 0, 0)
+    c.fillStyle = '#8fa6e8'
+    QUESTION.forEach((row, y) => {
+      for (let x = 0; x < 5; x++) if (row[x] === '#') c.fillRect(11 + x * 2, 9 + y * 2, 2, 2)
+    })
   }
   return canvas
 }
@@ -44,7 +54,7 @@ export function miniPortrait(idx: number, hidden = false): HTMLCanvasElement {
 export function holoCard(idx: number): HTMLElement {
   const card = el('div', 'remy-holo')
   card.style.setProperty('--art-accent', art.get(idx).palette.accent)
-  card.innerHTML = `<img src="${artSrc(idx)}" alt="Original Remy #${idx} artwork" draggable="false"><i class="remy-foil"></i><span class="remy-edition">BASED ORIGINAL / ${String(idx).padStart(4, '0')}</span>`
+  card.innerHTML = `<img src="${artSrc(idx)}" alt="Original Remy #${idx} artwork" draggable="false"><i class="remy-foil"></i>`
   const reset = () => {
     card.classList.remove('tilting')
     card.style.removeProperty('--rx')
@@ -66,8 +76,13 @@ export function holoCard(idx: number): HTMLElement {
 }
 
 function habitat(idx: number): string {
-  if (STARTERS.includes(idx)) return 'Prof. Gwei offers this Remy as a starter.'
-  if (RESERVED.has(idx)) return 'A familiar face from the story. Not found in wild grass.'
+  if (isCabald(idx)) {
+    return S.caught.includes(idx)
+      ? 'A bald Remy, so a Cabald member, who defected to your team before the Great Denial. Nobody asks questions.'
+      : 'Bald, so Cabald. Uncatchable: only fights for Cabald bosses. There is no Cabald. It loves you.'
+  }
+  if (starters().includes(idx)) return 'Prof. Gwei offers this Remy as a starter.'
+  if (reserved().has(idx)) return 'A familiar face from the story. Not found in wild grass.'
   const type = species(idx).type
   const maps = Object.values(MAPS)
     .filter((map) => (map.encounters?.weights[type] ?? 0) > 0)
@@ -81,30 +96,67 @@ function habitat(idx: number): string {
   return maps.length ? `Seek ${type} Remys in ${maps.slice(0, 2).map((m) => m.name).join(' or ')}.` : 'Keep exploring the tall grass. Every original has a story.'
 }
 
+/** Dex panel chrome shared by the grid and entries: wallpaper, title strip with a tappable B, cream help window. */
+function dexPanel(cls: string, title: string, body: string) {
+  const panel = el(
+    'section',
+    `panel ${cls}`,
+    `<div class="panel-head"><span>${icon('dex')}${title}</span><span class="panel-right"><button class="pbtn panel-x" aria-label="Back">B</button></span></div>${body}<div class="panel-foot"></div>`,
+  )
+  panel.querySelector('.panel-x')?.addEventListener('click', () => tap('b'))
+  return panel
+}
+
+const STAT_NAMES: Record<string, string> = { hp: 'HP', atk: 'ATK', def: 'DEF', spd: 'SPD' }
+const hex2css = (c: number) => `rgb(${c & 255},${(c >>> 8) & 255},${(c >>> 16) & 255})`
+
 export function remyDetail(idx: number): Promise<void> {
   return new Promise((resolve) => {
     const known = S.seen.includes(idx) || S.caught.includes(idx)
     const minted = S.caught.includes(idx)
     const sp = species(idx)
     const info = art.get(idx)
-    const epithet = 'epithet' in info && typeof info.epithet === 'string' ? info.epithet : 'A BASED ORIGINAL'
-    const panel = el('section', 'panel collection-detail')
-    panel.style.setProperty('--art-accent', info.palette.accent)
-    panel.style.setProperty('--art-bg', info.palette.bg)
-    panel.innerHTML = `<div class="panel-head"><span>REMYDEX / ${String(idx).padStart(4, '0')}</span><button class="collection-back">BACK</button></div><div class="panel-body"><div class="detail-layout"><div class="detail-art"></div><div class="detail-info"><div class="collection-eyebrow">${minted ? 'MINTED · YOUR COLLECTION' : known ? 'ENCOUNTER RECORDED' : 'UNDISCOVERED ORIGINAL'}</div><h2>${known ? `REMY #${idx}` : '???'}</h2><p class="detail-epithet"></p><div class="detail-data"></div></div></div></div><div class="panel-foot">${known ? 'A · ART / ↑↓ · SCROLL / B · BACK' : 'Meet this Remy to reveal its story. B · BACK'}</div>`
-    const subtitle = panel.querySelector('.detail-epithet') as HTMLElement
-    subtitle.textContent = known ? epithet : 'A new friend is out there.'
-    const artHost = panel.querySelector('.detail-art') as HTMLElement
-    const data = panel.querySelector('.detail-data') as HTMLElement
-    if (known) {
-      artHost.appendChild(holoCard(idx))
-      const where = [...S.party, ...S.storage].find((r) => r.idx === idx)?.caughtAt
-      data.innerHTML = `<span class="type" style="background:${TYPE_COLOR[sp.type]}">${sp.type}</span><div class="detail-swatches">${Object.entries(info.palette).map(([name, color]) => `<i style="background:${color}" title="${name}" aria-label="${name}"></i>`).join('')}</div><div class="collection-eyebrow">BASE STATS</div><div class="detail-stats">${Object.entries(sp.base).map(([name, n]) => `<div><span>${name.toUpperCase()}</span><i><b style="width:${Math.min(100, n)}%"></b></i><strong>${n}</strong></div>`).join('')}</div><p class="detail-origin">${minted ? `MINTED · ${where ? (MAPS[where]?.name ?? where) : 'Your collection'}` : 'Not minted yet — bring a Cold Wallet.'}</p><p class="detail-habitat">${habitat(idx)}</p><button class="collection-primary">VIEW ART ↗</button>`
-    } else {
-      artHost.appendChild(miniPortrait(idx, true))
-      data.innerHTML = `<p class="detail-habitat">${habitat(idx)}</p><p class="detail-origin">Meet this Remy to reveal its artwork, colors and stats.</p>`
-    }
+    const cabald = isCabald(idx)
+    const where = [...S.party, ...S.storage].find((r) => r.idx === idx)?.caughtAt
+    const status = minted ? `MINTED · ${where ? (MAPS[where]?.name ?? where) : 'your collection'}` : known ? 'SEEN · not minted yet' : 'UNDISCOVERED'
+    const panel = dexPanel(
+      `dex-detail${cabald ? ' cabald' : ''}`,
+      `No.${no(idx)}`,
+      `<div class="panel-body"><div class="dexd">
+        <div class="dexd-stage" style="${stageStyle(idx)}"><span class="dexd-status">${minted ? icon('star') : ''}</span></div>
+        <div class="dexd-info">
+          <div class="win dexd-card">
+            <div class="dexd-title"><b>${known ? `REMY #${idx}` : '???'}</b>${known ? typeBadge(sp.type) : ''}</div>
+            <p class="dexd-epithet"></p>
+            ${
+              known
+                ? `<div class="dexd-swatches">${Object.entries(info.palette)
+                    .map(([name, color]) => `<i style="background:${color}" title="${name}"></i>`)
+                    .join('')}</div>
+            <div class="dexd-stats">${Object.entries(sp.base)
+              .map(
+                ([name, n]) =>
+                  `<span>${STAT_NAMES[name] ?? name}</span><i><b style="--f:${Math.min(1, n / 100).toFixed(3)}"></b></i><em>${n}</em>`,
+              )
+              .join('')}</div>
+            <button class="pbtn gold dexd-art">VIEW ART</button>`
+                : '<p class="dexd-hint">Meet this Remy to reveal its artwork, colors and stats.</p>'
+            }
+          </div>
+          ${known ? '<div class="dexd-holo"></div>' : ''}
+        </div>
+      </div></div>`,
+    )
+    ;(panel.querySelector('.dexd-epithet') as HTMLElement).textContent = known ? info.epithet || 'A Based Original' : 'A new friend is out there.'
+    const stage = panel.querySelector('.dexd-stage') as HTMLElement
+    stage.prepend(remySprite(idx, known ? {} : { silhouette: hex2css(shade(hex(info.palette.bg), -0.7)) }))
+    if (known) panel.querySelector('.dexd-holo')?.prepend(holoCard(idx))
+    if (cabald) panel.querySelector('.dexd-card')?.prepend(el('div', 'dex-cabald-badge', 'CABALD MEMBER · BALD'))
+    const origin = cabald && !minted ? 'Uncatchable — Cabald member. Wallets bounce off the denial.' : status
+    const foot = panel.querySelector('.panel-foot') as HTMLElement
+    foot.innerHTML = `<span><b>${fmt(origin)}</b> ${fmt(habitat(idx))}</span>`
     uiRoot.appendChild(panel)
+    audio.cry(idx)
     let busy = false
     const open = async () => {
       if (!known || busy) return
@@ -115,16 +167,18 @@ export function remyDetail(idx: number): Promise<void> {
     const done = () => {
       if (busy) return
       pop()
-      panel.remove()
+      audio.sfx('back')
+      panel.classList.add('closing')
+      setTimeout(() => panel.remove(), 100)
       resolve()
     }
-    panel.querySelector('.collection-back')?.addEventListener('click', done)
-    panel.querySelector('.collection-primary')?.addEventListener('click', open)
+    panel.querySelector('.dexd-art')?.addEventListener('click', open)
+    panel.querySelector('.remy-holo')?.addEventListener('click', open)
     const pop = input.push((b) => {
       if (busy) return
       if (b === 'b' || b === 'start') done()
       else if (b === 'a') void open()
-      else if (b === 'up' || b === 'down') panel.querySelector('.panel-body')?.scrollBy({ top: (b === 'up' ? -1 : 1) * 60, behavior: 'smooth' })
+      else if (b === 'up' || b === 'down') panel.querySelector('.panel-body')?.scrollBy({ top: (b === 'up' ? -1 : 1) * 40 })
     })
   })
 }
@@ -133,10 +187,20 @@ function jumpTo(start: number): Promise<number | null> {
   return new Promise((resolve) => {
     const digits = String(start).padStart(4, '0').split('').map(Number)
     let at = 0
-    const modal = el('div', 'collection-jump', '<div class="jump-box"><div class="collection-eyebrow">COLLECTION COORDINATES</div><h2>JUMP TO #</h2><div class="jump-digits"></div><p>0000 — 4489 · ←→ DIGIT · ↑↓ CHANGE</p><div class="jump-actions"><button class="jump-cancel">BACK</button><button class="collection-primary jump-go">GO →</button></div></div>')
+    const modal = el(
+      'div',
+      'dex-jump',
+      `<div class="win jump-box"><b class="jump-title">JUMP TO No.</b><div class="jump-digits"></div><p>0000 – ${REMY_COUNT - 1}</p><div class="jump-actions"><button class="pbtn jump-cancel">BACK</button><button class="pbtn gold jump-go">GO</button></div></div>`,
+    )
     const host = modal.querySelector('.jump-digits') as HTMLElement
+    const hint = modal.querySelector('p') as HTMLElement
     const draw = () => {
-      host.innerHTML = digits.map((n, i) => `<div class="jump-digit ${i === at ? 'sel' : ''}"><button data-digit="${i}" data-step="1" aria-label="Increase digit ${i + 1}">▲</button><button data-digit="${i}" data-step="0" aria-label="Select digit ${i + 1}">${n}</button><button data-digit="${i}" data-step="-1" aria-label="Decrease digit ${i + 1}">▼</button></div>`).join('')
+      host.innerHTML = digits
+        .map(
+          (n, i) =>
+            `<div class="jump-digit ${i === at ? 'sel' : ''}"><button class="pbtn" data-digit="${i}" data-step="1" aria-label="Increase digit ${i + 1}">▲</button><button class="jump-n" data-digit="${i}" data-step="0" aria-label="Select digit ${i + 1}">${n}</button><button class="pbtn" data-digit="${i}" data-step="-1" aria-label="Decrease digit ${i + 1}">▼</button></div>`,
+        )
+        .join('')
     }
     const step = (n: number) => {
       digits[at] = (digits[at] + n + 10) % 10
@@ -151,10 +215,12 @@ function jumpTo(start: number): Promise<number | null> {
     const go = () => {
       const n = Number(digits.join(''))
       if (n >= REMY_COUNT) {
-        const hint = modal.querySelector('p') as HTMLElement
-        hint.textContent = 'Choose an art number from 0 to 4489.'
+        hint.textContent = `Choose a number from 0 to ${REMY_COUNT - 1}.`
         audio.sfx('error')
-      } else done(n)
+      } else {
+        audio.sfx('select')
+        done(n)
+      }
     }
     host.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-digit]')
@@ -167,11 +233,14 @@ function jumpTo(start: number): Promise<number | null> {
     uiRoot.appendChild(modal)
     draw()
     const pop = input.push((b) => {
-      if (b === 'b' || b === 'start') done(null)
-      else if (b === 'a') go()
+      if (b === 'b' || b === 'start') {
+        audio.sfx('back')
+        done(null)
+      } else if (b === 'a') go()
       else if (b === 'up' || b === 'down') step(b === 'up' ? 1 : -1)
       else if (b === 'left' || b === 'right') {
         at = (at + (b === 'left' ? 3 : 1)) % 4
+        audio.sfx('cursor')
         draw()
       }
     })
@@ -187,19 +256,27 @@ export async function dexScreen(): Promise<void> {
   await collection(false)
 }
 
+/** Grid cell footprint in logical px (rem); cells sit on whole-pixel positions so portraits never resample. */
+const CELL_W = 38
+const CELL_H = 46
+
 function collection(picking: boolean): Promise<number | null> {
   return new Promise((resolve) => {
     const minted = new Set(S.caught)
     const seen = new Set([...S.seen, ...S.caught])
-    const panel = el('section', 'panel collection')
-    panel.innerHTML = `<div class="panel-head"><span>${picking ? 'CHOOSE FAVORITE' : 'REMYDEX'}</span><button class="collection-back">BACK</button></div><div class="collection-counts"><div><b>${seen.size.toLocaleString()}</b><span>SEEN</span></div><div class="mint-count"><b>${minted.size.toLocaleString()}</b><span>MINTED</span></div><div><b>4,490</b><span>ORIGINALS</span></div><div class="collection-progress"><i style="width:${seen.size / REMY_COUNT * 100}%"></i><b style="width:${minted.size / REMY_COUNT * 100}%"></b></div></div><div class="collection-tools"></div><div class="collection-scroll"><div class="collection-space"></div></div><div class="panel-foot collection-foot"></div>`
-    const tools = panel.querySelector('.collection-tools') as HTMLElement
-    const scroll = panel.querySelector('.collection-scroll') as HTMLElement
-    const space = panel.querySelector('.collection-space') as HTMLElement
-    const foot = panel.querySelector('.collection-foot') as HTMLElement
+    const mintable = mintableCount()
+    const panel = dexPanel(
+      'dex',
+      picking ? 'FAVORITE' : 'REMYDEX',
+      `<div class="dex-counts"><span>SEEN<b>${seen.size.toLocaleString()}</b></span><span class="mint-count">MINTED<b>${minted.size.toLocaleString()}</b></span><span title="4,490 originals minus the Cabald's bald members">OF<b>${mintable.toLocaleString()}</b></span><div class="dex-prog"><i style="--f:${(seen.size / REMY_COUNT).toFixed(4)}"></i><b style="--f:${(minted.size / mintable).toFixed(4)}"></b></div></div><div class="dex-tools"></div><div class="dex-scroll"><div class="dex-space"></div></div>`,
+    )
+    const tools = panel.querySelector('.dex-tools') as HTMLElement
+    const scroll = panel.querySelector('.dex-scroll') as HTMLElement
+    const space = panel.querySelector('.dex-space') as HTMLElement
+    const foot = panel.querySelector('.panel-foot') as HTMLElement
     const names = picking ? ['MINTED', 'JUMP #'] : [...FILTERS, 'JUMP #']
     const buttons = names.map((name) => {
-      const button = el('button', '', name)
+      const button = el('button', 'pbtn', name)
       tools.appendChild(button)
       return button
     })
@@ -209,21 +286,21 @@ function collection(picking: boolean): Promise<number | null> {
     let toolAt = 0
     let zone: 'grid' | 'tools' = 'grid'
     let cols = 1
-    let cell = 1
-    let row = 1
-    let wide = false
+    let unit = 1
+    let offset = 0
     let busy = false
     let frame = 0
     let closed = false
     const cells = new Map<number, HTMLElement>()
+    const row = () => CELL_H * unit
     const draw = () => {
       if (closed) return
       buttons.forEach((b, i) => {
-        b.classList.toggle('active', names[i] === filter)
-        b.classList.toggle('focused', zone === 'tools' && i === toolAt)
+        b.classList.toggle('gold', names[i] === filter)
+        b.classList.toggle('focus', zone === 'tools' && i === toolAt)
       })
-      const first = Math.max(0, Math.floor(scroll.scrollTop / row) - 1) * cols
-      const end = Math.min(ids.length, (Math.ceil((scroll.scrollTop + scroll.clientHeight) / row) + 1) * cols)
+      const first = Math.max(0, Math.floor(scroll.scrollTop / row()) - 1) * cols
+      const end = Math.min(ids.length, (Math.ceil((scroll.scrollTop + scroll.clientHeight) / row()) + 1) * cols)
       for (const [index, node] of cells) {
         if (index < first || index >= end) {
           node.remove()
@@ -235,40 +312,41 @@ function collection(picking: boolean): Promise<number | null> {
         if (!node) {
           const idx = ids[index]
           const known = seen.has(idx)
-          node = el('button', `collection-cell ${minted.has(idx) ? 'minted' : known ? 'seen' : 'unknown'}`)
-          node.setAttribute('aria-label', `Remy #${idx}, ${minted.has(idx) ? 'minted' : known ? 'seen' : 'undiscovered'}`)
+          const member = known && isCabald(idx)
+          node = el('button', `dex-cell ring ${minted.has(idx) ? 'minted' : known ? 'seen' : 'unknown'}${member ? ' cabald' : ''}`)
+          node.setAttribute('aria-label', `Remy #${idx}, ${minted.has(idx) ? 'minted' : known ? 'seen' : 'undiscovered'}${member ? ', Cabald member' : ''}`)
           node.appendChild(miniPortrait(idx, !known))
-          node.appendChild(el('span', '', `#${String(idx).padStart(4, '0')}`))
+          node.appendChild(el('span', '', no(idx)))
           node.dataset.index = String(index)
           space.appendChild(node)
           cells.set(index, node)
         }
-        node.style.left = `${index % cols * cell}px`
-        node.style.top = `${Math.floor(index / cols) * row}px`
-        node.style.width = `${cell}px`
-        node.style.height = `${row}px`
+        node.style.left = `${offset + (index % cols) * CELL_W}rem`
+        node.style.top = `${Math.floor(index / cols) * CELL_H}rem`
         node.classList.toggle('sel', index === sel && zone === 'grid')
         node.setAttribute('aria-selected', String(index === sel))
       }
       const idx = ids[sel]
-      foot.innerHTML = idx === undefined ? 'No originals here yet. Head for the tall grass.' : `<b>REMY #${idx}</b><span>${minted.has(idx) ? 'MINTED' : seen.has(idx) ? 'SEEN' : 'UNDISCOVERED'} · ${sel + 1}/${ids.length.toLocaleString()}</span><small>${wide ? (picking ? 'A · PICK / B · BACK' : 'A · OPEN / B · BACK') : `${picking ? 'A · SET FAVORITE' : 'A · DETAILS'} / ↑ AT TOP · FILTERS / ←→ EDGE · PAGE`}</small>`
+      foot.innerHTML =
+        idx === undefined
+          ? filter === 'CABALD'
+            ? 'No Cabald members met. Which is exactly what they want.'
+            : 'No originals here yet. Head for the tall grass.'
+          : `<span class="dex-foot-no">No.${no(idx)}</span><span>${isCabald(idx) && seen.has(idx) ? 'CABALD · ' : ''}${minted.has(idx) ? 'Minted' : seen.has(idx) ? 'Seen' : 'Undiscovered'} · ${sel + 1}/${ids.length.toLocaleString()}</span>`
     }
     const reveal = () => {
-      const top = Math.floor(sel / cols) * row
+      const top = Math.floor(sel / cols) * row()
       if (top < scroll.scrollTop) scroll.scrollTop = top
-      else if (top + row > scroll.scrollTop + scroll.clientHeight) scroll.scrollTop = top + row - scroll.clientHeight
+      else if (top + row() > scroll.scrollTop + scroll.clientHeight) scroll.scrollTop = top + row() - scroll.clientHeight
       draw()
     }
     const layout = () => {
-      const unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
-      wide = view.H <= view.W * 0.8
-      panel.classList.toggle('collection-wide', wide)
-      const title = panel.querySelector('.panel-head > span') as HTMLElement
-      title.textContent = picking ? (wide ? 'FAVORITE' : 'CHOOSE FAVORITE') : 'REMYDEX'
-      cols = Math.max(1, Math.floor(scroll.clientWidth / ((wide ? 38 : 43) * unit)))
-      cell = scroll.clientWidth / cols
-      row = (wide ? 40 : 47) * unit
-      space.style.height = `${Math.ceil(ids.length / cols) * row}px`
+      unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+      const width = Math.floor(scroll.clientWidth / unit)
+      cols = Math.max(1, Math.floor(width / CELL_W))
+      offset = Math.floor((width - cols * CELL_W) / 2)
+      space.style.height = `${Math.ceil(ids.length / cols) * CELL_H}rem`
+      panel.classList.toggle('dex-tall', view.H > view.W * 0.8)
       reveal()
     }
     const apply = () => {
@@ -276,6 +354,8 @@ function collection(picking: boolean): Promise<number | null> {
         if (picking && !minted.has(idx)) return false
         if (filter === 'SEEN') return seen.has(idx)
         if (filter === 'MINTED') return minted.has(idx)
+        // Members only show up once met: the Cabald denies its roster even to the Remydex.
+        if (filter === 'CABALD') return isCabald(idx) && seen.has(idx)
         return filter === 'ALL' || species(idx).type === filter
       })
       sel = 0
@@ -290,7 +370,8 @@ function collection(picking: boolean): Promise<number | null> {
       pop()
       cancelAnimationFrame(frame)
       observer.disconnect()
-      panel.remove()
+      panel.classList.add('closing')
+      setTimeout(() => panel.remove(), 100)
       resolve(idx)
     }
     const pick = async () => {
@@ -304,6 +385,7 @@ function collection(picking: boolean): Promise<number | null> {
     const tool = async (i: number) => {
       if (busy) return
       toolAt = i
+      audio.sfx('select')
       if (names[i] === 'JUMP #') {
         busy = true
         const idx = await jumpTo(ids[sel] ?? 0)
@@ -327,36 +409,51 @@ function collection(picking: boolean): Promise<number | null> {
         apply()
       }
     }
-    buttons.forEach((button, i) => button.addEventListener('click', () => {
-      zone = 'tools'
-      void tool(i)
-    }))
-    panel.querySelector('.collection-back')?.addEventListener('click', () => done())
+    buttons.forEach((button, i) =>
+      button.addEventListener('click', () => {
+        zone = 'tools'
+        void tool(i)
+      }),
+    )
     space.addEventListener('click', (e) => {
       const target = (e.target as HTMLElement).closest<HTMLElement>('[data-index]')
       if (!target || busy) return
-      sel = Number(target.dataset.index)
+      const index = Number(target.dataset.index)
       zone = 'grid'
-      draw()
+      // First tap selects, second tap opens — same as the pad.
+      if (index !== sel) {
+        sel = index
+        audio.sfx('cursor')
+        draw()
+        return
+      }
       void pick()
     })
-    scroll.addEventListener('scroll', () => {
-      if (frame) return
-      frame = requestAnimationFrame(() => {
-        frame = 0
-        draw()
-      })
-    }, { passive: true })
+    scroll.addEventListener(
+      'scroll',
+      () => {
+        if (frame) return
+        frame = requestAnimationFrame(() => {
+          frame = 0
+          draw()
+        })
+      },
+      { passive: true },
+    )
     uiRoot.appendChild(panel)
     const observer = new ResizeObserver(layout)
     observer.observe(scroll)
     const pop = input.push((b) => {
       if (busy) return
-      if (b === 'b' || b === 'start') return done()
+      if (b === 'b' || b === 'start') {
+        audio.sfx('back')
+        return done()
+      }
       if (zone === 'tools') {
         if (b === 'left' || b === 'right') {
           toolAt = (toolAt + (b === 'left' ? names.length - 1 : 1)) % names.length
           buttons[toolAt].scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          audio.sfx('cursor')
         } else if (b === 'down') zone = 'grid'
         else if (b === 'a') return void tool(toolAt)
         draw()
@@ -365,16 +462,19 @@ function collection(picking: boolean): Promise<number | null> {
       if (b === 'a') return void pick()
       if (b === 'up' && sel < cols) {
         zone = 'tools'
+        audio.sfx('cursor')
         draw()
         return
       }
-      const page = Math.max(1, Math.floor(scroll.clientHeight / row)) * cols
+      const page = Math.max(1, Math.floor(scroll.clientHeight / row())) * cols
       let next = sel
       if (b === 'up') next -= cols
       else if (b === 'down') next += cols
       else if (b === 'left') next -= sel % cols === 0 ? page : 1
       else if (b === 'right') next += sel % cols === cols - 1 ? page : 1
-      sel = Math.max(0, Math.min(ids.length - 1, next))
+      next = Math.max(0, Math.min(ids.length - 1, next))
+      if (next === sel) return
+      sel = next
       audio.sfx('cursor')
       reveal()
     })

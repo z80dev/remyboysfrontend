@@ -1,62 +1,56 @@
-/* Museum-quality original art, independent of the pixelated world canvas. */
+/* THE FLOOR: the original HD art in a pixel-gilt museum frame. The image itself is smooth — it's the point. */
 .art-viewer {
   position: absolute;
   inset: 0;
   z-index: 85;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7rem;
-  padding: 10rem 14rem 7rem;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  justify-items: center;
+  gap: 4rem;
+  padding: 4rem 6rem 4rem;
   color: #f2dfb0;
-  background: radial-gradient(ellipse at 50% 32%, #34444a 0%, #17272f 45%, #0a121e 100%);
-  animation: art-room-in 180ms ease-out both;
+  background: #1a1410 var(--tile-night) 0 0 / 16rem 16rem;
+  image-rendering: pixelated;
+  animation: panel-in 140ms steps(4) both;
+  cursor: pointer;
 }
+/* Wall wash: a dithered spotlight falling on the frame. */
 .art-viewer::before {
   content: '';
   position: absolute;
-  inset: 5rem;
-  border: 1rem solid #bb985b42;
+  inset: 0;
   pointer-events: none;
+  background: radial-gradient(closest-side at 50% 40%, rgba(255, 220, 150, 0.22), transparent);
 }
 .art-viewer-header {
+  position: relative;
   display: flex;
   justify-content: space-between;
-  gap: 8rem;
   width: 100%;
-  flex: none;
-  color: #baa777;
-  font-size: 7rem;
-  letter-spacing: 1rem;
+  font: 8rem/10rem var(--font-hd);
+  color: #c9b27a;
+  text-shadow: 1rem 1rem 0 #000;
 }
-.art-viewer-header span:first-child { color: #ffe6a5; }
+.art-viewer-header span:first-child {
+  color: #ffe6a5;
+}
 .art-viewer-stage {
-  flex: 1;
-  min-height: 0;
+  position: relative;
   width: 100%;
+  min-height: 0;
   display: grid;
   place-items: center;
   container-type: size;
 }
 .art-viewer-frame {
   position: relative;
-  width: min(100cqw - 12rem, 100cqh - 6rem);
+  width: min(100cqw, 100cqh);
   aspect-ratio: 1;
-  flex: none;
-  padding: 4rem;
-  border: 2rem solid #705027;
-  outline: 1rem solid #e9cc85;
-  background: linear-gradient(135deg, #fff0b9, #ca9c48 20%, #795023 48%, #efd389 75%, #a57535);
-  box-shadow: 0 0 0 3rem #a67e40, 0 0 0 4rem #382d25, 0 7rem 12rem #0009;
-  animation: art-frame-in 300ms cubic-bezier(.2, .8, .2, 1) both;
-}
-.art-viewer-frame::after {
-  content: '';
-  position: absolute;
-  inset: 4rem;
-  border: 1rem solid #30241c;
-  box-shadow: inset 1rem 2rem 3rem #0006;
-  pointer-events: none;
+  border: var(--fw-gilt) solid transparent;
+  border-image: var(--f-gilt) / var(--fw-gilt);
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3rem 0 rgba(0, 0, 0, 0.5));
+  animation: art-frame-in 240ms steps(6) both;
 }
 .art-viewer-image {
   display: block;
@@ -65,64 +59,95 @@
   object-fit: contain;
   image-rendering: auto;
   opacity: 0;
-  transition: opacity 160ms ease-out;
+  transition: opacity 160ms steps(4);
 }
-.is-loaded .art-viewer-image { opacity: 1; }
+.is-loaded .art-viewer-image {
+  opacity: 1;
+}
 .art-viewer-loading {
   position: absolute;
-  inset: 6rem;
+  inset: 0;
   display: grid;
   place-items: center;
-  background: #203039;
-  font-size: 8rem;
+  background: #2a1d10;
+  font-size: 10rem;
   text-align: center;
 }
 .art-viewer-plaque {
-  flex: none;
-  width: min(100%, 220rem);
-  padding: 6rem 10rem;
+  position: relative;
+  width: min(100%, 200rem);
+  padding: 2rem 6rem 3rem;
+  border: var(--fw-inset) solid transparent;
+  border-image: var(--f-inset) / var(--fw-inset);
+  image-rendering: pixelated;
+  background: #e9d8ad;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1rem #876b45,
+    0 0 0 2rem var(--ink),
+    0 3rem 0 2rem rgba(0, 0, 0, 0.45);
   color: #3a2c22;
-  border: 1rem solid #ecd69d;
-  box-shadow: 1rem 2rem 0 #0006, inset 0 0 0 1rem #876b45;
-  background: linear-gradient(115deg, #e9d8ad, #c8ae79 65%, #e7d4a5);
 }
-.art-viewer-title { display: flex; align-items: center; justify-content: space-between; gap: 8rem; }
-.art-viewer-title strong { font-size: 13rem; letter-spacing: 1rem; }
-.art-viewer-type { color: white; background: var(--art-accent); padding: 1rem 4rem; font-size: 7rem; text-shadow: 0 1rem #0006; border: 1rem solid #0003; }
-.art-viewer-epithet { font-size: 8rem; margin-top: 2rem; }
-.art-viewer-status { font-size: 6rem; letter-spacing: .5rem; color: #655234; margin-top: 4rem; }
+.art-viewer-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6rem;
+}
+.art-viewer-title strong {
+  font: 8rem/12rem var(--font-hd);
+}
+.art-viewer-epithet {
+  font-size: 10rem;
+  line-height: 11rem;
+}
+.art-viewer-status {
+  font-size: 10rem;
+  line-height: 11rem;
+  color: #7a6040;
+}
 .art-viewer-close {
-  flex: none;
-  padding: 3rem 8rem;
-  background: transparent;
+  position: relative;
+  background: none;
   border: 0;
-  color: #ddcca6;
-  font: inherit;
-  font-size: 7rem;
+  padding: 1rem 4rem;
+  color: #c9b27a;
+  font: 8rem/8rem var(--font-hd);
+  text-shadow: 1rem 1rem 0 #000;
   cursor: pointer;
+  animation: blink 1s steps(1) infinite;
 }
-.art-viewer-close:focus-visible { outline: 1rem solid #e8cd87; }
-@keyframes art-room-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes art-frame-in { from { transform: translateY(8rem) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .art-viewer, .art-viewer-frame { animation: none; }
-  .art-viewer-image { transition: none; }
+.art-viewer-close:focus-visible {
+  outline: 1rem solid #e8cd87;
 }
-@media (min-aspect-ratio: 6/5) {
-  .art-viewer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(82rem, .72fr);
-    grid-template-rows: 12rem minmax(0, 1fr) 13rem;
-    gap: 7rem 12rem;
+@keyframes art-frame-in {
+  from {
+    transform: translateY(12rem);
+    opacity: 0;
   }
-  .art-viewer-header { grid-column: 1 / -1; }
-  .art-viewer-stage { height: 100%; }
-  .art-viewer-plaque { align-self: center; padding: 10rem; }
-  .art-viewer-title { flex-wrap: wrap; gap: 5rem; }
-  .art-viewer-epithet { margin-top: 8rem; }
-  .art-viewer-status { line-height: 1.7; margin-top: 10rem; }
-  .art-viewer-close { grid-column: 1 / -1; }
 }
+/* Wide screens: art left, plaque right. */
+.screen:not(.tall) .art-viewer {
+  grid-template-columns: minmax(0, 1fr) 104rem;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: 8rem;
+}
+.screen:not(.tall) .art-viewer-header,
+.screen:not(.tall) .art-viewer-close {
+  grid-column: 1 / -1;
+}
+.screen:not(.tall) .art-viewer-plaque {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+}
+.screen:not(.tall) .art-viewer-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3rem;
+}
+
+/* A living exhibit steps out of its frame. */
 .art-awakening {
   position: absolute;
   inset: 0;
@@ -130,20 +155,36 @@
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 10rem;
-  color: #ffedb5;
-  font-size: 9rem;
-  text-shadow: 1rem 1rem #152332;
-  background: radial-gradient(ellipse, #80ffdb33, transparent 65%);
+  gap: 6rem;
+  pointer-events: none;
 }
-.art-awakening canvas {
-  width: 48rem;
-  height: 48rem;
-  image-rendering: pixelated;
-  animation: art-step-out 850ms ease-out both;
+.art-awakening .rs {
+  animation: art-step-out 900ms steps(9) both;
+}
+.art-awakening span {
+  padding: 2rem 5rem;
+  font: 8rem/10rem var(--font-hd);
+  animation: menu-in 100ms 500ms steps(2) both;
 }
 @keyframes art-step-out {
-  from { transform: translateY(-35rem) scale(.35); opacity: 0; }
-  35% { opacity: 1; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+  from {
+    transform: translateY(-24rem);
+    clip-path: inset(0 0 100% 0);
+  }
+  50% {
+    transform: translateY(-24rem);
+    clip-path: inset(0);
+  }
+  to {
+    transform: none;
+    clip-path: inset(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .art-viewer,
+  .art-viewer-frame,
+  .art-viewer-close,
+  .art-awakening .rs {
+    animation: none;
+  }
 }

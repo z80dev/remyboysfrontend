@@ -1,4 +1,5 @@
 /** Liquidity City's optional cross-chain meeting place. All progress uses additive save flags. */
+import { civRemy } from './data'
 import type { MapDef, NpcDef, TrainerDef } from './maps'
 import { S, addItem, save } from './state'
 import type { ActorLook, MapObject } from './types'
@@ -12,7 +13,7 @@ export async function enterBridge() {
 }
 
 const TOUR = ['bridge_base', 'bridge_mainnet', 'bridge_solana', 'bridge_robinhood']
-const deskVoice = { speaker: 'BRIDGE GUIDE', portrait: 2013 }
+const deskVoice = { speaker: 'BRIDGE GUIDE', get portrait() { return civRemy(2013) } }
 const look: ActorLook = { skin: '#e0a878', hair: 'cap', hairColor: '#254975', shirt: '#3979d8', pants: '#252b45' }
 
 /** Also called by the guide, so an interrupted reward scene is safe to resume. */
@@ -74,7 +75,7 @@ export async function seizeBridgeCargo() {
   await talk([
     S.flags.rug ? '*Rug Tower* was the destination. Nobody told me the boss had fled!' : 'Fine! The cargo was headed for *Rug Tower*.',
     'Our unofficial bridge takes from every chain. Return lane sold separately.',
-  ], { speaker: 'CABALD COURIER', portrait: 10 })
+  ], { speaker: 'CABALD COURIER', portrait: grunt.idx })
   closeText()
   await walkPath(grunt, [18, 15], [12, 15])
   S.flags.bridge_seized = true
@@ -118,6 +119,16 @@ export const BRIDGE_TERMINAL: MapDef = {
     { kind: 'flowerpot', x: 7, y: 14 },
     { kind: 'flowerpot', x: 14, y: 14 },
     { kind: 'sign', x: 8, y: 13 },
+    { kind: 'sconce', x: 2, y: 0 },
+    { kind: 'sconce', x: 5, y: 0 },
+    { kind: 'sconce', x: 16, y: 0 },
+    { kind: 'sconce', x: 19, y: 0 },
+    { kind: 'palm', x: 1, y: 1 },
+    { kind: 'palm', x: 20, y: 1 },
+    { kind: 'palm', x: 1, y: 15 },
+    { kind: 'palm', x: 20, y: 15 },
+    { kind: 'vending', x: 20, y: 9 },
+    { kind: 'bin', x: 5, y: 10 },
   ],
   npcs: [
     { id: 'bridge_guide', x: 9, y: 13, dir: 'right', look, portrait: 2013, name: 'BRIDGE GUIDE', talk: bridgeGuide },
@@ -147,19 +158,19 @@ export const BRIDGE_TERMINAL: MapDef = {
     }),
     {
       id: 'bridge_cabald', x: 18, y: 13, dir: 'left', look: { ...look, shirt: '#44234f' },
-      portrait: 10, outfit: 'cabald', hideIf: 'bridge_seized', onWin: seizeBridgeCargo,
+      portrait: 1002, outfit: 'cabald', hideIf: 'bridge_seized', onWin: seizeBridgeCargo,
       trainer: {
-        name: 'CARRY-ON', title: 'CABALD COURIER', portrait: 10, party: [[555, 9]], sight: 0, prize: 160, music: 'cabald',
+        name: 'CARRY-ON', title: 'CABALD COURIER', portrait: 1002, party: [[555, 9]], sight: 0, prize: 160, music: 'cabald',
         intro: ['This suitcase? Just liquids. I mean, *liquidity*.', 'It is a very emotional suitcase.'],
         lose: 'The scanner saw right through my denial.',
-        after: ['My luggage has been detained. Emotionally, so have I.'],
+        after: ['My luggage has been detained. Emotionally, so have I.', 'At least customs can’t search my hair. Membership perk.'],
       },
     },
     {
       id: 'bridge_inspector', x: 18, y: 13, dir: 'left', look, portrait: 24, name: 'BAG INSPECTOR', showIf: 'bridge_seized',
       talk: async () => void await say(S.flags.rug
         ? 'The seized cargo is going home. Base, mainnet, Solana, Robinhood Chain. Every label matters.'
-        : 'Four chain labels. One destination: Rug Tower. That is no ordinary bridge.', { speaker: 'BAG INSPECTOR', portrait: 24 }),
+        : 'Four chain labels. One destination: Rug Tower. That is no ordinary bridge.', { speaker: 'BAG INSPECTOR', portrait: civRemy(24) }),
     },
     {
       id: 'bridge_builder', x: 5, y: 12, dir: 'down', look: { ...look, shirt: '#0052ff' }, portrait: 29, name: 'BASE BUILDER',

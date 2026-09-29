@@ -1,39 +1,38 @@
-/** Full-screen panels: party, summary, bag, Remydex, shop, cold storage, trainer card, start menu. */
-import { art } from './art'
+/** Full-screen panels: party, summary, bag, shop, cold storage, trainer card, start menu. */
 import { audio } from './audio'
 import {
   ITEM_ORDER,
   ITEMS,
   type ItemId,
   MOVES,
-  REMY_COUNT,
   type Remy,
   TYPE_BLURB,
-  TYPE_COLOR,
-  artSrc,
+  mintableCount,
   remyName,
   species,
   statsOf,
   xpForLevel,
 } from './data'
-import { dexScreen, holoCard, miniPortrait, pickFavorite } from './dex'
-import { input } from './input'
+import { dexScreen, pickFavorite } from './dex'
+import { input, tap } from './input'
 import { MAPS } from './maps'
-import { S, addItem, save, takeItem, useItemOn } from './state'
-import { choose, closeText, el, fmt, itemIcon, say, uiRoot } from './ui'
+import { icon, remyBust, remySprite, stageStyle, typeBadge } from './skin'
+import { S, addItem, cycleTextSpeed, prefs, save, takeItem, useItemOn } from './state'
+import { ask, choose, closeText, el, fmt, itemIcon, say, uiRoot } from './ui'
 import { view } from './view'
+import { viewArt } from './viewer'
 
-export const typeBadge = (t: string) => `<span class="type" style="background:${TYPE_COLOR[t as keyof typeof TYPE_COLOR]}">${t}</span>`
+export { typeBadge }
 
+/** HP bar in whole pixels; color steps at the classic 50% / 20% thresholds. */
 export function hpBar(hp: number, max: number) {
-  const f = Math.max(0, hp / max)
-  return `<div class="hpbar"><i class="${f <= 0.2 ? 'low' : f <= 0.5 ? 'mid' : ''}" style="width:${(f * 100).toFixed(1)}%"></i></div>`
+  const f = Math.max(0, Math.min(1, hp / max))
+  return `<div class="hp"><b><i class="${f <= 0.2 ? 'low' : f <= 0.5 ? 'mid' : ''}" style="--f:${f.toFixed(3)}"></i></b></div>`
 }
 
-export function portrait(r: { idx: number; gold?: boolean }, cls = '') {
-  const t = species(r.idx).type
-  return `<div class="pf ${r.gold ? 'gold' : ''} ${cls}" style="--rim:${TYPE_COLOR[t]}"><img src="${artSrc(r.idx)}" alt="" draggable="false"></div>`
-}
+const xpBar = (f: number) => `<div class="xp"><b><i style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)}"></i></b></div>`
+
+const isTall = () => view.H > view.W * 0.8
 
 interface NavOpts {
   cols: () => number
@@ -41,7 +40,6 @@ interface NavOpts {
   onMove?: (i: number) => void
   onPick: (i: number) => void
   onCancel?: () => void
-  onKey?: (b: string, i: number) => boolean
 }
 
 interface NavCtl {
@@ -72,7 +70,6 @@ function nav(items: HTMLElement[], o: NavOpts): NavCtl {
   )
   draw()
   const pop = input.push((b) => {
-    if (o.onKey?.(b, sel)) return
     const c = o.cols()
     const n = items.length
     let next = sel
@@ -102,37 +99,68 @@ function nav(items: HTMLElement[], o: NavOpts): NavCtl {
   }
 }
 
-function openPanel(title: string, right = '') {
-  const p = el('div', 'panel', `<div class="panel-head"><span>${title}</span><span class="panel-right">${right}</span></div><div class="panel-body"></div><div class="panel-foot"></div>`)
+interface Panel {
+  p: HTMLElement
+  body: HTMLElement
+  foot: HTMLElement
+  /** Replaces the right-hand info while keeping the back button. */
+  setRight(html: string): void
+  close(): void
+}
+
+/** Wallpapered full-screen panel: title strip (icon + title + right info + tappable B), body, cream help window. */
+function openPanel(title: string, right = '', ico = ''): Panel {
+  const p = el(
+    'div',
+    'panel',
+    `<div class="panel-head"><span>${ico ? icon(ico) : ''}${title}</span><span class="panel-right">${right}<button class="pbtn panel-x" aria-label="Back">B</button></span></div><div class="panel-body"></div><div class="panel-foot"></div>`,
+  )
+  p.querySelector('.panel-x')?.addEventListener('click', () => tap('b'))
   uiRoot.appendChild(p)
+  const rightEl = p.querySelector('.panel-right') as HTMLElement
   return {
     p,
     body: p.querySelector('.panel-body') as HTMLElement,
     foot: p.querySelector('.panel-foot') as HTMLElement,
-    right: p.querySelector('.panel-right') as HTMLElement,
+    setRight: (html: string) => {
+      const x = rightEl.querySelector('.panel-x') as HTMLElement
+      rightEl.innerHTML = html
+      rightEl.append(x)
+    },
     close: () => {
       p.classList.add('closing')
-      setTimeout(() => p.remove(), 120)
+      setTimeout(() => p.remove(), 100)
     },
   }
 }
 
-const cols2 = () => (view.H > view.W * 0.8 ? 1 : 2)
-
-function partyRow(r: Remy, i: number) {
+function partySlot(r: Remy, lead: boolean): HTMLElement {
   const st = statsOf(r)
-  const row = el('div', `prow ${r.hp <= 0 ? 'fainted' : ''} ${i === 0 ? 'lead' : ''}`)
-  row.innerHTML = `${portrait(r, 'pf-sm')}<div class="prow-info"><div class="prow-name">${remyName(r)}</div><div class="prow-meta">${typeBadge(species(r.idx).type)}<span class="lv">Lv${r.level}</span></div>${hpBar(r.hp, st.hp)}<div class="prow-hp">${r.hp <= 0 ? '<b>FAINTED</b>' : ''}<span>${Math.max(0, r.hp)}/${st.hp}</span></div></div>`
-  return row
+  const slot = el('div', `pslot ring${lead ? ' lead' : ''}${r.hp <= 0 ? ' fainted' : ''}`)
+  slot.innerHTML = `<div class="nm">${remyName(r)}</div>${typeBadge(species(r.idx).type)}<div class="row2"><span class="lv">${r.level}</span>${hpBar(r.hp, st.hp)}<span class="num">${Math.max(0, r.hp)}/${st.hp}</span></div>`
+  const [w, h] = lead ? (isTall() ? [44, 40] : [64, 72]) : [26, 24]
+  slot.prepend(remyBust(r.idx, w, h, { backdrop: lead }))
+  return slot
 }
+
+/** Emerald-style party layout: the lead on the left (on top when tall), the rest stacked, empty slots dashed. */
+function partyLayout(host: HTMLElement, list: Remy[], leadFirst: boolean): HTMLElement[] {
+  host.innerHTML = ''
+  const slots = list.map((r, i) => partySlot(r, leadFirst && i === 0))
+  host.append(...slots)
+  if (leadFirst) for (let i = list.length; i < 6; i++) host.appendChild(el('div', 'party-empty', '— — —'))
+  return slots
+}
+
+const partyCols = () => (isTall() ? 1 : 2)
 
 export type PartyMode = 'field' | 'switch' | 'forced' | 'item'
 
 export function partyScreen(o: { mode: PartyMode; active?: number; item?: ItemId; prompt?: string }): Promise<number> {
   return new Promise((resolve) => {
     const title = o.mode === 'item' && o.item ? `USE ${ITEMS[o.item].name.toUpperCase()}` : 'REMYS'
-    const P = openPanel(title, `<small>${S.party.length}/6</small>`)
-    const grid = el('div', 'party-grid')
+    const P = openPanel(title, `<small>${S.party.length}/6</small>`, 'party')
+    const grid = el('div', 'party')
     P.body.appendChild(grid)
     let swapFrom = -1
     let rows: HTMLElement[] = []
@@ -147,15 +175,11 @@ export function partyScreen(o: { mode: PartyMode; active?: number; item?: ItemId
     }
     const render = (start: number) => {
       navCtl?.pop()
-      grid.innerHTML = ''
-      rows = S.party.map((r, i) => {
-        const row = partyRow(r, i)
-        if (i === swapFrom) row.classList.add('swapping')
-        grid.appendChild(row)
-        return row
-      })
+      rows = partyLayout(grid, S.party, true)
+      if (swapFrom >= 0) rows[swapFrom]?.classList.add('swapping')
       P.foot.innerHTML = fmt(prompt())
-      navCtl = nav(rows, { cols: cols2, start, onPick, onCancel: o.mode === 'forced' ? undefined : cancel })
+      // The lead spans the left column and the rest stack beside it, so the order is one list: up/down walk it.
+      navCtl = nav(rows, { cols: () => 1, start, onPick, onCancel: o.mode === 'forced' ? undefined : cancel })
     }
     const finish = (i: number) => {
       navCtl?.pop()
@@ -183,8 +207,8 @@ export function partyScreen(o: { mode: PartyMode; active?: number; item?: ItemId
       }
       if (o.mode === 'item') return finish(i)
       navCtl?.pop()
-      const opts =
-        o.mode === 'field' ? ['SUMMARY', 'SWITCH', 'CANCEL'] : ['SEND OUT', 'SUMMARY', 'CANCEL']
+      const opts = o.mode === 'field' ? ['SUMMARY', 'SWITCH', 'CANCEL'] : ['SEND OUT', 'SUMMARY', 'CANCEL']
+      P.foot.innerHTML = fmt(`Do what with *${remyName(r)}*?`)
       const c = await choose(opts, { cancel: 2, cls: 'menu-right menu-panel' })
       const pick = opts[c]
       if (pick === 'SUMMARY') {
@@ -194,14 +218,10 @@ export function partyScreen(o: { mode: PartyMode; active?: number; item?: ItemId
         swapFrom = i
         render(i)
       } else if (pick === 'SEND OUT') {
-        if (r.hp <= 0) {
-          P.foot.innerHTML = fmt(`${remyName(r)} has fainted!`)
+        if (r.hp <= 0 || i === o.active) {
+          render(i)
+          P.foot.innerHTML = fmt(r.hp <= 0 ? `${remyName(r)} has fainted!` : `${remyName(r)} is already in battle!`)
           audio.sfx('error')
-          navCtl = nav(rows, { cols: cols2, start: i, onPick, onCancel: o.mode === 'forced' ? undefined : cancel })
-        } else if (i === o.active) {
-          P.foot.innerHTML = fmt(`${remyName(r)} is already in battle!`)
-          audio.sfx('error')
-          navCtl = nav(rows, { cols: cols2, start: i, onPick, onCancel: o.mode === 'forced' ? undefined : cancel })
         } else finish(i)
       } else render(i)
     }
@@ -214,95 +234,124 @@ export function partyScreen(o: { mode: PartyMode; active?: number; item?: ItemId
 export function summaryScreen(start: number): Promise<number> {
   return new Promise((resolve) => {
     let i = start
-    const P = openPanel('SUMMARY')
-    P.p.classList.add('summary')
+    let busy = false
+    const P = openPanel('SUMMARY', '', 'party')
     const draw = () => {
       const r = S.party[i]
       const sp = species(r.idx)
       const st = statsOf(r)
       const next = xpForLevel(r.level + 1)
       const cur = xpForLevel(r.level)
-      const f = Math.min(1, (r.xp - cur) / (next - cur))
-      P.right.innerHTML = `<button class="collection-back" data-summary="-1">◀</button> <small>${i + 1}/${S.party.length}</small> <button class="collection-back" data-summary="1">▶</button> <button class="collection-back" data-summary="0">BACK</button>`
+      const many = S.party.length > 1
+      P.setRight(
+        many
+          ? `<button class="pbtn" data-step="-1" aria-label="Previous">◀</button><small>${i + 1}/${S.party.length}</small><button class="pbtn" data-step="1" aria-label="Next">▶</button>`
+          : '',
+      )
+      const moves = Array.from({ length: 4 }, (_, k) => r.moves[k])
       P.body.innerHTML = `
         <div class="sum">
-          <div class="sum-card">${portrait(r, 'pf-lg')}<div class="sum-name">${remyName(r)}</div><div class="sum-meta">${typeBadge(sp.type)} <span class="lv">Lv${r.level}</span></div></div>
-          <div class="sum-info">
-            <div class="sum-stats">
-              <div><span>HP</span><b>${Math.max(0, r.hp)}/${st.hp}</b></div>${hpBar(r.hp, st.hp)}
-              <div><span>ATTACK</span><b>${st.atk}</b></div>
-              <div><span>DEFENSE</span><b>${st.def}</b></div>
-              <div><span>SPEED</span><b>${st.spd}</b></div>
-              <div><span>NEXT LV</span><b>${Math.max(0, next - r.xp)} XP</b></div>
-              <div class="xpbar"><i style="width:${(f * 100).toFixed(1)}%"></i></div>
+          <div class="sum-stage" style="${stageStyle(r.idx)}"><span class="sum-no">No.${String(r.idx).padStart(4, '0')}</span></div>
+          <div class="sum-side">
+            <div class="win-chip sum-head"><div class="nm">${remyName(r)}</div>${typeBadge(sp.type)}<span class="lv">${r.level}</span></div>
+            <div class="win sum-stats">
+              <div class="sum-hp">${hpBar(r.hp, st.hp)}<b>${Math.max(0, r.hp)}/${st.hp}</b></div>
+              <div class="sum-grid">
+                <div class="stat"><span>Attack</span><b>${st.atk}</b></div>
+                <div class="stat"><span>Defense</span><b>${st.def}</b></div>
+                <div class="stat"><span>Speed</span><b>${st.spd}</b></div>
+                <div class="stat"><span>Next Lv</span><b>${Math.max(0, next - r.xp)}</b></div>
+              </div>
+              ${xpBar((r.xp - cur) / (next - cur))}
             </div>
-            <div class="sum-moves">${r.moves
+            <div class="sum-moves">${moves
               .map((m) => {
+                if (!m) return '<div class="mv empty-move"><b>—</b></div>'
                 const mv = MOVES[m.id]
-                return `<div class="mv" style="--c:${TYPE_COLOR[mv.type]}"><b>${mv.name}</b><span>${mv.power ? `PWR ${mv.power}` : 'STATUS'}</span><span>PP ${m.pp}/${mv.pp}</span></div>`
+                return `<div class="mv"><b>${mv.name}</b>${typeBadge(mv.type)}<span>PP${m.pp}/${mv.pp}</span></div>`
               })
               .join('')}</div>
           </div>
         </div>`
-      P.body.querySelector('.sum-card .pf')?.replaceWith(holoCard(r.idx))
-      P.p.style.setProperty('--art-bg', art.get(r.idx).palette.bg)
-      const swatches = el('div', 'detail-swatches')
-      for (const color of Object.values(art.get(r.idx).palette)) {
-        const swatch = el('i')
-        swatch.style.background = color
-        swatches.appendChild(swatch)
-      }
-      P.body.querySelector('.sum-card')?.appendChild(swatches)
+      ;(P.body.querySelector('.sum-stage') as HTMLElement).append(remySprite(r.idx))
       const where = r.caughtAt && (MAPS[r.caughtAt]?.name ?? r.caughtAt)
       P.foot.innerHTML = fmt(`${TYPE_BLURB[sp.type]}${where ? ` Minted at *${where}*.` : ''}`)
     }
+    const step = (d: number) => {
+      if (S.party.length < 2) return
+      i = (i + d + S.party.length) % S.party.length
+      audio.sfx('cursor')
+      draw()
+    }
+    const close = () => {
+      pop()
+      audio.sfx('back')
+      P.close()
+      resolve(i)
+    }
+    const art = async () => {
+      busy = true
+      await viewArt(S.party[i].idx)
+      busy = false
+    }
     draw()
-    P.right.addEventListener('click', (e) => {
-      const button = (e.target as HTMLElement).closest<HTMLElement>('[data-summary]')
-      if (!button) return
-      const step = Number(button.dataset.summary)
-      if (step) {
-        i = (i + step + S.party.length) % S.party.length
-        audio.sfx('cursor')
-        draw()
-      } else {
-        pop()
-        audio.sfx('back')
-        P.close()
-        resolve(i)
-      }
+    P.p.addEventListener('click', (e) => {
+      const button = (e.target as HTMLElement).closest<HTMLElement>('[data-step]')
+      if (button) step(Number(button.dataset.step))
+      else if ((e.target as HTMLElement).closest('.sum-stage')) void art()
     })
     const pop = input.push((b) => {
-      if (b === 'up' || b === 'down') {
-        P.body.scrollBy({ top: b === 'up' ? -60 : 60, behavior: 'smooth' })
-      } else if ((b === 'left' || b === 'right') && S.party.length > 1) {
-        i = (i + (b === 'left' ? -1 : 1) + S.party.length) % S.party.length
-        audio.sfx('cursor')
-        draw()
-      } else if (b === 'a' || b === 'b' || b === 'start') {
-        pop()
-        audio.sfx('back')
-        P.close()
-        resolve(i)
-      }
+      if (busy) return
+      if (b === 'up' || b === 'down') P.body.scrollBy({ top: b === 'up' ? -40 : 40 })
+      else if (b === 'left' || b === 'right') step(b === 'left' ? -1 : 1)
+      else if (b === 'a') void art()
+      else if (b === 'b' || b === 'start') close()
     })
   })
 }
 
-const usableIn = (id: ItemId, ctx: 'field' | 'battle') => ctx === 'battle' || ITEMS[id].kind !== 'ball'
+const usableIn = (id: ItemId, ctx: 'field' | 'battle') => (ctx === 'battle' ? ITEMS[id].kind !== 'repel' : ITEMS[id].kind !== 'ball')
+
+/** Bag/shop body: pocket art on the left (current item, big), cream item list on the right. */
+function bagLayout(P: Panel, pocket: string) {
+  const wrap = el(
+    'div',
+    'bag',
+    `<div class="bag-side"><span class="bag-pocket">${pocket}</span><div class="bag-pic"></div><div class="bag-money"><small>$REMY</small>${S.money.toLocaleString()}</div></div><div class="win bag-list"></div>`,
+  )
+  P.body.appendChild(wrap)
+  const pic = wrap.querySelector('.bag-pic') as HTMLElement
+  const money = wrap.querySelector('.bag-money') as HTMLElement
+  return {
+    list: wrap.querySelector('.bag-list') as HTMLElement,
+    show: (id: ItemId | undefined) => {
+      pic.innerHTML = id ? itemIcon(id) : icon('bag')
+    },
+    money: () => {
+      money.innerHTML = `<small>$REMY</small>${S.money.toLocaleString()}`
+    },
+  }
+}
 
 export function bagScreen(ctx: 'field' | 'battle'): Promise<ItemId | null> {
   return new Promise((resolve) => {
-    const P = openPanel('BAG', `<small>${S.money.toLocaleString()} $REMY</small>`)
-    const list = el('div', 'bag-list')
-    P.body.appendChild(list)
+    const P = openPanel('BAG', '', 'bag')
+    const B = bagLayout(P, 'ITEMS')
     const ids = ITEM_ORDER.filter((id) => (S.bag[id] ?? 0) > 0)
     const rows = ids.map((id) => {
-      const row = el('div', `bag-row ${usableIn(id, ctx) ? '' : 'dim'}`, `${itemIcon(id)}<span class="bag-name">${ITEMS[id].name}</span><span class="bag-n">×${S.bag[id]}</span>`)
-      list.appendChild(row)
+      const row = el(
+        'div',
+        `bag-row ${usableIn(id, ctx) ? '' : 'dim'}`,
+        `<span class="bag-name">${ITEMS[id].name}</span><span class="bag-n">×${S.bag[id]}</span>`,
+      )
+      B.list.appendChild(row)
       return row
     })
-    if (!ids.length) list.innerHTML = '<div class="empty">Your bag is empty. Visit a Remy Mart.</div>'
+    if (!ids.length) {
+      B.list.innerHTML = '<div class="empty">Your bag is empty. Visit a Remy Mart.</div>'
+      B.show(undefined)
+      P.foot.innerHTML = 'Press B to close.'
+    }
     const done = (v: ItemId | null) => {
       ctl.pop()
       P.close()
@@ -311,13 +360,14 @@ export function bagScreen(ctx: 'field' | 'battle'): Promise<ItemId | null> {
     const ctl = nav(rows, {
       cols: () => 1,
       onMove: (i) => {
-        P.foot.innerHTML = ids[i] ? fmt(ITEMS[ids[i]].desc) : ''
+        B.show(ids[i])
+        if (ids[i]) P.foot.innerHTML = fmt(ITEMS[ids[i]].desc)
       },
       onPick: (i) => {
         const id = ids[i]
         if (!usableIn(id, ctx)) {
           audio.sfx('error')
-          P.foot.innerHTML = fmt('Use this in a *wild Remy* battle.')
+          P.foot.innerHTML = fmt(ctx === 'battle' ? 'Use this out in the *field*.' : 'Use this in a *wild Remy* battle.')
           return
         }
         audio.sfx('select')
@@ -325,7 +375,6 @@ export function bagScreen(ctx: 'field' | 'battle'): Promise<ItemId | null> {
       },
       onCancel: () => done(null),
     })
-    if (!ids.length) P.foot.innerHTML = 'Press B to close.'
   })
 }
 
@@ -334,6 +383,14 @@ export async function fieldBag() {
   for (;;) {
     const id = await bagScreen('field')
     if (!id) return
+    if (ITEMS[id].kind === 'repel') {
+      takeItem(id)
+      S.repel = (S.repel ?? 0) + (ITEMS[id].amount ?? 0)
+      audio.sfx('heal')
+      await say(`You routed through a *Private Mempool*. Wild Remys can’t see you for ${S.repel} grass steps.`)
+      closeText()
+      return
+    }
     const t = await partyScreen({ mode: 'item', item: id })
     if (t < 0) continue
     const msg = useItemOn(id, S.party[t])
@@ -350,19 +407,17 @@ export async function fieldBag() {
   }
 }
 
-
 export function shopScreen(): Promise<void> {
   return new Promise((resolve) => {
-    const P = openPanel('REMY MART', '')
-    const money = () => {
-      P.right.innerHTML = `<small>${S.money.toLocaleString()} $REMY</small>`
-    }
-    money()
-    const list = el('div', 'bag-list')
-    P.body.appendChild(list)
+    const P = openPanel('REMY MART', '', 'bag')
+    const B = bagLayout(P, 'FOR SALE')
     const rows = ITEM_ORDER.map((id) => {
-      const row = el('div', 'bag-row', `${itemIcon(id)}<span class="bag-name">${ITEMS[id].name}</span><span class="bag-have">×${S.bag[id] ?? 0}</span><span class="bag-n">$${ITEMS[id].price}</span>`)
-      list.appendChild(row)
+      const row = el(
+        'div',
+        'bag-row',
+        `<span class="bag-name">${ITEMS[id].name}</span><span class="bag-have">×${S.bag[id] ?? 0}</span><span class="bag-n">$${ITEMS[id].price}</span>`,
+      )
+      B.list.appendChild(row)
       return row
     })
     let busy = false
@@ -374,6 +429,7 @@ export function shopScreen(): Promise<void> {
     const ctl = nav(rows, {
       cols: () => 1,
       onMove: (i) => {
+        B.show(ITEM_ORDER[i])
         if (!busy) P.foot.innerHTML = fmt(ITEMS[ITEM_ORDER[i]].desc)
       },
       onPick: async (i) => {
@@ -393,7 +449,7 @@ export function shopScreen(): Promise<void> {
           S.money -= qty * price
           addItem(id, qty)
           audio.sfx('money')
-          money()
+          B.money()
           if (id === 'wallet' && qty >= 10) addItem('ledger', 1)
           for (const [k, row] of rows.entries()) {
             const have = row.querySelector('.bag-have')
@@ -419,30 +475,28 @@ function quantity(foot: HTMLElement, id: ItemId, price: number): Promise<number>
     const max = Math.max(1, Math.min(99, Math.floor(S.money / price)))
     let q = 1
     const draw = () => {
-      foot.innerHTML = `<div class="qty"><span>${ITEMS[id].name}</span><button class="q-dn">▼</button><b>×${String(q).padStart(2, '0')}</b><button class="q-up">▲</button><span class="qty-total">$${(q * price).toLocaleString()}</span><button class="q-ok">BUY</button></div>`
-      foot.querySelector('.q-dn')?.addEventListener('pointerdown', (e) => {
-        e.stopPropagation()
-        step(-1)
-      })
-      foot.querySelector('.q-up')?.addEventListener('pointerdown', (e) => {
-        e.stopPropagation()
-        step(1)
-      })
-      foot.querySelector('.q-ok')?.addEventListener('pointerdown', (e) => {
-        e.stopPropagation()
-        end(q)
-      })
+      foot.innerHTML = `<div class="qty"><span>${ITEMS[id].name}</span><button class="pbtn" data-q="-1" aria-label="Fewer">▼</button><b>×${String(q).padStart(2, '0')}</b><button class="pbtn" data-q="1" aria-label="More">▲</button><span class="qty-total">$${(q * price).toLocaleString()}</span><button class="pbtn gold" data-q="0">BUY</button></div>`
     }
     const step = (d: number) => {
       q = ((q - 1 + d + max) % max) + 1
       audio.sfx('cursor')
       draw()
     }
+    const onTap = (e: PointerEvent) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-q]')
+      if (!b) return
+      e.stopPropagation()
+      const d = Number(b.dataset.q)
+      if (d) step(d)
+      else end(q)
+    }
     const end = (v: number) => {
       pop()
+      foot.removeEventListener('pointerdown', onTap)
       resolve(v)
     }
     draw()
+    foot.addEventListener('pointerdown', onTap)
     const pop = input.push((b) => {
       if (b === 'up' || b === 'right') step(b === 'up' ? 1 : 10)
       else if (b === 'down' || b === 'left') step(b === 'down' ? -1 : -10)
@@ -507,22 +561,17 @@ export async function storageScreen() {
 
 function storagePick(): Promise<number> {
   return new Promise((resolve) => {
-    const P = openPanel('COLD STORAGE', `<small>${S.storage.length} REMYS</small>`)
-    const grid = el('div', 'party-grid')
+    const P = openPanel('COLD STORAGE', `<small>${S.storage.length} REMYS</small>`, 'save')
+    const grid = el('div', 'party storage')
     P.body.appendChild(grid)
-    const rows = S.storage.map((r, i) => {
-      const row = partyRow(r, i)
-      row.classList.remove('lead')
-      grid.appendChild(row)
-      return row
-    })
+    const rows = partyLayout(grid, S.storage, false)
     P.foot.innerHTML = 'Withdraw which Remy?'
     const done = (v: number) => {
       ctl.pop()
       P.close()
       resolve(v)
     }
-    const ctl = nav(rows, { cols: cols2, onPick: (i) => done(i), onCancel: () => done(-1) })
+    const ctl = nav(rows, { cols: partyCols, onPick: (i) => done(i), onCancel: () => done(-1) })
   })
 }
 
@@ -531,53 +580,54 @@ const fmtTime = (ms: number) => {
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
 }
 
+const BADGES = [
+  ['badge_mm', 'MARKET MAKER'],
+  ['badge_rug', 'RUG SLAYER'],
+] as const
+
+const trainerId = () => String((S.name.length * 7919 + 1234) % 100000).padStart(5, '0')
+
 export function cardScreen(): Promise<void> {
   // ES2022/iPhone target does not provide Promise.withResolvers.
   let resolve!: () => void
-  const promise = new Promise<void>((done) => { resolve = done })
-  const P = openPanel('TRAINER CARD')
-  P.p.classList.add('tcard-panel')
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  const P = openPanel('TRAINER CARD', '', 'card')
   let busy = false
-  let selected = 0
-  const badges = [
-    ['badge_mm', 'MARKET MAKER'],
-    ['badge_rug', 'RUG SLAYER'],
-  ]
   const favorite = () => {
     const flag = Object.keys(S.flags).find((key) => key.startsWith('fav:') && S.caught.includes(Number(key.slice(4))))
-    return flag ? Number(flag.slice(4)) : (S.caught[0] ?? S.party[0]?.idx ?? 0)
+    return flag ? Number(flag.slice(4)) : (S.caught[0] ?? S.party[0]?.idx ?? S.avatar)
   }
   const draw = () => {
-    const idx = favorite()
+    const fav = favorite()
     P.body.innerHTML = `
       <div class="tcard">
-        <div class="tcard-top"><span>BASE</span><span>ID ${String((S.name.length * 7919 + 1234) % 100000).padStart(5, '0')}</span></div>
         <div class="tcard-main">
-          <div class="trainer-favorite"></div>
+          <div class="trainer-avatar" style="${stageStyle(S.avatar)}"></div>
           <div class="tcard-rows">
             <div><span>NAME</span><b class="trainer-name"></b></div>
+            <div><span>IDNo.</span><b>${trainerId()}</b></div>
             <div><span>$REMY</span><b>${S.money.toLocaleString()}</b></div>
-            <div><span>REMYDEX</span><b>${S.caught.length}/${REMY_COUNT.toLocaleString()}</b></div>
+            <div><span>REMYDEX</span><b>${S.caught.length}/${mintableCount().toLocaleString()}</b></div>
             <div><span>TIME</span><b>${fmtTime(S.playMs)}</b></div>
           </div>
         </div>
-        <div class="tcard-badges">${badges.map(([f, n]) => `<div class="badge ${S.flags[f] ? 'on' : ''}"><i></i><span>${n}</span></div>`).join('')}</div>
-        <div class="collection-eyebrow">RECENT MINTS / YOUR CREW</div>
-        <div class="trainer-mosaic"></div>
-        <div class="trainer-actions"><button class="collection-primary">FAVORITE</button><button class="collection-back">CLOSE</button></div>
+        <div class="tcard-foot">
+          <div class="tcard-badges">${BADGES.map(([f, n]) => `<span class="badge ${S.flags[f] ? 'on' : ''}" title="${n}">${icon('star')}</span>`).join('')}</div>
+          <div class="trainer-mosaic"></div>
+          <button class="pbtn gold">FAVORITE</button>
+        </div>
       </div>`
-    const trainerName = P.body.querySelector('.trainer-name') as HTMLElement
-    trainerName.textContent = S.name
-    const portraitHost = P.body.querySelector('.trainer-favorite') as HTMLElement
-    portraitHost.appendChild(holoCard(idx))
-    portraitHost.appendChild(el('small', '', `FAVORITE #${idx}`))
+    ;(P.body.querySelector('.trainer-name') as HTMLElement).textContent = S.name
+    const avatar = P.body.querySelector('.trainer-avatar') as HTMLElement
+    avatar.append(remySprite(S.avatar), remyBust(fav, 24, 24, { backdrop: true }, 'rb tcard-fav'))
     const mosaic = P.body.querySelector('.trainer-mosaic') as HTMLElement
-    for (const recent of S.caught.slice(-8).reverse()) mosaic.appendChild(miniPortrait(recent))
-    if (!S.caught.length) mosaic.textContent = 'Your first mint starts the story.'
-    P.body.querySelector('.collection-primary')?.addEventListener('click', () => void chooseFavorite())
-    P.body.querySelector('.collection-back')?.addEventListener('click', done)
-    P.body.querySelectorAll('.trainer-actions button').forEach((button, i) => button.classList.toggle('sel', selected === i))
-    P.foot.textContent = '←→ · CHOOSE   A · SELECT   B · BACK'
+    const recent = S.caught.slice(-5).reverse()
+    for (const idx of recent) mosaic.appendChild(remyBust(idx, 20, 20, { backdrop: true }))
+    if (!recent.length) mosaic.textContent = 'Your first mint starts the story.'
+    P.body.querySelector('.tcard-foot .pbtn')?.addEventListener('click', () => void chooseFavorite())
+    P.foot.innerHTML = fmt(`Favorite: *REMY #${fav}*. Press A to choose another.`)
   }
   const chooseFavorite = async () => {
     if (busy) return
@@ -586,6 +636,7 @@ export function cardScreen(): Promise<void> {
       P.foot.textContent = 'Mint a Remy first to choose your favorite.'
       return
     }
+    audio.sfx('select')
     busy = true
     const idx = await pickFavorite()
     if (idx !== null) {
@@ -607,22 +658,49 @@ export function cardScreen(): Promise<void> {
   const pop = input.push((b) => {
     if (busy) return
     if (b === 'b' || b === 'start') done()
-    else if (b === 'a') {
-      if (selected === 0) void chooseFavorite()
-      else done()
-    } else if (b === 'left' || b === 'right') {
-      selected = 1 - selected
-      P.body.querySelectorAll('.trainer-actions button').forEach((button, i) => button.classList.toggle('sel', selected === i))
-      audio.sfx('cursor')
-    } else if (b === 'up' || b === 'down') P.body.scrollBy({ top: b === 'up' ? -60 : 60, behavior: 'smooth' })
+    else if (b === 'a') void chooseFavorite()
+    else if (b === 'up' || b === 'down') P.body.scrollBy({ top: b === 'up' ? -40 : 40 })
   })
   draw()
   return promise
 }
 
-/** START menu in the overworld. */
+/** FRLG-style save: a summary window, a confirmation, then the save itself. */
+async function saveFlow() {
+  const card = el(
+    'div',
+    'win save-card',
+    `<b>${fmt(S.name)}</b><div><span>Badges</span>${BADGES.filter(([f]) => S.flags[f]).length}</div><div><span>Remydex</span>${S.caught.length}</div><div><span>Time</span>${fmtTime(S.playMs)}</div>`,
+  )
+  uiRoot.appendChild(card)
+  const yes = await ask('Save your progress on this device?')
+  if (yes) {
+    closeText()
+    save()
+    audio.sfx('save')
+    await say('Game saved on this device.\nYour adventure stays in this browser.')
+  }
+  closeText()
+  card.remove()
+}
+
+const START_HINTS: Record<string, [string, string]> = {
+  REMYS: ['party', 'Check your Remys’ health, stats and moves.'],
+  BAG: ['bag', 'Items you’re carrying.'],
+  REMYDEX: ['dex', 'Your record of the originals you’ve met.'],
+  'TRAINER CARD': ['card', 'Your trainer profile and badges.'],
+  SAVE: ['save', 'Save your progress on this device.'],
+  SOUND: ['sound', 'Turn music and sound effects on or off.'],
+  TEXT: ['text', 'How fast dialogue prints.'],
+  EXIT: ['exit', 'Close this menu.'],
+}
+
+/** START menu in the overworld: icon list on the right, help line along the bottom. */
 export async function startMenu() {
   let start = 0
+  let first = true
+  const hint = el('div', 'win menu-hint')
+  uiRoot.appendChild(hint)
   for (;;) {
     const opts = [
       ...(S.party.length ? ['REMYS'] : []),
@@ -631,21 +709,33 @@ export async function startMenu() {
       'TRAINER CARD',
       'SAVE',
       `SOUND ${audio.muted ? 'OFF' : 'ON'}`,
+      `TEXT ${prefs.text.toUpperCase()}`,
       'EXIT',
     ]
-    const c = await choose(opts, { cancel: opts.length - 1, cls: 'menu-start', start })
+    const key = (o: string) => (o.startsWith('SOUND') ? 'SOUND' : o.startsWith('TEXT') ? 'TEXT' : o)
+    const icons = opts.map((o) => icon(o.startsWith('SOUND') && audio.muted ? 'mute' : START_HINTS[key(o)][0]))
+    const c = await choose(opts, {
+      cancel: opts.length - 1,
+      cls: `menu-start${first ? '' : ' still'}`,
+      start,
+      icons,
+      onMove: (i) => {
+        hint.textContent = START_HINTS[key(opts[i])][1]
+      },
+    })
+    first = false
     start = c
     const pick = opts[c]
-    if (pick === 'EXIT') return
+    if (pick === 'EXIT') break
+    hint.hidden = true
     if (pick === 'REMYS') await partyScreen({ mode: 'field' })
     else if (pick === 'BAG') await fieldBag()
     else if (pick === 'REMYDEX') await dexScreen()
     else if (pick === 'TRAINER CARD') await cardScreen()
-    else if (pick === 'SAVE') {
-      save()
-      audio.sfx('save')
-      await say('Game saved on this device.\nYour adventure stays in this browser.')
-      closeText()
-    } else if (pick.startsWith('SOUND')) audio.setMuted(!audio.muted)
+    else if (pick === 'SAVE') await saveFlow()
+    else if (pick.startsWith('SOUND')) audio.setMuted(!audio.muted)
+    else if (pick.startsWith('TEXT')) cycleTextSpeed()
+    hint.hidden = false
   }
+  hint.remove()
 }

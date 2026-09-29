@@ -531,15 +531,18 @@ export function drawActor(ctx: CanvasRenderingContext2D, look: ActorLook, dir: D
 // ---------------------------------------------------------------------------------------------------------------
 // Shadow + small effects
 
-let shadowImg: HTMLCanvasElement | undefined
-export function drawShadow(ctx: CanvasRenderingContext2D, px: number, py: number): void {
-  if (!shadowImg) {
+const shadowImgs: HTMLCanvasElement[] = []
+/** Two-tone contact shadow; `lift` (0..1, hop height) shrinks and fades it so jumps read as leaving the ground. */
+export function drawShadow(ctx: CanvasRenderingContext2D, px: number, py: number, lift = 0): void {
+  const i = lift > 0.66 ? 2 : lift > 0.3 ? 1 : 0
+  if (!shadowImgs[i]) {
+    const rx = [6.5, 5.5, 4.5][i]
     const p = new Px(14, 5)
-    p.ellipse(7, 2.5, 6.5, 2.2, withAlpha(hex('#1a1030'), 70))
-    p.ellipse(7, 2.5, 4.5, 1.4, withAlpha(hex('#1a1030'), 40))
-    shadowImg = p.toCanvas()
+    p.ellipse(7, 2.5, rx, 2.2 - i * 0.4, withAlpha(hex('#1a1030'), 62 - i * 12))
+    p.ellipse(7, 2.5, rx - 2.5, 1.3, withAlpha(hex('#1a1030'), 38))
+    shadowImgs[i] = p.toCanvas()
   }
-  ctx.drawImage(shadowImg, (px | 0) + 1, (py | 0) + 12)
+  ctx.drawImage(shadowImgs[i], (px | 0) + 1, (py | 0) + 12)
 }
 
 /** Shared per-frame state from drawAnimated (camera + theme) so fronts/rustles line up with the tiles. */
@@ -618,6 +621,42 @@ export function drawLedgeDust(ctx: CanvasRenderingContext2D, px: number, py: num
   ctx.globalAlpha = 1
 }
 
+/** Running kick-up: a small puff behind the heel that swells, drifts up and thins out. `k` = 0..1 life. */
+export function drawStepDust(ctx: CanvasRenderingContext2D, px: number, py: number, k: number): void {
+  const x0 = (px | 0) + 8
+  const y0 = (py | 0) + 14
+  ctx.globalAlpha = k > 0.5 ? (1 - k) * 2 : 0.9
+  const r = k < 0.3 ? 1 : 2
+  ctx.drawImage(puff(r), x0 - 3 - r - Math.round(k * 2), y0 - r - Math.round(k * 4))
+  ctx.drawImage(puff(1), x0 + 2 + Math.round(k * 3) - 1, y0 - 1 - Math.round(k * 2))
+  ctx.globalAlpha = 1
+}
+
+/** Staggered left/right prints pressed into sand, fading over their life `k` (0..1). */
+export function drawFootprint(ctx: CanvasRenderingContext2D, px: number, py: number, dir: Dir, k: number): void {
+  const x = px | 0
+  const y = py | 0
+  const vertical = dir === 'up' || dir === 'down'
+  ctx.globalAlpha = k > 0.6 ? (1 - k) * 2.5 : 1
+  ctx.fillStyle = 'rgba(112,72,30,0.58)'
+  if (vertical) {
+    ctx.fillRect(x + 5, y + 7, 2, 3)
+    ctx.fillRect(x + 9, y + 11, 2, 3)
+  } else {
+    ctx.fillRect(x + 3, y + 10, 3, 2)
+    ctx.fillRect(x + 10, y + 13, 3, 2)
+  }
+  ctx.fillStyle = 'rgba(255,250,230,0.45)'
+  if (vertical) {
+    ctx.fillRect(x + 5, dir === 'down' ? y + 10 : y + 6, 2, 1)
+    ctx.fillRect(x + 9, dir === 'down' ? y + 14 : y + 10, 2, 1)
+  } else {
+    ctx.fillRect(dir === 'right' ? x + 6 : x + 2, y + 10, 1, 2)
+    ctx.fillRect(dir === 'right' ? x + 13 : x + 9, y + 13, 1, 2)
+  }
+  ctx.globalAlpha = 1
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Emotes
 
@@ -676,16 +715,20 @@ function emoteSprite(emote: Emote, dots: number): HTMLCanvasElement {
   return c
 }
 
+/** Emotes pop in crisply: a spark, then the bubble springs up past its rest height and settles (no scaling). */
 export function drawEmote(ctx: CanvasRenderingContext2D, emote: Emote, px: number, py: number, t: number): void {
-  const dots = emote === 'dots' ? Math.min(3, 1 + Math.floor(Math.max(0, t) * 3) % 4) : 0
-  const img = emoteSprite(emote, dots)
-  const scale = t < 0.04 ? 0.35 : t < 0.08 ? 0.7 : t < 0.13 ? 1.2 : 1
-  const bob = t > 0.13 && t < 0.24 ? -1 : 0
-  const w = Math.round(14 * scale)
-  const h = Math.round(13 * scale)
-  const bx = (px | 0) + 8 - (w >> 1) + (scale === 1 ? 1 : 0)
-  const by = (py | 0) - 7 - h + bob
-  ctx.drawImage(img, bx, by, w, h)
+  const bx = (px | 0) + 2
+  const by = (py | 0) - 20
+  if (t < 0.05) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(bx + 6, by + 7, 1, 5)
+    ctx.fillRect(bx + 4, by + 9, 5, 1)
+    return
+  }
+  const dots = emote === 'dots' ? Math.min(3, 1 + (Math.floor(Math.max(0, t) * 3) % 4)) : 0
+  const rise = t < 0.09 ? 3 : t < 0.14 ? -2 : t < 0.19 ? -1 : 0
+  const breathe = t > 0.5 && Math.floor(t * 2.5) % 2 === 1 ? -1 : 0
+  ctx.drawImage(emoteSprite(emote, dots), bx, by + rise + breathe)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
