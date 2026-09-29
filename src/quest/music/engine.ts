@@ -206,7 +206,15 @@ export class MusicEngine {
     duck.linearRampToValueAtTime(1, this.duckUntil + 0.25)
     this.sessions.push(session)
     this.start()
-    return new Promise((resolve) => { session.resolve = resolve })
+    // Game scripts await fanfares, so the promise must not depend on the audio clock alone: a suspended or
+    // interrupted context (iOS before unlock or after a call, backgrounded tabs) freezes currentTime forever.
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, (session.fadeAt - now) * 1000)
+      session.resolve = () => {
+        clearTimeout(timer)
+        resolve()
+      }
+    })
   }
 
   private start(): void {
