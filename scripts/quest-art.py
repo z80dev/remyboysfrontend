@@ -28,8 +28,8 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "public/images"
-OUT = ROOT / "public/quest"
+SRC = ROOT / "media/remy"
+OUT = ROOT / "media/quest"
 CACHE = ROOT / ".cache/quest-art"
 MASKS = CACHE / "masks"
 COUNT = 4490

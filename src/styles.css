@@ -3506,7 +3506,7 @@ button.thumb {
   outline-offset: -1px;
 }
 
-.paint-frame {
+.app-frame {
   flex: 1;
   width: 100%;
   border: 0;

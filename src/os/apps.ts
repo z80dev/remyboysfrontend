@@ -8,7 +8,6 @@ import { DisplayProperties } from '../apps/DisplayProperties'
 import { Gallery } from '../apps/Gallery'
 import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
-import { Paint } from '../apps/Paint'
 import { Quest } from '../apps/Quest'
 import { Recovery } from '../apps/Recovery'
 import { Trader } from '../apps/Trader'
@@ -79,7 +78,6 @@ export const APPS: AppDef[] = [
   },
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
   { id: 'remix', title: 'Remy Remix Studio', short: 'Remix Studio', desc: 'Reimagine original Remy art', icon: 'remix', size: [980, 720], Component: Remix },
-  { id: 'paint', title: 'Remy Paint', short: 'Remy Paint', desc: 'Make a Remy meme', icon: 'paint', size: [940, 640], Component: Paint },
   { id: 'quest', title: 'Remy Quest', short: 'Remy Quest', desc: 'A Remy adventure on Base', icon: 'quest', size: [900, 660], Component: Quest },
   {
     id: 'launch',

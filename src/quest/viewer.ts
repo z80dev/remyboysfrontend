@@ -1,7 +1,8 @@
 /** The collection at full resolution. Shared by world exhibits and the Remydex. */
+import { remySrc } from '../lib/media'
 import { art } from './art'
 import { audio } from './audio'
-import { artSrc, species } from './data'
+import { species } from './data'
 import { input } from './input'
 import { remySprite, typeBadge } from './skin'
 import { S } from './state'
@@ -28,7 +29,7 @@ export async function viewArt(idx: number, opts: ViewArtOptions = {}): Promise<v
   const frame = el('div', 'art-viewer-frame')
   const image = el('img', 'art-viewer-image')
   image.alt = `Original Based Remy Boys artwork #${idx}`
-  image.src = artSrc(idx)
+  image.src = remySrc(idx)
   image.decoding = 'async'
   const loading = el('span', 'art-viewer-loading', 'UNVEILING ORIGINAL…')
   image.onload = () => { loading.remove(); frame.classList.add('is-loaded') }

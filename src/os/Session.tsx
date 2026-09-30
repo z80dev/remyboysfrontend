@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAccount, useConnect } from 'wagmi'
 import { shortAddr } from '../lib/format'
+import { remyImg } from '../lib/media'
 import { isAdmin, teamRole } from '../lib/launch'
 import { FlagMark, Icon, RemyFlag } from './icons'
 import { connectorLabel } from './shell'
@@ -156,7 +157,7 @@ function Users({ onLogOn }: { onLogOn: () => void }) {
       )}
       <button type="button" className="user-tile" onClick={onLogOn}>
         <span className="user-pic" style={{ width: 64, height: 64 }}>
-          <img src={`/images/Character${GUEST_ART}.webp`} alt="" />
+          <img {...remyImg(GUEST_ART, '64px')} alt="" />
         </span>
         <span>
           <b>Guest</b>

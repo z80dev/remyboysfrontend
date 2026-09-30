@@ -6,6 +6,7 @@ import { converterAbi, erc20Abi, stakedAbi } from '../abis'
 import { ADDR, EXPLORER, NEW } from '../config'
 import { useLegacyHandedOver } from '../lib/launch'
 import { fmt, shortAddr } from '../lib/format'
+import { remyImg } from '../lib/media'
 import type { TxStep } from '../lib/tx'
 import { Icon } from '../os/icons'
 import { useIsMobile } from '../os/shell'
@@ -317,7 +318,7 @@ function WizardFrame({ children }: { children: React.ReactNode }) {
       <div className="wiz">
         {!mobile && (
           <aside className="wiz-side" aria-hidden="true">
-            <img src="/images/Character777.webp" alt="" />
+            <img {...remyImg(777, '150px')} alt="" />
             <span>
               Legacy
               <br />

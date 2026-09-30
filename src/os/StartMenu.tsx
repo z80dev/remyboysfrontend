@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
 import { LINKS } from '../config'
 import { shortAddr } from '../lib/format'
+import { remyImg } from '../lib/media'
 import { useVisibleApps } from './apps'
 import { FlagMark, Icon } from './icons'
 import { useWalletRemy } from './system'
@@ -20,7 +21,7 @@ export function UserPicture({ address, size = 48 }: { address?: Address; size?: 
     )
   return (
     <span className="user-pic" style={{ width: size, height: size }}>
-      <img src={`/images/Character${art ?? GUEST_ART}.webp`} alt="" />
+      <img {...remyImg(art ?? GUEST_ART, `${size}px`)} alt="" />
     </span>
   )
 }

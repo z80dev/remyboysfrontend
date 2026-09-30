@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { remySrc } from '../lib/media'
 
 /*
  * Remy OS XP icon set. Every icon is drawn on a 32×32 grid in the Luna idiom: soft top-left light,
@@ -144,7 +145,7 @@ export function RemyFlag({ size = 96, art = [2069, 420, 777, 42], className }: {
           <g key={d} clipPath={`url(#${uid}-${i})`}>
             <rect x="0" y="0" width="100" height="86" fill={FLAG_COLORS[i]} />
             <image
-              href={`/images/Character${art[i]}.webp`}
+              href={remySrc(art[i], 128)}
               x={col === 0 ? -6 : 42}
               y={row === 0 ? -6 : 32}
               width="62"
@@ -319,26 +320,6 @@ const icons: Record<string, ReactNode> = {
       <circle cx="24.4" cy="16.8" r="1.5" fill="url(#xi-red)" stroke="#6a1a14" strokeWidth=".4" />
       <circle cx="27" cy="14.6" r="1.5" fill="url(#xi-red)" stroke="#6a1a14" strokeWidth=".4" />
       <path d="M4.6 10.6c5.6-1.9 17.2-1.9 22.8 0" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth=".9" strokeLinecap="round" />
-    </>
-  ),
-  /* Paint palette and brush. */
-  paint: (
-    <>
-      <Shadow />
-      <path
-        d="M15.6 4.6C8 4.6 3 9.4 3 15.4c0 6.4 5.4 11.4 12.4 11.4 3.2 0 4.2-1.4 3.4-3.2-.8-1.8.4-3.4 2.6-3.4H24c2.8 0 5-2 5-5 0-6-5.8-10.6-13.4-10.6z"
-        fill="url(#xi-wood)"
-        stroke="#8a5a24"
-        strokeWidth=".9"
-      />
-      <ellipse cx="10.4" cy="20.2" rx="2.2" ry="1.8" fill="#f7f2e6" stroke="#b07d3e" strokeWidth=".6" />
-      <circle cx="9" cy="13.4" r="2.3" fill="url(#xi-red)" />
-      <circle cx="14.2" cy="9.4" r="2.3" fill="url(#xi-yellow)" />
-      <circle cx="20.2" cy="9.8" r="2.3" fill="url(#xi-green)" />
-      <circle cx="24.4" cy="14.2" r="2.1" fill="url(#xi-blue)" />
-      <path d="m29.2 3.4-10 12.4 1.8 1.6 10-11.8z" fill="#b8322a" stroke="#6a1a14" strokeWidth=".6" />
-      <path d="m19.2 15.8 1.8 1.6-1.2 1.4-1.9-1.5z" fill="#d7dde4" stroke="#6b7580" strokeWidth=".5" />
-      <path d="M17.9 17.3c-1.4 1.4-1.6 3.4-3.6 4.8 2.6.2 4.8-1 5.5-3.3z" fill="#1c3f9a" />
     </>
   ),
   /* Leather wallet with a card peeking out. */

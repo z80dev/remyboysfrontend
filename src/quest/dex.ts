@@ -1,7 +1,8 @@
 /** Remydex: a virtualized grid of all originals (only visible rows own DOM) plus per-Remy entries. */
+import { remySrc } from '../lib/media'
 import { art } from './art'
 import { audio } from './audio'
-import { REMY_COUNT, artSrc, isCabald, mintableCount, species } from './data'
+import { REMY_COUNT, isCabald, mintableCount, species } from './data'
 import { hex, shade } from './gfx/px'
 import { input, tap } from './input'
 import { MAPS, reserved, starters } from './maps'
@@ -54,7 +55,7 @@ export function miniPortrait(idx: number, hidden = false): HTMLCanvasElement {
 export function holoCard(idx: number): HTMLElement {
   const card = el('div', 'remy-holo')
   card.style.setProperty('--art-accent', art.get(idx).palette.accent)
-  card.innerHTML = `<img src="${artSrc(idx)}" alt="Original Remy #${idx} artwork" draggable="false"><i class="remy-foil"></i>`
+  card.innerHTML = `<img src="${remySrc(idx, 320)}" alt="Original Remy #${idx} artwork" draggable="false"><i class="remy-foil"></i>`
   const reset = () => {
     card.classList.remove('tilting')
     card.style.removeProperty('--rx')

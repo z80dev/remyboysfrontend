@@ -13,16 +13,27 @@ npm run build   # tsc + vite build → dist (Cloudflare Pages)
 - Pre-launch states: Legacy Exchange keeps rbREMY/rbREMYLS closed until the converter owns the legacy vault; Remy Vault disables ETH buys/sells until the fREMY/ETH pool can fill a quote. `#/launch` (Launch Control, listed only for the team wallets) walks the launch checklist.
 - `src/abis.ts` — minimal `parseAbi` fragments.
 - `src/os/` — Remy OS XP shell: boot + log-on (`Session`), Luna windows, taskbar/tray with balloons, Start menu, desktop + right-click menu, XP icon set (`icons.tsx`), shell store for balloons/message boxes/display prefs (`shell.ts`). Below 720px the Pocket PC shell (`Pocket.tsx`) takes over: title strip, full-screen apps, Today screen, soft-key bar.
-- `src/apps/` — Welcome, Recovery Center, Approvals, Legacy Exchange, Remy Vault, Remy Trader, Gallery, Remix Studio, Paint (`public/jspaint`), Remy Quest (iframe of `/quest/`), Display Properties.
+- `src/apps/` — Welcome, Recovery Center, Approvals, Legacy Exchange, Remy Vault, Remy Trader, Gallery, Remix Studio, Remy Quest (iframe of `/quest/`), Display Properties.
 - Remy Quest (`/quest/`, second Vite entry in `vite.config.ts`): standalone Pokémon-style game, vanilla TS + canvas + DOM, no React/wagmi. `src/quest/` — `world.ts` (grid movement, NPCs, trainers, encounters, render loop), `maps.ts` (maps, cast, story scripts), `battle.ts`, `menus.ts`, `dex.ts`, `viewer.ts`, `scenes.ts` (title, intro, starter, Hall of Fame), `gfx/` (procedural pixel-art tiles/sprites), `art/` (Remy art atlases), `audio.ts` + `music/` (runtime-synthesized soundtrack + SFX), `data.ts` (types, moves, per-art-index stats). The world renders to a low-res canvas upscaled by an integer factor; inside `.screen`, `1rem` = one game pixel. Touch devices get an on-screen pad. Save: `localStorage['remyquest.save.v1']`.
 - Remy Trader (`#/trader`): fREMY/ETH market from PoolManager logs (`src/lib/trader.ts`, cached in localStorage, ≤2,000-block chunks), order ticket via RemyRouter `buyFloor`/`sellFloor`, and a Uniswap v4 liquidity desk via PositionManager action scripts. v4 math (TickMath, SqrtPriceMath, LiquidityAmounts) is ported to bigint in `src/lib/v4math.ts`.
 - Wallpaper: `public/wallpaper/remy-bliss.svg` (the Remy kite is inline SVG in `src/os/Desktop.tsx`).
 - Deep links: `/#/<app>` (e.g. `/#/vault`, `/#/gallery/123`).
-- Art: the art index is the last path segment of `tokenURI` (re-mints keep the original art); images come from `public/images/Character<idx>.webp`.
+- Art: the art index is the last path segment of `tokenURI` (re-mints keep the original art); pictures come from `/media/remy/…` (see below).
+
+## Art delivery (`/media/*`, R2)
+
+Art is not in `public/` or the Pages build. Sources live in git under `media/` (`media/remy/Character<idx>.webp`, 600×600 originals; `media/quest/`, the Remy Quest art). `npm run media:sync` builds the variants and uploads them to the private R2 bucket `remy-media`; `workers/remy-media` serves it on `basedremyboys.club/media/*` with `Cache-Control: public, max-age=31536000, immutable` and the edge cache, so a browser downloads each file once.
+
+- `remy/v1/<128|320|600>/<idx>.webp`: 128/320 are sharp resizes (WebP q82, ~4 KB / ~17 KB); 600 is the original bytes (~65 KB). `src/lib/media.ts`: `remyImg(idx, sizes)` gives `<img>` `src`/`srcSet`/`sizes` so the browser picks the smallest sufficient variant; `remySrc(idx, width)` for CSS/SVG/canvas. Pass the rendered CSS width as `sizes`. Bump `REMY_RECIPE` if the resize recipe changes.
+- `quest/<hash>/<path>`: `media/quest/<path>` under a 16-hex content hash of the whole directory (`__QUEST_MEDIA__`, computed by `vite.config.ts`), so regenerated Quest art gets new URLs; use `questSrc(path)`.
+- Pages `/assets/*` (Vite-fingerprinted JS/CSS) is immutable too (`public/_headers`).
+- `npm run dev`/`preview` serve `/media/*` from `media/` and `.cache/media` (resizing on first request); no network needed.
+- `npm run media:sync` needs `MEDIA_UPLOAD_TOKEN` (the Worker secret; kept in the git-ignored `.env.local`). It lists the bucket through the Worker and uploads only objects whose MD5 differs, so reruns are cheap. **Run it before deploying Pages** whenever `media/` changed, or the new Quest hash 404s.
+- Worker: `cd workers/remy-media && bun test && bun run deploy`. Rotate the token with `openssl rand -hex 32`, `bunx wrangler secret put MEDIA_UPLOAD_TOKEN`, and update `.env.local`.
 
 ## Remy Quest art pipeline
 
-`npm run quest:art` regenerates the committed, deterministic Remy Quest art in two stages. Stage 1 (`scripts/quest-art.mjs`, needs `ffmpeg` and `cwebp`, e.g. `brew install ffmpeg webp`) writes `public/quest/art.json` (sampled palette, overworld look, art-derived type, epithet) and `minis.webp` (32×32 posterized portraits). Stage 2 (`scripts/quest-art.py`, run through `uv` with rembg/numpy/pillow) cuts every original out with rembg's `isnet-anime` model (masks cached in the git-ignored `.cache/quest-art/`; ~40 min the first time, ~2 min after) and paints:
+`npm run quest:art` regenerates the committed, deterministic Remy Quest art in two stages. Stage 1 (`scripts/quest-art.mjs`, needs `ffmpeg` and `cwebp`, e.g. `brew install ffmpeg webp`) writes `media/quest/art.json` (sampled palette, overworld look, art-derived type, epithet) and `minis.webp` (32×32 posterized portraits). Stage 2 (`scripts/quest-art.py`, run through `uv` with rembg/numpy/pillow) cuts every original out with rembg's `isnet-anime` model (masks cached in the git-ignored `.cache/quest-art/`; ~40 min the first time, ~2 min after) and paints:
 - `sprites/<idx>.webp` (76×116) and `sprites/far/<idx>.webp` (52×79, the distant foe): full-body pixel chibis — area-reduced cut-out, median-cut palette, generated legs and shoes, tinted outline. Lazy-loaded per Remy (~2 KB each).
 - `heads.webp` / `sides.webp`: 16px front/profile overworld heads with the real hair silhouette and a repainted face (hand-placed eyes, brows, mouth), sharing one 256-colour palette.
 - the canonical `bald` flag in `art.json`. `scripts/quest-bald.json` is the reviewed Cabald roster (240 Remys): detector candidates (crown vs cheek chromaticity + texture) checked by eye.
@@ -67,7 +78,7 @@ Drafts are saved locally; only the latest result is saved in session storage, su
 
 ### Image service and local development
 
-`workers/remy-remix` is an independent Cloudflare Worker on `basedremyboys.club/api/remix*`; it does not modify the indexer's `/api/admin/*` routes. `OPENROUTER_API_KEY` is a Worker secret, never a `VITE_*` variable. The Worker fetches only catalog images from the fixed site origin, allows only models in its enabled registry, and returns sanitized errors.
+`workers/remy-remix` is an independent Cloudflare Worker on `basedremyboys.club/api/remix*`; it does not modify the indexer's `/api/admin/*` routes. `OPENROUTER_API_KEY` is a Worker secret, never a `VITE_*` variable. The Worker reads source art straight from the `remy-media` R2 bucket (`MEDIA` binding, `remote = true` so `wrangler dev` reads the real bucket), allows only models in its enabled registry, and returns sanitized errors.
 
 ```sh
 cd workers/remy-remix
@@ -83,7 +94,8 @@ Admission is atomic and durable: **5 attempts per network/IP per UTC day, 100 gl
 ### Verification and deployment
 
 ```sh
-# At frontend root:
+# At frontend root (upload new/changed art first):
+npm run media:sync
 npm run build
 
 # In workers/remy-remix:

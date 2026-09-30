@@ -1,0 +1,13 @@
+name = "remy-media"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+workers_dev = false
+routes = [{ pattern = "basedremyboys.club/media/*", zone_name = "basedremyboys.club" }]
+
+# Private bucket (no public access); this Worker is the only reader.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "remy-media"
+
+[observability]
+enabled = true

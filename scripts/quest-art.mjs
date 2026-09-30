@@ -10,7 +10,7 @@ import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const OUT = `${ROOT}public/quest/`
+const OUT = `${ROOT}media/quest/`
 const COUNT = 4490
 const COLS = 67
 const ROWS = Math.ceil(COUNT / COLS)
@@ -98,7 +98,7 @@ await Promise.all(Array.from({ length: Math.min(8, availableParallelism()) }, as
     const start = next
     next += batch
     const count = Math.min(batch, COUNT - start)
-    const bytes = await run('ffmpeg', ['-v', 'error', '-threads', '1', '-start_number', String(start), '-i', `${ROOT}public/images/Character%d.webp`, '-frames:v', String(count), '-vf', `scale=${SIZE}:${SIZE}:flags=area`, '-threads', '1', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'])
+    const bytes = await run('ffmpeg', ['-v', 'error', '-threads', '1', '-start_number', String(start), '-i', `${ROOT}media/remy/Character%d.webp`, '-frames:v', String(count), '-vf', `scale=${SIZE}:${SIZE}:flags=area`, '-threads', '1', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'])
     if (bytes.length !== count * FRAME) throw new Error(`Incomplete batch at ${start}: ${bytes.length}`)
     for (let i = 0; i < count; i++) analyze(bytes.subarray(i * FRAME, (i + 1) * FRAME), start + i)
     complete += count

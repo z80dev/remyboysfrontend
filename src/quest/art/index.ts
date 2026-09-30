@@ -1,4 +1,5 @@
 /** Build-time portrait knowledge and decoded pixel atlases. Regenerate with npm run quest:art. */
+import { questSrc } from '../../lib/media'
 import type { ActorLook } from '../types'
 
 export type ArtType = 'BULL' | 'BEAR' | 'WHALE' | 'DEGEN'
@@ -33,10 +34,10 @@ export interface AtlasRect {
 }
 
 /**
- * Full-body battle sprite (committed per Remy at /quest/sprites/<idx>.webp): a cut-out, palette-quantized, outlined
+ * Full-body battle sprite (committed per Remy at media/quest/sprites/<idx>.webp): a cut-out, palette-quantized, outlined
  * chibi of the original art in its native three-quarter pose. Never mirror it: shirt slogans and meme captions are
  * part of the art. Transparent background; the body is centred on x = SPRITE_W / 2 and the shoe soles rest on row
- * SPRITE_FEET. The FAR variant (/quest/sprites/far/) is the same Remy re-reduced from the source at exactly 2/3 size,
+ * SPRITE_FEET. The FAR variant (sprites/far/) is the same Remy re-reduced from the source at exactly 2/3 size,
  * for the distant foe on short screens.
  */
 export const SPRITE_W = 76
@@ -67,7 +68,7 @@ async function resource(path: string): Promise<Blob> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 20000)
   try {
-    const response = await fetch(`/quest/${path}`, { signal: controller.signal })
+    const response = await fetch(questSrc(path), { signal: controller.signal })
     if (!response.ok) throw new Error(`Art resource: ${response.status}`)
     // Read the body within the timeout, not just the response headers.
     return await response.blob()
@@ -127,7 +128,7 @@ function fallbackSprite(index: number, far: boolean): HTMLCanvasElement {
 async function loadSprite(index: number, far: boolean): Promise<HTMLCanvasElement> {
   try {
     const img = new Image()
-    img.src = `/quest/sprites/${far ? 'far/' : ''}${index}.webp`
+    img.src = questSrc(`sprites/${far ? 'far/' : ''}${index}.webp`)
     await img.decode()
     const c = document.createElement('canvas')
     c.width = img.naturalWidth

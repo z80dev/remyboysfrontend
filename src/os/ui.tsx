@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { useAccount, useConnect } from 'wagmi'
 import { EXPLORER } from '../config'
+import { remyImg } from '../lib/media'
 import type { TxStatus } from '../lib/tx'
 import { Icon } from './icons'
 import { connectorLabel } from './shell'
@@ -103,7 +104,11 @@ export function Thumb({
   const inner = (
     <>
       <span className="thumb-frame">
-        {index === undefined ? <span className="thumb-ph" /> : <img src={`/images/Character${index}.webp`} alt="" loading="lazy" decoding="async" />}
+        {index === undefined ? (
+          <span className="thumb-ph" />
+        ) : (
+          <img {...remyImg(index, '120px')} alt="" loading="lazy" decoding="async" />
+        )}
         {(selected || mark) && (
           <span className="thumb-check" aria-hidden="true">
             <Icon name="check" size={14} />

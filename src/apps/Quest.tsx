@@ -3,7 +3,7 @@ import { StatusBar } from '../os/ui'
 export function Quest() {
   return (
     <div className="app-col">
-      <iframe className="paint-frame quest-frame" src="/quest/" title="Remy Quest" allow="autoplay; fullscreen" />
+      <iframe className="app-frame quest-frame" src="/quest/" title="Remy Quest" allow="autoplay; fullscreen" />
       <StatusBar
         right={
           <a href="/quest/" target="_blank" rel="noreferrer">

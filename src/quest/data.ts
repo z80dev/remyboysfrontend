@@ -2,7 +2,6 @@
 import { art } from './art'
 
 export const REMY_COUNT = 4490
-export const artSrc = (idx: number) => `/images/Character${idx}.webp`
 
 export type RType = 'BULL' | 'BEAR' | 'WHALE' | 'DEGEN' | 'MEME'
 export const TYPES: RType[] = ['BULL', 'BEAR', 'WHALE', 'DEGEN']

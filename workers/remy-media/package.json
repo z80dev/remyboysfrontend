@@ -1,0 +1,17 @@
+{
+  "name": "remy-media",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --port 8789",
+    "deploy": "wrangler deploy",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.142.0"
+  }
+}

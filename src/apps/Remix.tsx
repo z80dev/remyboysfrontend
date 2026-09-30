@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import type { AppProps } from "../os/apps";
-import { artSrc } from "../lib/art";
+import { remyImg, remySrc } from "../lib/media";
 import { Icon } from "../os/icons";
 import { StatusBar } from "../os/ui";
 import "./Remix.css";
@@ -408,7 +408,12 @@ export function Remix({ param }: AppProps) {
                 onClick={() => setSelected(index)}
                 title={`Original art number ${index}`}
               >
-                <img src={artSrc(index)} alt="" loading="lazy" />
+                <img
+                  {...remyImg(index, "(max-width: 420px) 22vw, (max-width: 760px) 16vw, 64px")}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span>#{index}</span>
                 {selected === index && (
                   <span className="remix-check" aria-hidden="true">
@@ -450,7 +455,7 @@ export function Remix({ param }: AppProps) {
             </div>
           </div>
           <div className="remix-selected">
-            <img src={artSrc(selected)} alt={`Original Remy art number ${selected}`} />
+            <img {...remyImg(selected, "48px")} alt={`Original Remy art number ${selected}`} />
             <div>
               <span>IMAGE 1 · YOUR REMY</span>
               <b>Character #{selected}</b>
@@ -661,7 +666,7 @@ export function Remix({ param }: AppProps) {
             <div className="remix-compare">
               <figure>
                 <div className="remix-image">
-                  <img src={artSrc(result.artIndex)} alt={`Original Character ${result.artIndex}`} />
+                  <img src={remySrc(result.artIndex)} alt={`Original Character ${result.artIndex}`} />
                 </div>
                 <figcaption>Original · #{result.artIndex}</figcaption>
               </figure>

@@ -11,8 +11,6 @@ export function artIndexFromUri(uri: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-export const artSrc = (index: number) => `/images/Character${index}.webp`
-
 export const ipfsToHttp = (uri: string) => (uri.startsWith('ipfs://') ? IPFS_GATEWAY + uri.slice(7) : uri)
 
 /** tokenURI → art index for many ids in one multicall. */

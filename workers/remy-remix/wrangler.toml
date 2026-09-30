@@ -12,6 +12,12 @@ class_name = "Admission"
 tag = "v1"
 new_sqlite_classes = ["Admission"]
 
+# Source art (owned by workers/remy-media). `remote` lets `wrangler dev` read the real bucket.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "remy-media"
+remote = true
+
 [vars]
 ENVIRONMENT = "production"
 

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useReadContracts } from 'wagmi'
 import { remyAbi } from '../abis'
 import { ADDR } from '../config'
-import { artIndexFromUri, artSrc, ipfsToHttp, useMetadata } from '../lib/art'
+import { artIndexFromUri, ipfsToHttp, useMetadata } from '../lib/art'
+import { remySrc } from '../lib/media'
 import { shortAddr } from '../lib/format'
 import type { AppProps } from '../os/apps'
 import { Icon } from '../os/icons'
@@ -35,7 +36,7 @@ export function Gallery({ param, navigate }: AppProps) {
   const missing = !isLoading && data && !uri
 
   const go = (n: number) => navigate(`gallery/${((n % supply) + supply) % supply}`)
-  const src = art === undefined ? undefined : imgFailed && meta.data?.image ? ipfsToHttp(meta.data.image) : artSrc(art)
+  const src = art === undefined ? undefined : imgFailed && meta.data?.image ? ipfsToHttp(meta.data.image) : remySrc(art)
   const setWallpaper = () => {
     if (art === undefined) return
     setPrefs({ wallpaper: { kind: 'remy', art, fit: 'stretch' } })
@@ -95,7 +96,7 @@ export function Gallery({ param, navigate }: AppProps) {
                 Set as desktop background
               </TaskLink>
               {art !== undefined && (
-                <a className="tasklink" href={artSrc(art)} download={`remy-${id}.webp`}>
+                <a className="tasklink" href={remySrc(art)} download={`remy-${id}.webp`}>
                   <Icon name="download" size={16} />
                   <span>Download this picture</span>
                 </a>
@@ -160,7 +161,7 @@ export function Gallery({ param, navigate }: AppProps) {
               <Icon name="display" size={26} />
             </button>
             {art !== undefined && (
-              <a className="round-btn" href={artSrc(art)} download={`remy-${id}.webp`} aria-label="Download art" title="Download art">
+              <a className="round-btn" href={remySrc(art)} download={`remy-${id}.webp`} aria-label="Download art" title="Download art">
                 <Icon name="download" size={26} />
               </a>
             )}

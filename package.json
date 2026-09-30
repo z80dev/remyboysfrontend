@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "lint": "biome check .",
     "preview": "vite preview",
-    "quest:art": "node scripts/quest-art.mjs && uv run --python 3.12 --with 'rembg[cpu]' --with numpy --with pillow python scripts/quest-art.py"
+    "quest:art": "node scripts/quest-art.mjs && uv run --python 3.12 --with 'rembg[cpu]' --with numpy --with pillow python scripts/quest-art.py",
+    "media:build": "node scripts/media.mjs build",
+    "media:sync": "node --env-file-if-exists=.env.local scripts/media.mjs sync"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.4.0",
@@ -26,6 +28,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vite": "^6.4.3"
   }

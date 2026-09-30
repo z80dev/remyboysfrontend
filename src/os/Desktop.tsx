@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, type MouseEvent, useCallback, useEffect, useState } from 'react'
 import { TOTAL_SUPPLY_HINT } from '../config'
+import { remySrc } from '../lib/media'
 import { useVisibleApps } from './apps'
 import { FLAG_COLORS, Icon } from './icons'
 import { type Wallpaper as WallpaperPref, setPrefs, useShell } from './shell'
@@ -9,8 +10,8 @@ import { useOutside } from './Taskbar'
 export function wallpaperStyle(w: WallpaperPref): CSSProperties {
   if (w.kind === 'solid') return { background: '#004e98' }
   if (w.kind === 'remy') {
-    const img = `url(/images/Character${w.art}.webp)`
-    if (w.fit === 'tile') return { background: `${img} 0 0 / 180px 180px repeat, #004e98` }
+    if (w.fit === 'tile') return { background: `url(${remySrc(w.art, 320)}) 0 0 / 180px 180px repeat, #004e98` }
+    const img = `url(${remySrc(w.art)})`
     if (w.fit === 'center') return { background: `${img} center / min(60vh, 600px) no-repeat, #004e98` }
     return { background: `${img} center / cover no-repeat, #004e98` }
   }
@@ -52,7 +53,7 @@ function Kite() {
         {tris.map((t, i) => (
           <g key={t} clipPath={`url(#kite-${i})`}>
             <polygon points={t} fill={FLAG_COLORS[i]} />
-            <image href={`/images/Character${art[i]}.webp`} x={spots[i][0]} y={spots[i][1]} width="44" height="44" />
+            <image href={remySrc(art[i], 128)} x={spots[i][0]} y={spots[i][1]} width="44" height="44" />
             <polygon points={t} fill={FLAG_COLORS[i]} opacity=".6" style={{ mixBlendMode: 'color' }} />
             <polygon points={t} fill={FLAG_COLORS[i]} opacity=".18" />
           </g>

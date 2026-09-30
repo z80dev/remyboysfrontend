@@ -1,6 +1,7 @@
 import { useReadContract } from 'wagmi'
 import { remyAbi, vaultAbi } from '../abis'
 import { ADDR, LINKS, NEW } from '../config'
+import { remyImg } from '../lib/media'
 import type { AppProps } from '../os/apps'
 import { Icon, RemyFlag } from '../os/icons'
 
@@ -50,7 +51,12 @@ export function Welcome({ navigate }: AppProps) {
       <div className="wel-body">
         <aside className="wel-side">
           <figure className="photo">
-            <img src="/images/Character2069.webp" alt="Remy Boy #2069, green hair, holding a baguette" width={600} height={600} />
+            <img
+              {...remyImg(2069, '(max-width: 720px) 120px, 190px')}
+              alt="Remy Boy #2069, green hair, holding a baguette"
+              width={600}
+              height={600}
+            />
             <figcaption>Remy Boy #2069</figcaption>
           </figure>
           <dl className="kv wel-stats">

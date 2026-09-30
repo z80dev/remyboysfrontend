@@ -18,6 +18,7 @@ const LEASE_MS = REQUEST_TIMEOUT_MS + 30_000;
 export interface Env {
   OPENROUTER_API_KEY?: string;
   REMIX_ADMISSION: DurableObjectNamespace;
+  MEDIA: R2Bucket;
   ENVIRONMENT?: string;
 }
 
@@ -318,21 +319,15 @@ export default {
     const input = validateInput(parsed);
     if (!input) return failure("Invalid remix request", "invalid_input", 400, origin!);
 
-    const sourceUrl = `${SOURCE_ORIGIN}/images/Character${input.artIndex}.webp`;
-    let sourceResponse: Response;
-    try {
-      sourceResponse = await fetch(sourceUrl, { signal: AbortSignal.timeout(15_000), redirect: "manual" });
-    } catch {
-      return failure("Source artwork could not be loaded", "source_unavailable", 502, origin!);
-    }
-    if (!sourceResponse.ok) return failure("Source artwork could not be loaded", "source_unavailable", 502, origin!);
-    if (Number(sourceResponse.headers.get("content-length")) > MAX_SOURCE_BYTES)
-      return failure("Source artwork is invalid", "source_invalid", 502, origin!);
+    // Original bytes from the private art bucket (remy-media; key scheme in src/lib/media.ts).
     let source: Uint8Array;
     try {
-      source = await readBounded(sourceResponse, MAX_SOURCE_BYTES);
+      const object = await env.MEDIA.get(`remy/v1/600/${input.artIndex}.webp`);
+      if (!object) return failure("Source artwork could not be loaded", "source_unavailable", 502, origin!);
+      if (object.size > MAX_SOURCE_BYTES) return failure("Source artwork is invalid", "source_invalid", 502, origin!);
+      source = new Uint8Array(await object.arrayBuffer());
     } catch {
-      return failure("Source artwork is invalid", "source_invalid", 502, origin!);
+      return failure("Source artwork could not be loaded", "source_unavailable", 502, origin!);
     }
     if (!imageMime(source)) return failure("Source artwork is invalid", "source_invalid", 502, origin!);
 

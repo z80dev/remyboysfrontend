@@ -16,7 +16,7 @@ export const config = createConfig({
         name: 'Remy OS',
         description: 'Based Remy Boys',
         url: 'https://basedremyboys.club',
-        icons: ['https://basedremyboys.club/images/Character0.webp'],
+        icons: ['https://basedremyboys.club/media/remy/v1/128/0.webp'],
       },
     }),
   ],
