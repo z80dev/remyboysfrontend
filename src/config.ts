@@ -70,3 +70,6 @@ export const LINKS = [
   { label: 'Magic Eden', href: 'https://magiceden.io/collections/base/0x3e9e529e32ad2821bdbfda348c2f9da94b43976c' },
   { label: 'Telegram', href: 'https://t.me/+0he27MlVgxU2OTQx' },
 ] as const
+
+/** Halloween Remys: free mint for Remy holders on JPEG Markets. */
+export const HALLOWEEN_MINT = 'https://jpeg.markets/collections/halloween-remys'

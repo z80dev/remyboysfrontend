@@ -3,6 +3,7 @@ import { useAccount, useDisconnect } from 'wagmi'
 import { appById, isTeam } from './os/apps'
 import { MessageBoxHost } from './os/Balloons'
 import { DesktopIcons, Wallpaper, useDesktopMenu } from './os/Desktop'
+import { HalloweenMint } from './os/Halloween'
 import { IconDefs } from './os/icons'
 import { Pocket } from './os/Pocket'
 import { Session, type SessionStage, TurnOffDialog } from './os/Session'
@@ -165,6 +166,7 @@ export default function App() {
           <div className="desktop" onContextMenu={menu.onContextMenu}>
             <Wallpaper />
             <DesktopIcons open={navigate} />
+            <HalloweenMint />
             {wins.filter((w) => !w.min).map(renderWindow)}
             {menu.element}
             <Taskbar

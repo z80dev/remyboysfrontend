@@ -6,6 +6,7 @@ import { shortAddr } from '../lib/format'
 import { usePoolState } from '../lib/launch'
 import { appById, useVisibleApps } from './apps'
 import { BalloonHost } from './Balloons'
+import { HalloweenMint } from './Halloween'
 import { FlagMark, Icon } from './icons'
 import { UserPicture } from './StartMenu'
 import { useSecurityState } from './system'
@@ -204,6 +205,7 @@ function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWalle
           <small>{address ? 'Connected to Base' : 'Tap to connect a wallet'}</small>
         </span>
       </button>
+      <HalloweenMint pocket />
       <div className="today-list">
         <TodayRow icon="recovery" title="Recovery Center" text={recovery.text} tone={recovery.tone} onClick={() => onLaunch('recovery')} />
         <TodayRow
