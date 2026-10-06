@@ -2,8 +2,9 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { type Address, formatUnits, parseUnits } from 'viem'
 import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { readContract } from 'wagmi/actions'
-import { erc20Abi, routerAbi, vaultAbi } from '../abis'
+import { erc20Abi, routerAbi } from '../abis'
 import { EXPLORER, NEW } from '../config'
+import { useDataSnapshot } from '../lib/data'
 import { deadline, fmt, shortAddr } from '../lib/format'
 import { type RangeSelection, edgePrice, formatFromMarket, formatPrice, presetSelection, resolveRange } from '../lib/liquidityRange'
 import { useQuote } from '../lib/pool'
@@ -952,16 +953,9 @@ export function Trader({ param, navigate }: AppProps) {
   const setTab = (t: Tab) => navigate(`trader/${t}`)
   const tx = useTxUi()
   const pool = usePoolData()
-  const { data: inventory } = useReadContract({ address: NEW.vault, abi: vaultAbi, functionName: 'inventoryCount', query: { refetchInterval: 30_000 } })
-  const { data: supply } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'totalSupply', query: { staleTime: Number.POSITIVE_INFINITY } })
-  const { data: inVault } = useReadContract({
-    address: NEW.fremy,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [NEW.vault],
-    query: { refetchInterval: 30_000 },
-  })
-  const outside = supply !== undefined && inVault !== undefined ? supply - inVault : undefined
+  const { data: snapshot } = useDataSnapshot()
+  const inventory = snapshot ? BigInt(snapshot.stats.inventory) : undefined
+  const outside = snapshot ? BigInt(snapshot.stats.fremySupply) - BigInt(snapshot.stats.fremyInVault) : undefined
 
   return (
     <div className="app-col trader">

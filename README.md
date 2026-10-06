@@ -15,7 +15,7 @@ npm run build   # tsc + vite build → dist (Cloudflare Pages)
 - `src/os/` — Remy OS XP shell: boot + log-on (`Session`), Luna windows, taskbar/tray with balloons, Start menu, desktop + right-click menu, XP icon set (`icons.tsx`), shell store for balloons/message boxes/display prefs (`shell.ts`). Below 720px the Pocket PC shell (`Pocket.tsx`) takes over: title strip, full-screen apps, Today screen, soft-key bar.
 - `src/apps/` — Welcome, Recovery Center, Approvals, Legacy Exchange, Remy Vault, Remy Trader, Send fREMY (`#/send`, plain ERC-20 `transfer` for wallets that don't list fREMY; after a failed send it offers a Permit2 route — approve Permit2, Permit2 `approve` to self, Permit2 `transferFrom` — for wallets that crash decoding unknown-token transfers), Gallery, Remix Studio, Remy Quest (iframe of `/quest/`), Display Properties.
 - Remy Quest (`/quest/`, second Vite entry in `vite.config.ts`): standalone Pokémon-style game, vanilla TS + canvas + DOM, no React/wagmi. `src/quest/` — `world.ts` (grid movement, NPCs, trainers, encounters, render loop), `maps.ts` (maps, cast, story scripts), `battle.ts`, `menus.ts`, `dex.ts`, `viewer.ts`, `scenes.ts` (title, intro, starter, Hall of Fame), `gfx/` (procedural pixel-art tiles/sprites), `art/` (Remy art atlases), `audio.ts` + `music/` (runtime-synthesized soundtrack + SFX), `data.ts` (types, moves, per-art-index stats). The world renders to a low-res canvas upscaled by an integer factor; inside `.screen`, `1rem` = one game pixel. Touch devices get an on-screen pad. Save: `localStorage['remyquest.save.v1']`.
-- Remy Trader (`#/trader`): fREMY/ETH market from PoolManager logs (`src/lib/trader.ts`, cached in localStorage, ≤2,000-block chunks), order ticket via RemyRouter `buyFloor`/`sellFloor`, and a Uniswap v4 market-maker desk via PositionManager action scripts. The desk (`src/apps/TraderRange.tsx`, model in `src/lib/liquidityRange.ts`) places any range the pool's ticks allow, from one step to 0–∞, on a draggable liquidity chart; edges at the market stay anchored to it so asks stay fREMY-only and bids ETH-only. v4 math (TickMath, SqrtPriceMath, LiquidityAmounts) is ported to bigint in `src/lib/v4math.ts`.
+- Remy Trader (`#/trader`): fREMY/ETH market from the shared Alchemy event index (`workers/remy-data`, `/api/data/snapshot`), order ticket via RemyRouter `buyFloor`/`sellFloor`, and a Uniswap v4 market-maker desk via PositionManager action scripts. The desk (`src/apps/TraderRange.tsx`, model in `src/lib/liquidityRange.ts`) places any range the pool's ticks allow, from one step to 0–∞, on a draggable liquidity chart; edges at the market stay anchored to it so asks stay fREMY-only and bids ETH-only. v4 math (TickMath, SqrtPriceMath, LiquidityAmounts) is ported to bigint in `src/lib/v4math.ts`.
 - Wallpaper: `public/wallpaper/remy-bliss.svg` (the Remy kite is inline SVG in `src/os/Desktop.tsx`).
 - Deep links: `/#/<app>` (e.g. `/#/vault`, `/#/gallery/123`).
 - Art: the art index is the last path segment of `tokenURI` (re-mints keep the original art); pictures come from `/media/remy/…` (see below).
@@ -113,3 +113,27 @@ npx wrangler pages deploy dist --project-name remyboys --branch main
 `GET /api/remix` exposes availability, model IDs, and limits. `POST /api/remix` accepts `{artIndex, prompt, model, referenceImage?}` and returns `{imageDataUrl, model, costUsd, artIndex, prompt, createdAt, referenceImageUsed}`. `referenceImage` must be a base64 PNG/JPEG/WebP data URL, never an external URL or an array. The browser decodes uploads before submission; the Worker checks the encoded/decoded size limits, base64 syntax, and matching raster signature before fetching art or consuming an allowance. Only the Worker builds the ordered model-reference list.
 
 Verification covered real reference-image generation with both models, source/result attribution, window reopen during generation, desktop/Pocket rendering, PNG download, and live origin/catalog rejection. The upload flow was exercised with a real two-image GPT generation, removal/replacement, invalid/oversized files, and tab-memory-only upload persistence. Worker regression tests cover quota persistence, concurrency, lease expiry, midnight rollover, input boundaries (including uploaded references), and invalid provider output.
+
+## Shared chain data and Alchemy
+
+`workers/remy-data` serves `/api/data/snapshot` and `/api/data/health` on the production domain. One durable SQLite-backed index owns the pool event cursor and the complete published snapshot for all visitors. Two server-side Alchemy log subscriptions watch this pool and the Remy/fREMY/vault contracts; event bursts coalesce into at most one refresh per 15 seconds. A 60-second heartbeat recovers missed events, reconnects subscriptions, and updates LP ownership; if subscriptions are unavailable it polls every 30 seconds. Every refresh reads the current block, backfills from the durable cursor with a 128-block reorg overlap, and pins grouped public/LP reads to that same block with Multicall3. The small launch quote runs as a separate eth_call. Current live data needs five RPC calls per refresh, independent of visitor count.
+
+The public API is a fixed read-only snapshot, not an arbitrary RPC proxy. It uses a 15-second edge cache; the frontend shares one React Query entry and one 30-second polling timer across all windows. Welcome/Today stats, the network tray, market history, pool availability, and LP positions use this API. Quotes for the selected order, wallet balances, NFT enumeration/metadata, approval checks, and receipt checks still read Alchemy or the wallet directly. Grouped caller-independent reads use bounded Multicall3 batches; the quoter preserves its direct-call context. A confirmed transaction invalidates frontend caches once at the end of the sequence. The server preserves its last complete snapshot on a failure and answers 503 after two minutes of staleness; it never substitutes empty market data.
+
+`.env.production` contains the **public browser key**, Alchemy app `remy frontend`, restricted to `basedremyboys.club` and the contract allowlist. Its presence in the shipped bundle is intentional. The private `newremy` server key is stored only as the Worker's `ALCHEMY_API_KEY` secret. JPEG Markets credentials and allowlists are independent. Wallet chain registration uses the wallet's normal chain RPC because the website-only key rejects wallet/server origins. For local development use a separate development key; for forks also set `VITE_DATA_API` to a service indexing that fork.
+
+```sh
+cd workers/remy-data
+bun install --frozen-lockfile
+bun test
+bun run typecheck
+bunx wrangler secret put ALCHEMY_API_KEY # private server key, supplied via stdin/prompt
+bun run deploy
+curl https://basedremyboys.club/api/data/health
+# Wait for ok:true before deploying the frontend:
+cd ../..
+npm run build
+npx wrangler pages deploy dist --project-name remyboys --branch main
+```
+
+The 128-block overlap handles shallow reorgs; a deeper historical reorg requires rebuilding the index. The API exposes `generatedAt` and the indexed block, and its health endpoint reports subscription count and refresh failures.

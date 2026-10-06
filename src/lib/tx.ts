@@ -46,6 +46,7 @@ export function useTx() {
   const run = useCallback(
     async (steps: TxStep[]): Promise<boolean> => {
       setBusy(true)
+      let confirmed = false
       try {
         if (chainId !== chain.id) await switchChainAsync({ chainId: chain.id })
         for (const [i, step] of steps.entries()) {
@@ -57,8 +58,8 @@ export function useTx() {
           setStatus({ msg: `${prefix}: waiting for confirmation…`, error: false, hash })
           const receipt = await waitForTransactionReceipt(config, { hash, chainId: chain.id })
           if (receipt.status !== 'success') throw new Error(`${step.label} reverted (${hash})`)
+          confirmed = true
           setStatus({ msg: `${prefix}: done.`, error: false, hash })
-          await qc.invalidateQueries()
         }
         return true
       } catch (err) {
@@ -66,7 +67,7 @@ export function useTx() {
         return false
       } finally {
         setBusy(false)
-        await qc.invalidateQueries()
+        if (confirmed) await qc.invalidateQueries()
       }
     },
     [chainId, config, qc, switchChainAsync, writeContractAsync],

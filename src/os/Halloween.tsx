@@ -63,9 +63,9 @@ export function HalloweenMint({ pocket }: { pocket?: boolean }) {
         <b className="spooky-title">
           Free Mint<small>Halloween Remys</small>
         </b>
-        <span className="spooky-text">Hold a Remy? Your Halloween Remy is free on JPEG Markets.</span>
+        <span className="spooky-text">Hold a Remy? Your Halloween Remy is free on jpeg markets.</span>
         <a className="spooky-cta" href={HALLOWEEN_MINT} target="_blank" rel="noreferrer">
-          Mint on JPEG Markets ↗
+          Mint on jpeg markets ↗
         </a>
       </div>
     </aside>

@@ -1,0 +1,16 @@
+name = "remy-data"
+main = "src/worker.ts"
+compatibility_date = "2026-10-05"
+workers_dev = true
+routes = [{ pattern = "basedremyboys.club/api/data/*", zone_name = "basedremyboys.club" }]
+
+[[durable_objects.bindings]]
+name = "MARKET"
+class_name = "RemyData"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RemyData"]
+
+[observability]
+enabled = true

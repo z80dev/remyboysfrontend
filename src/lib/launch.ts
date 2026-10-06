@@ -2,10 +2,10 @@ import { type Address, isAddressEqual } from 'viem'
 import { useReadContract } from 'wagmi'
 import { erc20Abi, legacyVaultAbi } from '../abis'
 import { ADDR, ADMINS, NEW, TEAM } from '../config'
-import { type PoolKey, usePoolKey, useQuote, useSpotPrice } from './pool'
+import { useDataSnapshot } from './data'
+import type { PoolKey } from './pool'
 import { type ReclaimWave, useReclaimState } from './reclaim'
-
-const ONE = 10n ** 18n
+import { ethPriceAtSqrt } from './v4math'
 
 /** fREMY/ETH pool status; `spot` is ETH per fREMY. */
 export interface PoolState {
@@ -38,10 +38,13 @@ export interface LaunchState {
  * below the start tick, so in-range liquidity alone is not a usable signal.
  */
 export function usePoolState(): PoolState {
-  const key = usePoolKey(NEW.router)
-  const spot = useSpotPrice(key)
-  const quote = useQuote(spot !== undefined ? key : undefined, 'buy', ONE)
-  return { key, spot, live: spot !== undefined && quote.data !== undefined, loading: key === undefined || (spot !== undefined && quote.isLoading) }
+  const { data, isLoading } = useDataSnapshot()
+  return {
+    key: data?.pool.key,
+    spot: data ? ethPriceAtSqrt(BigInt(data.pool.slot0[0])) : undefined,
+    live: !!data && data.pool.buyOneQuote !== null,
+    loading: isLoading,
+  }
 }
 
 /** The legacy vault redeems only once the converter owns it (MigratorRouter.transfer_vault_ownership). */

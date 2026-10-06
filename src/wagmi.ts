@@ -7,6 +7,7 @@ export const chain = RPC_URL ? { ...base, rpcUrls: { default: { http: [CHAIN_RPC
 
 export const config = createConfig({
   chains: [chain],
+  batch: { multicall: { batchSize: 16_384, wait: 20 } },
   connectors: [
     injected(),
     coinbaseWallet({ appName: 'Remy OS', preference: { options: 'all', telemetry: false } }),
@@ -20,7 +21,7 @@ export const config = createConfig({
       },
     }),
   ],
-  transports: { [chain.id]: http(RPC_URL) },
+  transports: { [chain.id]: http(RPC_URL, { retryCount: 1, timeout: 15_000 }) },
 })
 
 declare module 'wagmi' {

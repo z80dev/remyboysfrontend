@@ -1,16 +1,16 @@
 import { type ReactNode, useCallback, useState } from 'react'
-import { useAccount, useReadContract } from 'wagmi'
-import { vaultAbi } from '../abis'
-import { LINKS, NEW } from '../config'
+import { useAccount } from 'wagmi'
+import { LINKS } from '../config'
+import { useDataSnapshot } from '../lib/data'
 import { shortAddr } from '../lib/format'
 import { usePoolState } from '../lib/launch'
-import { appById, useVisibleApps } from './apps'
 import { BalloonHost } from './Balloons'
 import { HalloweenMint } from './Halloween'
-import { FlagMark, Icon } from './icons'
 import { UserPicture } from './StartMenu'
-import { useSecurityState } from './system'
 import { WalletPanel, useClock, useOutside } from './Taskbar'
+import { appById, useVisibleApps } from './apps'
+import { FlagMark, Icon } from './icons'
+import { useSecurityState } from './system'
 
 type Props = {
   active?: string
@@ -173,7 +173,8 @@ function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWalle
   const apps = useVisibleApps()
   const sec = useSecurityState()
   const now = useClock()
-  const { data: inv } = useReadContract({ address: NEW.vault, abi: vaultAbi, functionName: 'inventoryCount' })
+  const { data } = useDataSnapshot()
+  const inv = data ? BigInt(data.stats.inventory) : undefined
   const pool = usePoolState()
 
   const recovery = !address

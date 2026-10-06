@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { type Address, encodeAbiParameters, keccak256 } from 'viem'
 import { useReadContract } from 'wagmi'
-import { quoterAbi, routerAbi, stateViewAbi } from '../abis'
+import { quoterAbi } from '../abis'
 import { ADDR } from '../config'
 
 export type PoolKey = { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address }
@@ -14,35 +15,23 @@ export function poolId(key: PoolKey) {
   )
 }
 
-export function usePoolKey(router?: Address) {
-  return useReadContract({ address: router, abi: routerAbi, functionName: 'poolKey', query: { enabled: !!router, staleTime: Number.POSITIVE_INFINITY } }).data as
-    | PoolKey
-    | undefined
-}
-
-/** Spot price in ETH per fREMY. currency0 is native ETH, so slot0 price = fREMY per ETH. */
-export function useSpotPrice(key?: PoolKey) {
-  const { data } = useReadContract({
-    address: ADDR.stateView,
-    abi: stateViewAbi,
-    functionName: 'getSlot0',
-    args: key ? [poolId(key)] : undefined,
-    query: { enabled: !!key, refetchInterval: 30_000 },
-  })
-  const sqrt = data?.[0]
-  if (!sqrt) return undefined
-  const s = Number(sqrt) / 2 ** 96
-  return 1 / (s * s)
-}
-
 /** ETH → exact fREMY out (buy) or exact fREMY in → ETH (sell). */
 export function useQuote(key: PoolKey | undefined, side: 'buy' | 'sell', amount: bigint) {
   const buy = side === 'buy'
-  return useReadContract({
+  const [settledAmount, setSettledAmount] = useState(amount)
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledAmount(amount), 250)
+    return () => clearTimeout(timer)
+  }, [amount])
+  const settled = amount === settledAmount
+  const quote = useReadContract({
     address: ADDR.v4Quoter,
+    account: '0x0000000000000000000000000000000000000000',
     abi: quoterAbi,
     functionName: buy ? 'quoteExactOutputSingle' : 'quoteExactInputSingle',
-    args: key ? [{ poolKey: key, zeroForOne: buy, exactAmount: amount, hookData: '0x' }] : undefined,
-    query: { enabled: !!key && amount > 0n, refetchInterval: 20_000, retry: false },
+    args: key ? [{ poolKey: key, zeroForOne: buy, exactAmount: settledAmount, hookData: '0x' }] : undefined,
+    query: { enabled: !!key && settled && amount > 0n, refetchInterval: settled && amount > 0n ? 20_000 : false, retry: false },
   })
+  // Hide the previous amount's quote immediately so it can never authorize a changed order.
+  return { ...quote, data: settled ? quote.data : undefined, isLoading: (!settled && amount > 0n) || quote.isLoading }
 }
