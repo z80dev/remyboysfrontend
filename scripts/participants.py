@@ -54,7 +54,7 @@ ASSETS = {
 }
 BY_ADDR = {a: k for k, (a, _) in ASSETS.items()}
 
-# Mirrors LABELS in workers/remy-index/src/config.ts.
+# Labels for team wallets in the output.
 LABELS = {
     '0xe23fa24551d36cffd2859a50e5110befa411e7c6': 'Remy owner',
     '0x07a145dbbc7e425d0f1b3b9982f955e97abad7a2': 'z80.eth',
@@ -64,7 +64,7 @@ LABELS = {
 # Wave 1 (2026-09-26) EOA and exploit contract; wave 2 (2026-09-28/29) EOA, which received every NFT itself.
 ATTACKER = {'0x28bc445b674940c53c227b45d4405c34e60027ad', '0xc7b9b6f2f2b41f91dc409dc429efb2013774f676',
             '0x81691b7e2936413078c2b16a320412a6014b5053'}
-# Remy system contracts from workers/remy-index/src/config.ts; some are small proxies that look like wallets.
+# Remy system contracts; some are small proxies that look like wallets.
 PROTOCOL = {
     '0x2eb990a5f9adea7bcaf09fde6261469ad906635c',  # legacy vault (rbREMY)
     '0x858e3a590fbb08fd92f6b0645e75b086dff5a3ad',  # recovery vault (REMY)
@@ -84,9 +84,9 @@ WALLET_MAX_CODE = 200
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / '.cache' / 'participants'
 # RemyReclaim per theft wave and its owed file: stolen NFT ids and their victims (one row per NFT).
-SRC = ROOT / 'workers' / 'remy-index' / 'src'
-RECLAIMS = {'0x4bfa9df6f8ceef97c9808c44a1c2b4be2d4525ab': SRC / 'owed.json',
-            '0xacdf2c2bccda8e13c1ec979e32ad2628f4eb4de6': SRC / 'owed-2.json'}
+DATA = ROOT / 'data'
+RECLAIMS = {'0x4bfa9df6f8ceef97c9808c44a1c2b4be2d4525ab': DATA / 'owed.json',
+            '0xacdf2c2bccda8e13c1ec979e32ad2628f4eb4de6': DATA / 'owed-2.json'}
 
 
 def post(body, timeout=90):

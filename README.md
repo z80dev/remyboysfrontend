@@ -19,7 +19,7 @@ npm run build   # tsc + vite build → dist (Cloudflare Pages)
 - Wallpaper: `public/wallpaper/remy-bliss.svg` (the Remy kite is inline SVG in `src/os/Desktop.tsx`).
 - Deep links: `/#/<app>` (e.g. `/#/vault`, `/#/gallery/123`).
 - Art: the art index is the last path segment of `tokenURI` (re-mints keep the original art); pictures come from `/media/remy/…` (see below).
-- Recovery: one RemyReclaim per Payment Processor v2 theft wave (`RECLAIMS` in `src/config.ts`, read through `src/lib/reclaim.ts`): wave 1 (2026-09-26, 120 Remys, `workers/remy-index/src/owed.json`) and wave 2 (2026-09-28/29, 52 Remys from 17 wallets, `owed-2.json`). Wave 2 deploys from `remy-boys-recovery` with `OWED=data/owed-2.json forge script script/Deploy.s.sol --rpc-url base --broadcast` through the CREATE2 factory, so its address (`0xacDF…4DE6`) is fixed before deploy and anyone can broadcast it; until it has code the site treats wave 2 as not deployed. The collection owner then enables claims per wave (Launch Control or the Recovery Center owner row).
+- Recovery: one RemyReclaim per Payment Processor v2 theft wave (`RECLAIMS` in `src/config.ts`, read through `src/lib/reclaim.ts`): wave 1 (2026-09-26, 120 Remys, `data/owed.json`) and wave 2 (2026-09-28/29, 52 Remys from 17 wallets, `data/owed-2.json`). Wave 2 deploys from `remy-boys-recovery` with `OWED=data/owed-2.json forge script script/Deploy.s.sol --rpc-url base --broadcast` through the CREATE2 factory, so its address (`0xacDF…4DE6`) is fixed before deploy and anyone can broadcast it; until it has code the site treats wave 2 as not deployed. The collection owner then enables claims per wave (Launch Control or the Recovery Center owner row).
 - Participant snapshot: `python3 scripts/participants.py [--min-hold-days 7] [--tiers 10,5,3,2]` scans every Transfer of the collection and rbREMY/rbREMYLS/wREMY/REMY/fREMY since the collection's deploy block (via `mainnet.base.org`) and writes `.cache/participants/remy-participants-<block>.csv`: every wallet holding Remy equivalents now (wallet balances, live fREMY/ETH v4 LP positions, and stolen NFTs RemyReclaim still owes) that held ≥ N days in one stretch, tiered 1–5 by Remys held now (`--tiers` are the floors of tiers 1–4). Wrapping, staking (rbREMYLS), LP adds/removes and the theft/re-mint don't break a streak. It drops wallets holding nothing now (full dumpers), snipers, protocol/marketplace contracts, and the attacker. Logs are cached per 20k blocks, so reruns only fetch new blocks.
 
 ## Art delivery (`/media/*`, R2)
@@ -80,7 +80,7 @@ Drafts are saved locally; only the latest result is saved in session storage, su
 
 ### Image service and local development
 
-`workers/remy-remix` is an independent Cloudflare Worker on `basedremyboys.club/api/remix*`; it does not modify the indexer's `/api/admin/*` routes. `OPENROUTER_API_KEY` is a Worker secret, never a `VITE_*` variable. The Worker reads source art straight from the `remy-media` R2 bucket (`MEDIA` binding, `remote = true` so `wrangler dev` reads the real bucket), allows only models in its enabled registry, and returns sanitized errors.
+`workers/remy-remix` is an independent Cloudflare Worker on `basedremyboys.club/api/remix*`. `OPENROUTER_API_KEY` is a Worker secret, never a `VITE_*` variable. The Worker reads source art straight from the `remy-media` R2 bucket (`MEDIA` binding, `remote = true` so `wrangler dev` reads the real bucket), allows only models in its enabled registry, and returns sanitized errors.
 
 ```sh
 cd workers/remy-remix
@@ -121,8 +121,6 @@ Verification covered real reference-image generation with both models, source/re
 The public API is a fixed read-only snapshot, not an arbitrary RPC proxy. It uses a 15-second edge cache; the frontend shares one React Query entry and one 30-second polling timer across all windows. Welcome/Today stats, the network tray, market history, pool availability, and LP positions use this API. Quotes for the selected order, wallet balances, NFT enumeration/metadata, approval checks, and receipt checks still read Alchemy or the wallet directly. Grouped caller-independent reads use bounded Multicall3 batches; the quoter preserves its direct-call context. A confirmed transaction invalidates frontend caches once at the end of the sequence. The server preserves its last complete snapshot on a failure and answers 503 after two minutes of staleness; it never substitutes empty market data.
 
 `.env.production` contains the **public browser key**, Alchemy app `remy frontend`, restricted to `basedremyboys.club` and the contract allowlist. Its presence in the shipped bundle is intentional. The private `newremy` server key is stored only as the `remy-data` Worker's `ALCHEMY_API_KEY` secret. JPEG Markets credentials and allowlists are independent. Wallet chain registration uses the wallet's normal chain RPC because the website-only key rejects wallet/server origins. For local development use a separate development key; for forks also set `VITE_DATA_API` to a service indexing that fork.
-
-The admin indexer (`workers/remy-index`, `/api/admin/*`) reads Base and Ethereum mainnet only through Alchemy app `remy index`, whose key is that Worker's `ALCHEMY_API_KEY` secret (`bunx wrangler secret put ALCHEMY_API_KEY`); `bun run build-snapshot` / `bun run seed` need the same key in the environment.
 
 ```sh
 cd workers/remy-data

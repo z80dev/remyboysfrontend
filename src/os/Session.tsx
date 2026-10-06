@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccount, useConnect } from 'wagmi'
 import { shortAddr } from '../lib/format'
 import { remyImg } from '../lib/media'
-import { isAdmin, teamRole } from '../lib/launch'
+import { teamRole } from '../lib/launch'
 import { FlagMark, Icon, RemyFlag } from './icons'
 import { connectorLabel } from './shell'
 import { GUEST_ART, UserPicture } from './StartMenu'
@@ -111,7 +111,7 @@ function Users({ onLogOn }: { onLogOn: () => void }) {
   useEffect(() => {
     if (picking && address) onLogOn()
   }, [picking, address, onLogOn])
-  const role = teamRole(address) ?? (isAdmin(address) ? 'Administrator' : undefined)
+  const role = teamRole(address)
 
   return (
     <div className="logon-users">

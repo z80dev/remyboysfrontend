@@ -64,12 +64,6 @@ export const TEAM = {
   migrator: getAddress('0x70f4b83795Af9236dA8211CDa3b031E503C00970'),
 } as const
 
-/** Wallets that see Remy Admin (hidden from everyone else, not protected: the data is public chain data). */
-export const ADMINS: readonly Address[] = [TEAM.owner, TEAM.migrator, getAddress('0x07a145DbBc7e425d0F1B3B9982F955E97abad7a2')]
-
-/** Remy admin index API (Cloudflare Worker `workers/remy-index`). */
-export const ADMIN_API: string = (env.VITE_ADMIN_API || 'https://basedremyboys.club').replace(/\/$/, '')
-
 /** First block worth scanning for fREMY/ETH pool and position logs (vault deploy; the pool opened just after). */
 export const POOL_START_BLOCK = 51884322n
 
