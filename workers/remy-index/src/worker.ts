@@ -4,6 +4,8 @@ export interface Env {
   INDEX: KVNamespace
   /** Secret for GET /api/admin/refresh?key=…[&full] (manual run; `full` forces a rebuild). */
   REFRESH_KEY?: string
+  /** Secret: Alchemy `remy index` server key, the only RPC for Base and Ethereum mainnet reads. */
+  ALCHEMY_API_KEY: string
 }
 
 /** KV keys: full snapshot JSON, indexer state, and small run metadata for /health and /stats. */
@@ -45,7 +47,7 @@ async function run(env: Env, force = false): Promise<RunMeta> {
   const stored = await env.INDEX.get<IndexState>(K.state, 'json')
   const prev = stored?.v === 1 && stored.builtAt ? stored : null
   try {
-    const result = await runIndex(prev, force)
+    const result = await runIndex(prev, env.ALCHEMY_API_KEY, force)
     if (result.quiet) {
       const body = await env.INDEX.get(K.snapshot)
       const generatedAt = new Date().toISOString()

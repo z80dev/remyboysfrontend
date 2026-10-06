@@ -23,9 +23,11 @@ const statePath = join(dir, 'state.json')
 const prev: IndexState | null =
   !values.fresh && existsSync(statePath) ? ((await Bun.file(statePath).json()) as IndexState) : null
 
+const alchemyKey = process.env.ALCHEMY_API_KEY
+if (!alchemyKey) throw new Error('set ALCHEMY_API_KEY (the Alchemy `remy index` server key)')
 const cpu0 = process.cpuUsage()
 // The local runner always rebuilds (quiet runs only make sense against the Worker's stored snapshot).
-const result = await runIndex(prev, true)
+const result = await runIndex(prev, alchemyKey, true)
 const cpu = process.cpuUsage(cpu0)
 if (result.quiet) throw new Error('unreachable: forced run came back quiet')
 const { snapshot, state, stats } = result

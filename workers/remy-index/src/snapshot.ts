@@ -2,12 +2,10 @@ import { keccak_256 } from '@noble/hashes/sha3'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils'
 import {
   A,
-  BASE_RPCS,
   BLOCKSCOUT,
   LABELS,
   LEGACY_KEYS,
   type LegacyKey,
-  MAINNET_RPCS,
   POOL_ID,
   SEL,
   START_BLOCK,
@@ -18,6 +16,7 @@ import {
   type TokenKey,
   USER_AGENT,
   WHALE_EXCLUDED,
+  alchemyRpcs,
 } from './config'
 import owedWave1 from './owed.json'
 import owedWave2 from './owed-2.json'
@@ -170,8 +169,8 @@ export type RunStats = {
 /** Small per-run record stored next to the snapshot (KV key `meta`) for /health and /stats. */
 export type RunMeta = { generatedAt: string; block: number; stats: RunStats; lastError?: { at: string; message: string } }
 
-const LOG_RANGE = 500 // mainnet.base.org caps eth_getLogs at 500 blocks (was 2,000 until early October 2026)
-const MAX_LOG_CHUNKS = 120 // per run (60,000 blocks); a stale cursor catches up over several runs
+const LOG_RANGE = 10_000 // Alchemy takes wide eth_getLogs ranges; responses cap at 10k logs
+const MAX_LOG_CHUNKS = 120 // per run (1.2M blocks); a stale cursor catches up over several runs
 const SWEEP_STEP = 2000 // ownerOf ids per extra holders() call when the collection grows past the guess
 const E18 = 10n ** 18n
 const SCOUT_EVERY_MS = 6 * 3600_000 // Blockscout is only a candidate cross-check once the log cursor is live
@@ -244,10 +243,11 @@ export type RunResult = { stats: RunStats } & (
  * block/time move). Otherwise verifies every candidate balance on-chain at a single pinned block and assembles
  * the admin snapshot. Pure apart from network I/O; the caller persists the result.
  */
-export async function runIndex(prev: IndexState | null, force = false): Promise<RunResult> {
+export async function runIndex(prev: IndexState | null, alchemyKey: string, force = false): Promise<RunResult> {
   const started = Date.now()
   const meter = new Meter()
-  const base = new Rpc(BASE_RPCS, meter)
+  const rpcs = alchemyRpcs(alchemyKey)
+  const base = new Rpc(rpcs.base, meter)
   const warnings: string[] = []
 
   const head = Number(await base.call<string>('eth_blockNumber', []))
@@ -515,7 +515,7 @@ export async function runIndex(prev: IndexState | null, force = false): Promise<
     target: A.ensUniversalResolver,
     data: `${SEL.reverse}${word(64)}${word(60)}${word(20)}${a.slice(2).padEnd(64, '0')}`,
   }))
-  const mainnet = new Rpc(MAINNET_RPCS, meter)
+  const mainnet = new Rpc(rpcs.mainnet, meter)
   const [r3, ensRet] = await Promise.all([
     codeQuery.length || nameQuery.length
       ? base.batch([lensCodes(codeQuery, B), lensWords(A.baseL2ReverseRegistrar, SEL.nameForAddr, nameQuery, 4, B)])

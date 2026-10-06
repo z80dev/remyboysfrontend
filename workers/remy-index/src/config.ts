@@ -2,15 +2,11 @@
 
 import type { Endpoint } from './rpc'
 
-// publicnode takes large batches and wide log ranges; mainnet.base.org allows 10 calls per batch and rate-limits.
-export const BASE_RPCS: Endpoint[] = [
-  { url: 'https://base-rpc.publicnode.com', maxBatch: 40 },
-  { url: 'https://mainnet.base.org', maxBatch: 10 },
-]
-export const MAINNET_RPCS: Endpoint[] = [
-  { url: 'https://ethereum-rpc.publicnode.com', maxBatch: 20 },
-  { url: 'https://eth.drpc.org', maxBatch: 10 },
-]
+/** Alchemy server key only (Worker secret `ALCHEMY_API_KEY`); public RPCs rate-limit and cap log ranges. */
+export const alchemyRpcs = (key: string): { base: Endpoint[]; mainnet: Endpoint[] } => ({
+  base: [{ url: `https://base-mainnet.g.alchemy.com/v2/${key}`, maxBatch: 50 }],
+  mainnet: [{ url: `https://eth-mainnet.g.alchemy.com/v2/${key}`, maxBatch: 50 }],
+})
 export const BLOCKSCOUT = 'https://base.blockscout.com'
 export const USER_AGENT = 'remy-index/1 (+https://basedremyboys.club)'
 
