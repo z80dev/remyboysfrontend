@@ -2,8 +2,9 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { type Address, formatUnits, parseUnits } from 'viem'
 import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { readContract } from 'wagmi/actions'
-import { erc20Abi, routerAbi, vaultAbi } from '../abis'
+import { erc20Abi, routerAbi } from '../abis'
 import { EXPLORER, NEW } from '../config'
+import { useDataSnapshot } from '../lib/data'
 import { deadline, fmt, shortAddr } from '../lib/format'
 import { useQuote } from '../lib/pool'
 import { POOL_KEY, type PoolData, type Position, type Trade, closeStep, collectStep, mintSteps, removeStep, usePoolData, usePositions } from '../lib/trader'
@@ -339,7 +340,12 @@ function OrderTicket({ pool, tx, navigate }: { pool: PoolData; tx: TxUi; navigat
   const quote = useQuote(POOL_KEY, side, amount)
   const quoted = quote.data?.[0]
   const { data: eth } = useBalance({ address, query: { enabled: !!address } })
-  const { data: fremy } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'balanceOf', args: address ? [address] : undefined })
+  const { data: fremy } = useReadContract({
+    address: NEW.fremy,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+  })
   const avg = quoted && amount ? Number(quoted) / Number(amount) : undefined
   const impact = avg ? (side === 'buy' ? avg / pool.price - 1 : 1 - avg / pool.price) : undefined
   const bps = BigInt(Math.round(slip * 100))
@@ -366,7 +372,12 @@ function OrderTicket({ pool, tx, navigate }: { pool: PoolData; tx: TxUi; navigat
             {
               label: 'Approve fREMY',
               request: async () =>
-                (await readContract(config, { address: NEW.fremy, abi: erc20Abi, functionName: 'allowance', args: [me, NEW.router] })) >= amount
+                (await readContract(config, {
+                  address: NEW.fremy,
+                  abi: erc20Abi,
+                  functionName: 'allowance',
+                  args: [me, NEW.router],
+                })) >= amount
                   ? null
                   : { address: NEW.fremy, abi: erc20Abi, functionName: 'approve', args: [NEW.router, amount] },
             },
@@ -483,10 +494,38 @@ const STEP = `${((1.0001 ** SPACING - 1) * 100).toFixed(2)}%`
 
 /** Range presets pinned to exact ticks; "curve" is the launch position's range (#3094976). */
 const PRESETS = [
-  { id: 'curve', name: 'Stack on the floor curve', label: '0.0015–0.015', tickLower: 41800, tickUpper: 65000, blurb: 'fREMY spread from the floor to 10×, alongside the launch position.' },
-  { id: 'near', name: 'Near the floor', label: '0.0015–0.005', tickLower: 52800, tickUpper: 65000, blurb: 'fREMY concentrated close to the floor: earns the most while the price stays low.' },
-  { id: 'bid', name: 'Floor bid', label: '0.001–0.0015', tickLower: 65000, tickUpper: 69000, blurb: 'ETH that buys fREMY back if the price dips under the floor.' },
-  { id: 'custom', name: 'Custom range', label: '', tickLower: 0, tickUpper: 0, blurb: `Your own min and max price, on ${STEP} steps.` },
+  {
+    id: 'curve',
+    name: 'Stack on the floor curve',
+    label: '0.0015–0.015',
+    tickLower: 41800,
+    tickUpper: 65000,
+    blurb: 'fREMY spread from the floor to 10×, alongside the launch position.',
+  },
+  {
+    id: 'near',
+    name: 'Near the floor',
+    label: '0.0015–0.005',
+    tickLower: 52800,
+    tickUpper: 65000,
+    blurb: 'fREMY concentrated close to the floor: earns the most while the price stays low.',
+  },
+  {
+    id: 'bid',
+    name: 'Floor bid',
+    label: '0.001–0.0015',
+    tickLower: 65000,
+    tickUpper: 69000,
+    blurb: 'ETH that buys fREMY back if the price dips under the floor.',
+  },
+  {
+    id: 'custom',
+    name: 'Custom range',
+    label: '',
+    tickLower: 0,
+    tickUpper: 0,
+    blurb: `Your own min and max price, on ${STEP} steps.`,
+  },
 ] as const
 
 function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: () => void }) {
@@ -496,7 +535,12 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
   const [cMax, setCMax] = useState('0.01')
   const [amt, setAmt] = useState('')
   const { data: eth } = useBalance({ address, query: { enabled: !!address } })
-  const { data: fremyBal } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'balanceOf', args: address ? [address] : undefined })
+  const { data: fremyBal } = useReadContract({
+    address: NEW.fremy,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+  })
 
   const p = PRESETS.find((x) => x.id === preset) ?? PRESETS[0]
   // Custom prices snap to the nearest grid step; the min price sets the upper tick (ETH per fREMY = 1.0001^-tick).
@@ -869,16 +913,9 @@ export function Trader({ param, navigate }: AppProps) {
   const setTab = (t: Tab) => navigate(`trader/${t}`)
   const tx = useTxUi()
   const pool = usePoolData()
-  const { data: inventory } = useReadContract({ address: NEW.vault, abi: vaultAbi, functionName: 'inventoryCount', query: { refetchInterval: 30_000 } })
-  const { data: supply } = useReadContract({ address: NEW.fremy, abi: erc20Abi, functionName: 'totalSupply', query: { staleTime: Number.POSITIVE_INFINITY } })
-  const { data: inVault } = useReadContract({
-    address: NEW.fremy,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [NEW.vault],
-    query: { refetchInterval: 30_000 },
-  })
-  const outside = supply !== undefined && inVault !== undefined ? supply - inVault : undefined
+  const { data: snapshot } = useDataSnapshot()
+  const inventory = snapshot ? BigInt(snapshot.stats.inventory) : undefined
+  const outside = snapshot ? BigInt(snapshot.stats.fremySupply) - BigInt(snapshot.stats.fremyInVault) : undefined
 
   return (
     <div className="app-col trader">

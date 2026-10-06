@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useAccount, useBalance, useBlockNumber, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useBalance, useConnect, useDisconnect } from 'wagmi'
+import { useDataSnapshot } from '../lib/data'
 import { fmt, shortAddr } from '../lib/format'
 import { chain } from '../wagmi'
-import { appById } from './apps'
 import { BalloonHost } from './Balloons'
+import { StartMenu } from './StartMenu'
+import { appById } from './apps'
 import { FlagMark, Icon } from './icons'
 import { connectorLabel } from './shell'
-import { StartMenu } from './StartMenu'
 
 /** Close a popover on outside pointer-down or Escape. */
 export function useOutside<T extends HTMLElement>(open: boolean, close: () => void) {
@@ -100,7 +101,8 @@ function Tray() {
   const close = useCallback(() => setOpen(false), [])
   const ref = useOutside<HTMLDivElement>(open, close)
   const { address, chainId } = useAccount()
-  const { data: block, isError } = useBlockNumber({ chainId: chain.id, watch: false, query: { refetchInterval: 30_000 } })
+  const { data: snapshot, isError } = useDataSnapshot()
+  const block = snapshot?.block.number
   const now = useClock()
   const wrong = !!address && chainId !== chain.id
 

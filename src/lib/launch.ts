@@ -2,9 +2,9 @@ import { type Address, isAddressEqual } from 'viem'
 import { useReadContract, useReadContracts } from 'wagmi'
 import { erc20Abi, legacyVaultAbi, remyAbi } from '../abis'
 import { ADDR, ADMINS, NEW, TEAM } from '../config'
-import { type PoolKey, usePoolKey, useQuote, useSpotPrice } from './pool'
-
-const ONE = 10n ** 18n
+import { useDataSnapshot } from './data'
+import type { PoolKey } from './pool'
+import { ethPriceAtSqrt } from './v4math'
 
 /** fREMY/ETH pool status; `spot` is ETH per fREMY. */
 export interface PoolState {
@@ -34,10 +34,13 @@ export interface LaunchState {
  * below the start tick, so in-range liquidity alone is not a usable signal.
  */
 export function usePoolState(): PoolState {
-  const key = usePoolKey(NEW.router)
-  const spot = useSpotPrice(key)
-  const quote = useQuote(spot !== undefined ? key : undefined, 'buy', ONE)
-  return { key, spot, live: spot !== undefined && quote.data !== undefined, loading: key === undefined || (spot !== undefined && quote.isLoading) }
+  const { data, isLoading } = useDataSnapshot()
+  return {
+    key: data?.pool.key,
+    spot: data ? ethPriceAtSqrt(BigInt(data.pool.slot0[0])) : undefined,
+    live: !!data && data.pool.buyOneQuote !== null,
+    loading: isLoading,
+  }
 }
 
 /** The legacy vault redeems only once the converter owns it (MigratorRouter.transfer_vault_ownership). */
@@ -79,8 +82,7 @@ export function teamRole(address?: Address): 'Collection owner' | 'Legacy vault 
 export const isAdmin = (address?: Address) => !!address && ADMINS.some((a) => isAddressEqual(a, address))
 
 /** The owner's rbREMY has reached the deployer (or the pool is already live); undefined while loading. */
-export const seedFundsSent = (s: LaunchState): boolean | undefined =>
-  s.pool.live ? true : s.ownerRb === undefined ? undefined : s.ownerRb === 0n
+export const seedFundsSent = (s: LaunchState): boolean | undefined => (s.pool.live ? true : s.ownerRb === undefined ? undefined : s.ownerRb === 0n)
 
 /** Launch steps `address` still has to sign, in checklist order; undefined while any input is loading. */
 export function pendingSignatures(address: Address, s: LaunchState): string[] | undefined {

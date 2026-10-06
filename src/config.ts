@@ -8,9 +8,12 @@ function addressOr(value: string | undefined, fallback: string): Address {
 }
 
 /** RPC used for reads. Point at a local anvil fork with VITE_RPC_URL=http://127.0.0.1:8552. */
-export const RPC_URL: string | undefined = env.VITE_RPC_URL || undefined
-/** RPC advertised to wallets when adding the chain (defaults to VITE_RPC_URL, then Base's public RPC). */
-export const CHAIN_RPC: string = env.VITE_CHAIN_RPC || RPC_URL || 'https://mainnet.base.org'
+export const RPC_URL: string | undefined =
+  env.VITE_RPC_URL || (env.VITE_ALCHEMY_API_KEY ? `https://base-mainnet.g.alchemy.com/v2/${env.VITE_ALCHEMY_API_KEY}` : undefined)
+/** Shared server data. Forks must configure a matching data service. */
+export const DATA_API: string = (env.VITE_DATA_API || 'https://basedremyboys.club/api/data').replace(/\/$/, '')
+/** Wallet chain registration uses its own RPC; the browser key only accepts the website origin. */
+export const CHAIN_RPC: string = env.VITE_CHAIN_RPC || env.VITE_RPC_URL || 'https://mainnet.base.org'
 export const EXPLORER = 'https://basescan.org'
 export const WALLETCONNECT_PROJECT_ID = 'd98b79aeb44471c27770f6ea2657fd17'
 export const IPFS_GATEWAY = 'https://gateway.pinata.cloud/ipfs/'
@@ -67,7 +70,6 @@ export const TOTAL_SUPPLY_HINT = 4490
 export const LINKS = [
   { label: 'Twitter', href: 'https://x.com/basedremyboys' },
   { label: 'OpenSea', href: 'https://opensea.io/collection/remy-boys' },
-  { label: 'Magic Eden', href: 'https://magiceden.io/collections/base/0x3e9e529e32ad2821bdbfda348c2f9da94b43976c' },
   { label: 'Telegram', href: 'https://t.me/+0he27MlVgxU2OTQx' },
 ] as const
 

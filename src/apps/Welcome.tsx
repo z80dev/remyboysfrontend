@@ -1,6 +1,5 @@
-import { useReadContract } from 'wagmi'
-import { remyAbi, vaultAbi } from '../abis'
-import { ADDR, LINKS, NEW } from '../config'
+import { ADDR, LINKS } from '../config'
+import { useDataSnapshot } from '../lib/data'
 import { remyImg } from '../lib/media'
 import type { AppProps } from '../os/apps'
 import { Icon, RemyFlag } from '../os/icons'
@@ -24,18 +23,30 @@ const NEWS = [
     title: 'Remy Vault',
     text: 'A new vault backed 1:1 by Remys. Every fREMY redeems any Remy in the vault, and the fREMY/ETH pool lets you buy the floor with ETH.',
   },
-  { id: 'legacy', icon: 'exchange', title: 'Legacy Exchange', text: 'rbREMY, staked rbREMYLS and wREMY convert into fREMY at the fixed old rates.' },
-  { id: 'approvals', icon: 'approvals', title: 'Approvals Manager', text: 'Check which marketplaces can move your Remys and revoke them in one click.' },
-  { id: 'remix', icon: 'remix', title: 'Remy Remix Studio', text: 'Pick any original Remy and make a new image with AI. Choose a look, compare it with the source, and download your result.' },
+  {
+    id: 'legacy',
+    icon: 'exchange',
+    title: 'Legacy Exchange',
+    text: 'rbREMY, staked rbREMYLS and wREMY convert into fREMY at the fixed old rates.',
+  },
+  {
+    id: 'approvals',
+    icon: 'approvals',
+    title: 'Approvals Manager',
+    text: 'Check which marketplaces can move your Remys and revoke them in one click.',
+  },
+  {
+    id: 'remix',
+    icon: 'remix',
+    title: 'Remy Remix Studio',
+    text: 'Pick any original Remy and make a new image with AI. Choose a look, compare it with the source, and download your result.',
+  },
 ]
 
 export function Welcome({ navigate }: AppProps) {
-  const { data: supply } = useReadContract({ address: ADDR.remy, abi: remyAbi, functionName: 'totalSupply' })
-  const { data: inv } = useReadContract({
-    address: NEW.vault,
-    abi: vaultAbi,
-    functionName: 'inventoryCount',
-  })
+  const { data } = useDataSnapshot()
+  const supply = data ? BigInt(data.stats.collectionSupply) : undefined
+  const inv = data ? BigInt(data.stats.inventory) : undefined
 
   return (
     <div className="welcome scroll">
@@ -51,12 +62,7 @@ export function Welcome({ navigate }: AppProps) {
       <div className="wel-body">
         <aside className="wel-side">
           <figure className="photo">
-            <img
-              {...remyImg(2069, '(max-width: 720px) 120px, 190px')}
-              alt="Remy Boy #2069, green hair, holding a baguette"
-              width={600}
-              height={600}
-            />
+            <img {...remyImg(2069, '(max-width: 720px) 120px, 190px')} alt="Remy Boy #2069, green hair, holding a baguette" width={600} height={600} />
             <figcaption>Remy Boy #2069</figcaption>
           </figure>
           <dl className="kv wel-stats">

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Address } from 'viem'
-import { useAccount, useBalance, useReadContracts } from 'wagmi'
+import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { readContract } from 'wagmi/actions'
 import { erc20Abi, remyAbi, routerAbi, vaultAbi } from '../abis'
 import { ADDR, NEW } from '../config'
 import { useArtIndexes } from '../lib/art'
+import { useDataSnapshot } from '../lib/data'
 import { deadline, fmt } from '../lib/format'
-import { useOwnedIds } from '../lib/owned'
 import { usePoolState } from '../lib/launch'
+import { useOwnedIds } from '../lib/owned'
 import { useQuote } from '../lib/pool'
 import type { TxStep } from '../lib/tx'
 import type { AppProps } from '../os/apps'
@@ -69,15 +70,16 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
   // biome-ignore lint/correctness/useExhaustiveDependencies: switching folders clears the selection
   useEffect(() => setSelected(new Set()), [tab])
 
-  const { data: stats } = useReadContracts({
-    contracts: [
-      { address: vault, abi: vaultAbi, functionName: 'inventoryCount' },
-      { address: vault, abi: vaultAbi, functionName: 'maxBatch' },
-      { address: fremy, abi: erc20Abi, functionName: 'balanceOf', args: [address ?? vault] },
-    ],
-    allowFailure: false,
+  const { data: snapshot } = useDataSnapshot()
+  const invCount = snapshot ? BigInt(snapshot.stats.inventory) : undefined
+  const maxBatchBig = snapshot ? BigInt(snapshot.stats.maxBatch) : undefined
+  const { data: fremyBal } = useReadContract({
+    address: fremy,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
   })
-  const [invCount, maxBatchBig, fremyBal] = stats ?? []
   const maxBatch = Number(maxBatchBig ?? 100n)
   const { data: ethBal } = useBalance({ address, query: { enabled: !!address } })
 
@@ -105,7 +107,12 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
   const nftApproval = (operator: Address): TxStep => ({
     label: 'Approve Remys',
     request: async () =>
-      (await readContract(config, { address: ADDR.remy, abi: remyAbi, functionName: 'isApprovedForAll', args: [me, operator] }))
+      (await readContract(config, {
+        address: ADDR.remy,
+        abi: remyAbi,
+        functionName: 'isApprovedForAll',
+        args: [me, operator],
+      }))
         ? null
         : { address: ADDR.remy, abi: remyAbi, functionName: 'setApprovalForAll', args: [operator, true] },
   })
@@ -129,7 +136,12 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
         {
           label: 'Approve fREMY',
           request: async () =>
-            (await readContract(config, { address: fremy, abi: erc20Abi, functionName: 'allowance', args: [me, vault] })) >= amount
+            (await readContract(config, {
+              address: fremy,
+              abi: erc20Abi,
+              functionName: 'allowance',
+              args: [me, vault],
+            })) >= amount
               ? null
               : { address: fremy, abi: erc20Abi, functionName: 'approve', args: [vault, amount] },
         },
@@ -239,7 +251,13 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
             disabled: tx.busy || !nSel || !quoted,
             primary: true,
           },
-          { key: 'deposit', icon: 'coin', label: nSel ? `Deposit ${nSel} for fREMY` : 'Deposit selected for fREMY', run: deposit, disabled: tx.busy || !nSel },
+          {
+            key: 'deposit',
+            icon: 'coin',
+            label: nSel ? `Deposit ${nSel} for fREMY` : 'Deposit selected for fREMY',
+            run: deposit,
+            disabled: tx.busy || !nSel,
+          },
         ]
   const pager = tab === 'buy' ? <Pager page={page} pages={inv.pages} set={setPage} /> : <Pager page={myPage} pages={mine.pages} set={setMyPage} />
 
