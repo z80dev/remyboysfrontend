@@ -76,6 +76,32 @@ export function ethPriceAtSqrt(sqrtPriceX96: bigint): number {
 
 export const ethPriceAtTick = (tick: number) => 1.0001 ** -tick
 
+/** A price range relative to the live floor, snapped to the pool grid. Floor asks/bids stay single-sided. */
+export function floorRelativeRange(sqrtP: bigint, minMultiple: number, maxMultiple: number, spacing: number) {
+  if (
+    !Number.isInteger(spacing) ||
+    spacing <= 0 ||
+    !(minMultiple > 0) ||
+    !(maxMultiple > minMultiple) ||
+    !Number.isFinite(maxMultiple) ||
+    sqrtP < getSqrtPriceAtTick(MIN_TICK) ||
+    sqrtP > getSqrtPriceAtTick(MAX_TICK)
+  ) return undefined
+  const floor = ethPriceAtSqrt(sqrtP)
+  let tickLower = nearestTickForEthPrice(floor * maxMultiple, spacing)
+  let tickUpper = nearestTickForEthPrice(floor * minMultiple, spacing)
+  if (tickLower === undefined || tickUpper === undefined) return undefined
+  const floorTick = Math.floor(getTickAtSqrtPrice(sqrtP) / spacing) * spacing
+  // ETH/fREMY price is inverted: asks start at or above spot; bids end at or below spot.
+  if (minMultiple === 1) tickUpper = floorTick
+  if (maxMultiple === 1) {
+    tickLower = floorTick < MIN_TICK || getSqrtPriceAtTick(floorTick) < sqrtP ? floorTick + spacing : floorTick
+  }
+  const maxTick = Math.floor(MAX_TICK / spacing) * spacing
+  if (tickLower < -maxTick || tickUpper > maxTick || tickLower >= tickUpper) return undefined
+  return { tickLower, tickUpper }
+}
+
 /* SqrtPriceMath deltas (sqrtA < sqrtB). */
 export function amount0Delta(x: bigint, y: bigint, liquidity: bigint, roundUp: boolean): bigint {
   const [sqrtA, sqrtB] = x < y ? [x, y] : [y, x]

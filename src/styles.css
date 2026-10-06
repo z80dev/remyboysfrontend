@@ -4230,8 +4230,14 @@ button.thumb {
 /* Market Maker */
 .mm {
   display: grid;
+  gap: 14px;
+  container-type: inline-size;
+}
+
+.mm-body {
+  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -4242,79 +4248,394 @@ button.thumb {
   min-width: 0;
 }
 
-.presets {
+.mm-designer {
+  padding: 18px;
+  border: 1px solid #c1cad8;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #fff, #f5f8fc);
+  box-shadow: 0 2px 4px #1437670a;
+}
+
+.mm-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.mm-eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: #56708d;
+}
+
+.mm-heading h2 {
+  margin: 4px 0 0;
+  font-size: 23px;
+  font-weight: normal;
+  letter-spacing: -0.5px;
+  color: #102b4c;
+}
+
+.mm-floor {
   display: grid;
   gap: 4px;
-  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 3px solid #316ac5;
+  background: #eaf1fb;
+  color: #234b7b;
+}
+
+.mm-floor > span {
+  font-size: 10px;
+}
+
+.mm-floor b {
+  font-size: 14px;
+}
+
+.mm-floor small {
+  font-size: 10px;
+  font-weight: normal;
+}
+
+.mm-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
   padding: 0;
   border: 0;
 }
 
-.preset {
+.mm-mode {
+  position: relative;
   display: grid;
-  gap: 1px;
-  padding: 6px 8px;
-  border: 1px solid transparent;
+  grid-template-columns: 28px 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  padding: 12px 10px;
+  border: 1px solid #c7d0df;
   border-radius: 3px;
+  background: #fff;
   cursor: pointer;
+  color: #30465f;
 }
 
-.preset b {
-  color: #003399;
+.mm-mode input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
 }
 
-.preset small {
-  color: #555;
+.mm-mode-icon {
+  grid-row: span 2;
+  font-size: 27px;
+  color: #7590ad;
+}
+
+.mm-mode b {
+  font-size: 12px;
+}
+
+.mm-mode small {
+  font-size: 10px;
+  color: #697789;
+}
+
+.mm-mode:hover {
+  border-color: #316ac5;
+  background: #f7faff;
+}
+
+.mm-mode.on {
+  border-color: #316ac5;
+  background: #eaf2ff;
+  box-shadow: inset 0 -2px #316ac5;
+}
+
+.mm-mode.on .mm-mode-icon {
+  color: #316ac5;
+}
+
+.mm-mode:focus-within,
+.mm-exact-toggle:focus-visible {
+  outline: 2px solid #316ac5;
+  outline-offset: 2px;
+}
+
+.mm-explain {
+  margin: 12px 0 18px;
+  color: #54667a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mm-range-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.mm-widths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.mm-widths .chip {
+  padding: 5px 10px;
   font-size: 11px;
 }
 
-.preset:hover {
-  border-color: #c6d3f7;
-  background: #f4f8ff;
+.mm-widths .chip.on {
+  border-color: #316ac5;
+  color: #124692;
+  background: #eaf2ff;
 }
 
-.preset.on {
-  border-color: var(--sel);
-  background: linear-gradient(to bottom, #eef4ff, #d6e4fb);
-  box-shadow: inset 3px 0 var(--sel);
+.mm-exact-toggle {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: #245ba6;
+  text-decoration: underline;
+  font-size: 11px;
+  cursor: pointer;
 }
 
-.preset:focus-within {
-  outline: 1px dotted #000;
+.mm-range-plot {
+  padding: 12px 16px;
+  border: 1px solid #274767;
+  border-radius: 4px;
+  background: linear-gradient(110deg, #11263e, #1c3552);
+  color: #91aecb;
 }
 
-.mm-snap {
-  margin-top: 4px;
+.mm-plot-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
 }
 
-/* XP up-down control beside a price field: two stacked arrow buttons. */
-.spin {
-  display: inline-flex;
-  flex-direction: column;
-  margin-left: -1px;
+.mm-plot-track {
+  position: relative;
+  height: 28px;
+  margin: 28px 0 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(to right, #ffffff07 0, #ffffff07 calc(10% - 1px), #ffffff19 calc(10% - 1px), #ffffff19 10%);
+  box-shadow: inset 0 0 0 1px #ffffff18;
 }
 
-.spin button {
-  width: 17px;
-  height: 12px;
-  padding: 0;
-  border: 1px solid var(--field-border);
-  background: linear-gradient(to bottom, #fff, #e8e7e0);
-  font-size: 7px;
-  line-height: 10px;
-  color: #333;
+.mm-plot-selection {
+  position: absolute;
+  inset: 0 auto 0 var(--range-start);
+  width: var(--range-width);
+  min-width: 2px;
+  border: 1px solid #89b9fe;
+  border-radius: 2px;
+  background: linear-gradient(to right, #448afbbb, #83b7ffaa);
 }
 
-.spin button + button {
-  margin-top: -1px;
+.mm-plot-selection::before,
+.mm-plot-selection::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  background: #d9eaff;
 }
 
-.spin button:hover {
-  background: linear-gradient(to bottom, #fff, #fbe7b8);
+.mm-plot-selection::before { left: 3px; }
+.mm-plot-selection::after { right: 3px; }
+
+.mm-plot-floor {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: var(--floor-at);
+  width: 2px;
+  background: #efdc8c;
 }
 
-.spin button:active {
-  background: linear-gradient(to bottom, #e3e2da, #fff);
+.mm-plot-floor span {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: bold;
+  color: #efdc8c;
+}
+
+.mm-boundaries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.mm-boundary {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d3dce7;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.mm-boundary label {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: bold;
+  color: #30465f;
+}
+
+.mm-boundary label span {
+  font-size: 10px;
+  font-weight: normal;
+  color: #6a7e94;
+}
+
+.mm-boundary-price {
+  margin: 10px 0 6px;
+  font-size: 19px;
+  color: #15395f;
+}
+
+.mm-boundary-price small {
+  font-size: 11px;
+  color: #6a7e94;
+}
+
+.mm-boundary input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: #316ac5;
+  cursor: pointer;
+}
+
+.mm-exact-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: #6a7e94;
+  font-size: 11px;
+}
+
+.mm-exact-input .input {
+  min-width: 0;
+  width: 100%;
+}
+
+.mm-range-note {
+  margin: 12px 0 0;
+  font-size: 10px;
+  color: #6a7e94;
+  line-height: 1.5;
+}
+
+.mm-deposit-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+  color: #54667a;
+}
+
+.mm-summary-range {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 16px;
+}
+
+.mm-summary-range > small {
+  color: #54667a;
+}
+
+.mm-summary-range b {
+  font-size: 15px;
+  color: #15395f;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mm-summary .kv {
+  font-size: 11px;
+}
+
+.mm-summary .kv dd {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mm-fee-note {
+  padding: 10px;
+  border: 1px solid #cee0d1;
+  border-radius: 3px;
+  color: #2d613b;
+  background: #f0f8f1;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.mm-details {
+  border-top: 1px solid #c1cad8;
+  padding-top: 12px;
+}
+
+.mm-details summary {
+  color: #30465f;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.mm-details summary span {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: normal;
+  color: #697789;
+}
+
+.mm-details > .mm-body {
+  margin-top: 14px;
+}
+
+@container (max-width: 620px) {
+  .mm-body { grid-template-columns: minmax(0, 1fr); }
+  .mm-modes { gap: 5px; }
+  .mm-mode { grid-template-columns: 1fr; gap: 6px; padding: 10px 8px; }
+  .mm-mode-icon { grid-row: auto; font-size: 23px; }
+}
+
+@container (max-width: 400px) {
+  .mm-designer { padding: 12px; }
+  .mm-heading { align-items: start; }
+  .mm-heading h2 { font-size: 20px; }
+  .mm-floor { padding: 6px 8px; }
+  .mm-floor b { font-size: 12px; }
+  .mm-mode b { font-size: 11px; }
+  .mm-mode small { font-size: 9px; }
+  .mm-boundaries { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .mm-boundary-price { font-size: 18px; }
+  .mm-details summary span { display: block; margin: 4px 0 0 16px; }
 }
 
 .side-badge {
