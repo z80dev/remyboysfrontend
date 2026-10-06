@@ -14,6 +14,7 @@ export const remyAbi = parseAbi([
 ])
 
 export const reclaimAbi = parseAbi([
+  'function remy() view returns (address)',
   'function owed(address victim) view returns (uint256[])',
   'function claimed(address victim) view returns (uint256)',
   'function remaining(address victim) view returns (uint256)',
@@ -101,6 +102,7 @@ export const positionManagerAbi = parseAbi([
 export const permit2Abi = parseAbi([
   'function approve(address token, address spender, uint160 amount, uint48 expiration)',
   'function allowance(address user, address token, address spender) view returns (uint160 amount, uint48 expiration, uint48 nonce)',
+  'function transferFrom(address from, address to, uint160 amount, address token)',
 ])
 
 /** PoolManager events for one pool (the pool id is the first indexed topic). */

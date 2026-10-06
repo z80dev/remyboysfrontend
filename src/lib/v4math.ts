@@ -58,16 +58,6 @@ export function getTickAtSqrtPrice(sqrtPriceX96: bigint): number {
   return t
 }
 
-/**
- * Nearest tick on the spacing grid for an ETH-per-fREMY price (ethPriceAtTick(t) = 1.0001^-t).
- * Undefined for non-positive prices or prices beyond the pool's usable tick range.
- */
-export function nearestTickForEthPrice(ethPerFremy: number, spacing: number): number | undefined {
-  if (!(ethPerFremy > 0) || !Number.isFinite(ethPerFremy)) return undefined
-  const tick = Math.round(-Math.log(ethPerFremy) / Math.log(1.0001) / spacing) * spacing
-  return Math.abs(tick) > Math.floor(MAX_TICK / spacing) * spacing ? undefined : tick
-}
-
 /** ETH per fREMY at a pool sqrt price. */
 export function ethPriceAtSqrt(sqrtPriceX96: bigint): number {
   const s = Number(sqrtPriceX96) / 2 ** 96
@@ -75,32 +65,6 @@ export function ethPriceAtSqrt(sqrtPriceX96: bigint): number {
 }
 
 export const ethPriceAtTick = (tick: number) => 1.0001 ** -tick
-
-/** A price range relative to the live floor, snapped to the pool grid. Floor asks/bids stay single-sided. */
-export function floorRelativeRange(sqrtP: bigint, minMultiple: number, maxMultiple: number, spacing: number) {
-  if (
-    !Number.isInteger(spacing) ||
-    spacing <= 0 ||
-    !(minMultiple > 0) ||
-    !(maxMultiple > minMultiple) ||
-    !Number.isFinite(maxMultiple) ||
-    sqrtP < getSqrtPriceAtTick(MIN_TICK) ||
-    sqrtP > getSqrtPriceAtTick(MAX_TICK)
-  ) return undefined
-  const floor = ethPriceAtSqrt(sqrtP)
-  let tickLower = nearestTickForEthPrice(floor * maxMultiple, spacing)
-  let tickUpper = nearestTickForEthPrice(floor * minMultiple, spacing)
-  if (tickLower === undefined || tickUpper === undefined) return undefined
-  const floorTick = Math.floor(getTickAtSqrtPrice(sqrtP) / spacing) * spacing
-  // ETH/fREMY price is inverted: asks start at or above spot; bids end at or below spot.
-  if (minMultiple === 1) tickUpper = floorTick
-  if (maxMultiple === 1) {
-    tickLower = floorTick < MIN_TICK || getSqrtPriceAtTick(floorTick) < sqrtP ? floorTick + spacing : floorTick
-  }
-  const maxTick = Math.floor(MAX_TICK / spacing) * spacing
-  if (tickLower < -maxTick || tickUpper > maxTick || tickLower >= tickUpper) return undefined
-  return { tickLower, tickUpper }
-}
 
 /* SqrtPriceMath deltas (sqrtA < sqrtB). */
 export function amount0Delta(x: bigint, y: bigint, liquidity: bigint, roundUp: boolean): bigint {
@@ -175,9 +139,9 @@ function netByTick(ranges: Range[]) {
 export function simulateBuy(sqrtP: bigint, ranges: Range[], fremyOut: bigint) {
   const net = netByTick(ranges)
   const currentTick = getTickAtSqrtPrice(sqrtP)
-  let active = 0n
-  for (const r of ranges) if (r.tickLower <= currentTick && currentTick < r.tickUpper) active += r.liquidity
-  const below = [...net.keys()].filter((t) => getSqrtPriceAtTick(t) < sqrtP).sort((a, b) => b - a)
+  let active = liquidityAt(ranges, currentTick)
+  // `<=`: a price sitting exactly on an initialized tick crosses it before moving down.
+  const below = [...net.keys()].filter((t) => getSqrtPriceAtTick(t) <= sqrtP).sort((a, b) => b - a)
   let s = sqrtP
   let left = fremyOut
   let eth = 0n
@@ -198,6 +162,44 @@ export function simulateBuy(sqrtP: bigint, ranges: Range[], fremyOut: bigint) {
     active -= net.get(b) ?? 0n
   }
   return { ethIn: eth, sqrtAfter: s, filled: fremyOut - left }
+}
+
+/**
+ * Simulate selling `fremyIn` fREMY for ETH (price walks to higher ticks) across `ranges`, ignoring the swap fee.
+ * Returns the ETH received, the final price, and how much fREMY the liquidity absorbed.
+ */
+export function simulateSell(sqrtP: bigint, ranges: Range[], fremyIn: bigint) {
+  const net = netByTick(ranges)
+  let active = liquidityAt(ranges, getTickAtSqrtPrice(sqrtP))
+  const above = [...net.keys()].filter((t) => getSqrtPriceAtTick(t) > sqrtP).sort((a, b) => a - b)
+  const top = getSqrtPriceAtTick(MAX_TICK)
+  let s = sqrtP
+  let left = fremyIn
+  let eth = 0n
+  for (const b of [...above, null]) {
+    const sb = b === null ? top : getSqrtPriceAtTick(b)
+    if (active > 0n) {
+      const avail = amount1Delta(s, sb, active, true)
+      if (left <= avail) {
+        const next = s + mulDiv(left, Q96, active)
+        eth += amount0Delta(s, next, active, false)
+        return { ethOut: eth, sqrtAfter: next, filled: fremyIn }
+      }
+      eth += amount0Delta(s, sb, active, false)
+      left -= avail
+    }
+    if (b === null) break
+    s = sb
+    active += net.get(b) ?? 0n
+  }
+  return { ethOut: eth, sqrtAfter: s, filled: fremyIn - left }
+}
+
+/** Liquidity active at `tick`: ranges with tickLower <= tick < tickUpper. */
+export function liquidityAt(ranges: Range[], tick: number) {
+  let l = 0n
+  for (const r of ranges) if (r.tickLower <= tick && tick < r.tickUpper) l += r.liquidity
+  return l
 }
 
 /** fREMY and ETH held by `ranges` inside the tick band [tickA, tickB]. */

@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import { isAddressEqual } from 'viem'
 import { useAccount, useReadContracts } from 'wagmi'
 import { reclaimAbi, remyAbi } from '../abis'
 import { ADDR, EXPLORER, RECLAIM_BATCH } from '../config'
 import { useArtIndexes } from '../lib/art'
+import { type ReclaimWave, useReclaimState } from '../lib/reclaim'
 import type { TxStep } from '../lib/tx'
 import type { AppProps } from '../os/apps'
 import { useIsMobile } from '../os/shell'
@@ -14,22 +16,34 @@ const revokeStep: TxStep = {
   request: { address: ADDR.remy, abi: remyAbi, functionName: 'setApprovalForAll', args: [ADDR.paymentProcessor, false] },
 }
 
-function OwnerRow({ enabled, tx }: { enabled?: boolean; tx: TxUi }) {
+function OwnerRow({ waves, tx }: { waves: ReclaimWave[]; tx: TxUi }) {
+  const live = waves.filter((w) => w.deployed)
+  const enabled = live.length > 0 && live.every((w) => w.minting)
+  const anyOn = live.some((w) => w.minting)
   const set = (on: boolean) =>
-    tx.run([
-      {
-        label: on ? 'Enable claims' : 'Disable claims',
-        request: { address: ADDR.remy, abi: remyAbi, functionName: 'set_minter', args: [ADDR.reclaim, on] },
-      },
-    ])
+    tx.run(
+      live
+        .filter((w) => w.minting !== on)
+        .map((w) => ({
+          label: `${on ? 'Enable' : 'Disable'} claims (${w.label})`,
+          request: { address: ADDR.remy, abi: remyAbi, functionName: 'set_minter', args: [w.address, on] },
+        })),
+    )
   return (
-    <StatusRow tone={enabled ? 'ok' : 'warn'} icon="computer" title="Collection owner: claim minting" state={enabled ? 'ON' : 'OFF'}>
-      <p>Claims mint through the RemyReclaim contract, which needs minter rights on Remy Boys. You are the collection owner.</p>
+    <StatusRow tone={enabled ? 'ok' : 'warn'} icon="computer" title="Collection owner: claim minting" state={enabled ? 'ON' : anyOn ? 'PARTLY ON' : 'OFF'}>
+      <p>Claims mint through one RemyReclaim contract per theft wave, each needing minter rights on Remy Boys. You are the collection owner.</p>
+      <ul className="muted small">
+        {waves.map((w) => (
+          <li key={w.address}>
+            {w.label}: {!w.deployed ? 'not deployed yet' : w.minting ? 'claims open' : 'claims closed'}
+          </li>
+        ))}
+      </ul>
       <div className="row end">
-        <button type="button" className="btn" disabled={tx.busy || !enabled} onClick={() => set(false)}>
+        <button type="button" className="btn" disabled={tx.busy || !anyOn} onClick={() => set(false)}>
           Disable claims
         </button>
-        <button type="button" className="btn default" disabled={tx.busy || enabled} onClick={() => set(true)}>
+        <button type="button" className="btn default" disabled={tx.busy || enabled || live.length === 0} onClick={() => set(true)}>
           Enable claims
         </button>
       </div>
@@ -45,21 +59,25 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
   const { data, isLoading } = useReadContracts({
     contracts: [
       { address: ADDR.remy, abi: remyAbi, functionName: 'owner' },
-      { address: ADDR.remy, abi: remyAbi, functionName: 'is_minter', args: [ADDR.reclaim] },
-      { address: ADDR.reclaim, abi: reclaimAbi, functionName: 'owed', args: [acct] },
-      { address: ADDR.reclaim, abi: reclaimAbi, functionName: 'claimed', args: [acct] },
       { address: ADDR.remy, abi: remyAbi, functionName: 'isApprovedForAll', args: [acct, ADDR.paymentProcessor] },
     ],
     allowFailure: false,
   })
-  const [owner, enabled, owed = [], claimedBig, approved] = data ?? []
-  const { map: art } = useArtIndexes(owed)
+  const reclaim = useReclaimState(acct)
+  const [owner, approved] = data ?? []
+  const ids = useMemo(() => reclaim.data?.owed.map((o) => o.id) ?? [], [reclaim.data])
+  const { map: art } = useArtIndexes(ids)
   const isOwner = !!owner && isAddressEqual(owner, acct)
-  const claimed = Number(claimedBig ?? 0n)
-  const remaining = owed.length - claimed
-  const batch = Math.min(remaining, RECLAIM_BATCH)
+  const owed = reclaim.data?.owed ?? []
+  const claimed = reclaim.data?.claimed ?? 0
+  const remaining = reclaim.data?.remaining ?? 0
+  const enabled = reclaim.data?.claimsOpen
+  const next = reclaim.data?.next
+  const batch = next ? Math.min(next.owed.length - next.claimed, RECLAIM_BATCH) : 0
 
-  if (isLoading || !data) return <Loading>Recovery Center is checking this wallet…</Loading>
+  if (isLoading || !data || reclaim.isLoading || !reclaim.data) return <Loading>Recovery Center is checking this wallet…</Loading>
+  /** The contract this wallet deals with (Basescan link, status bar). */
+  const shown = next ?? reclaim.data.waves.find((w) => w.owed.length > 0) ?? reclaim.data.waves[0]
 
   const claimLabel =
     remaining === 0 ? 'All claimed' : batch < remaining ? `Claim next ${batch} (${remaining} left)` : `Claim ${remaining} Remy${remaining > 1 ? 's' : ''}`
@@ -115,7 +133,7 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
               <TaskLink icon="gallery" onClick={() => navigate('gallery')}>
                 Browse the gallery
               </TaskLink>
-              <TaskLink icon="globe" href={`${EXPLORER}/address/${ADDR.reclaim}`}>
+              <TaskLink icon="globe" href={`${EXPLORER}/address/${shown.address}`}>
                 RemyReclaim on Basescan
               </TaskLink>
             </TaskBox>
@@ -133,7 +151,7 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
         )}
         <main className="split-main scroll">
           {banner}
-          {isOwner && <OwnerRow enabled={enabled} tx={tx} />}
+          {isOwner && <OwnerRow waves={reclaim.data.waves} tx={tx} />}
           {owed.length === 0 ? (
             approved && (
               <StatusRow tone="bad" icon="shieldBad" title="Payment Processor approval" state="AT RISK">
@@ -175,7 +193,8 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
                     className="btn default"
                     disabled={tx.busy || !!approved || remaining === 0 || !enabled}
                     onClick={() =>
-                      tx.run([{ label: 'Claim', request: { address: ADDR.reclaim, abi: reclaimAbi, functionName: 'claim', args: [BigInt(RECLAIM_BATCH)] } }])
+                      next &&
+                      tx.run([{ label: 'Claim', request: { address: next.address, abi: reclaimAbi, functionName: 'claim', args: [BigInt(RECLAIM_BATCH)] } }])
                     }
                   >
                     {claimLabel}
@@ -184,8 +203,8 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
               </StatusRow>
               <h2 className="section-h">Your stolen Remys ({owed.length})</h2>
               <div className="thumbs compact">
-                {owed.map((id, i) => (
-                  <Thumb key={id.toString()} index={art.get(id)} label={`#${id}`} dim={i < claimed} mark={i < claimed ? 'check' : undefined} />
+                {owed.map(({ id, claimed: done }) => (
+                  <Thumb key={id.toString()} index={art.get(id)} label={`#${id}`} dim={done} mark={done ? 'check' : undefined} />
                 ))}
               </div>
               <p className="muted small">
@@ -195,7 +214,7 @@ function RecoveryInner({ navigate }: { navigate: (h: string) => void }) {
           )}
         </main>
       </div>
-      <StatusBar status={tx.status} busy={tx.busy} right={mobile ? undefined : `RemyReclaim ${ADDR.reclaim.slice(0, 10)}…`} />
+      <StatusBar status={tx.status} busy={tx.busy} right={mobile ? undefined : `RemyReclaim ${shown.address.slice(0, 10)}…`} />
     </>
   )
 }

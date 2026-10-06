@@ -298,6 +298,9 @@ function VaultInner({ vault, fremy, router, navigate }: Deployed & { navigate: (
               <TaskLink icon="trader" onClick={() => navigate('trader')}>
                 Open Remy Trader
               </TaskLink>
+              <TaskLink icon="coin" onClick={() => navigate('send')}>
+                Send fREMY
+              </TaskLink>
               <TaskLink icon="exchange" onClick={() => navigate('legacy')}>
                 Legacy Exchange
               </TaskLink>

@@ -19,7 +19,8 @@ import {
   USER_AGENT,
   WHALE_EXCLUDED,
 } from './config'
-import owedData from './owed.json'
+import owedWave1 from './owed.json'
+import owedWave2 from './owed-2.json'
 import {
   ZERO,
   abiBytes,
@@ -37,6 +38,17 @@ import {
   word,
 } from './rpc'
 import { amountsForLiquidity, ethPriceAtSqrt, getSqrtPriceAtTick } from './v4math'
+
+/** One RemyReclaim per theft wave: its victims (unique, lowercase) and how many Remys each is owed. */
+const WAVES = [
+  { address: A.reclaim, data: owedWave1 },
+  { address: A.reclaim2, data: owedWave2 },
+].map(({ address, data }) => {
+  const owed = new Map<string, number>()
+  for (const v of data.victims) owed.set(v.toLowerCase(), (owed.get(v.toLowerCase()) ?? 0) + 1)
+  return { address, victims: [...owed.keys()], owed }
+})
+const STOLEN_IDS = [...owedWave1.ids, ...owedWave2.ids]
 
 /* ---------- API contract (fixed; the admin UI depends on it) ---------- */
 
@@ -158,8 +170,8 @@ export type RunStats = {
 /** Small per-run record stored next to the snapshot (KV key `meta`) for /health and /stats. */
 export type RunMeta = { generatedAt: string; block: number; stats: RunStats; lastError?: { at: string; message: string } }
 
-const LOG_RANGE = 2000 // mainnet.base.org caps eth_getLogs at 2,000 blocks
-const MAX_LOG_CHUNKS = 30 // per run; a stale cursor catches up over several runs
+const LOG_RANGE = 500 // mainnet.base.org caps eth_getLogs at 500 blocks (was 2,000 until early October 2026)
+const MAX_LOG_CHUNKS = 120 // per run (60,000 blocks); a stale cursor catches up over several runs
 const SWEEP_STEP = 2000 // ownerOf ids per extra holders() call when the collection grows past the guess
 const E18 = 10n ** 18n
 const SCOUT_EVERY_MS = 6 * 3600_000 // Blockscout is only a candidate cross-check once the log cursor is live
@@ -306,19 +318,17 @@ export async function runIndex(prev: IndexState | null, force = false): Promise<
     { target: A.nftVault, data: SEL.reserve },
     { target: A.fREMY, data: SEL.balanceOf + word(A.nftVault) },
     { target: A.stateView, data: SEL.getSlot0 + word(POOL_ID) },
-    { target: A.remyBoys, data: SEL.isMinter + word(A.reclaim) },
+    ...WAVES.map((w) => ({ target: A.remyBoys, data: SEL.isMinter + word(w.address) })),
   ]
-  const victims = [...new Set(owedData.victims.map((v) => v.toLowerCase()))]
   const sweepEnd = (prev?.maxId ?? 4600) + 300
 
   const r1 = await base.all([
     lensCalls(header, 2, B),
-    lensWords(A.reclaim, SEL.claimed, victims, 1, B),
-    lensWords(A.reclaim, SEL.remaining, victims, 1, B),
-    lensWords(A.remyBoys, SEL.ownerOf, owedData.ids, 1, B),
+    lensWords(A.remyBoys, SEL.ownerOf, STOLEN_IDS, 1, B),
     lensHolders(A.remyBoys, 0, sweepEnd, B),
+    ...WAVES.map((w) => lensWords(w.address, SEL.claimed, w.victims, 1, B)),
   ])
-  const [h, claimedRaw, remainingRaw, stolenOwnersRaw, holdersRaw] = r1
+  const [h, stolenOwnersRaw, holdersRaw, ...claimedRaw] = r1
   const headerWords = chunksOf(abiBytes(h), 64)
   const hv = headerWords.map((c) => BigInt(`0x${c.slice(0, 64)}`))
   const supply = Object.fromEntries(TOKEN_KEYS.map((k, i) => [k, hv[i]])) as Record<TokenKey, bigint>
@@ -333,7 +343,8 @@ export async function runIndex(prev: IndexState | null, force = false): Promise<
   const slot0 = headerWords[i++]
   const sqrtP = BigInt(`0x${slot0.slice(0, 64)}`)
   const tick = int24OfWord(slot0.slice(64))
-  const claimsEnabled = hv[i++] === 1n
+  // Claims are open only when every wave's RemyReclaim mints (a not-yet-deployed wave reads as closed).
+  const claimsEnabled = WAVES.map(() => hv[i++] === 1n).every(Boolean)
   if (sqrtP === 0n || lsRate === 0n || nftSupply === 0) throw new Error('header reads returned zero')
 
   // Collection holders, aggregated on-node; extend the id range while short of totalSupply (mints past the guess).
@@ -589,9 +600,11 @@ export async function runIndex(prev: IndexState | null, force = false): Promise<
       : {}),
   }))
 
-  const claimed = chunksOf(abiBytes(claimedRaw), 32).map((w) => Number(BigInt(`0x${w}`)))
-  const remaining = chunksOf(abiBytes(remainingRaw), 32).map((w) => Number(BigInt(`0x${w}`)))
-  const attackerSet = new Set<string>([A.attacker, A.exploit])
+  // Owed counts are fixed per wave by its owed file; a wave not deployed yet reads zero claimed.
+  const victimRows = WAVES.flatMap((w, k) =>
+    chunksOf(abiBytes(claimedRaw[k]), 32).map((c, j) => ({ address: w.victims[j], owed: w.owed.get(w.victims[j]) ?? 0, claimed: Number(BigInt(`0x${c}`)) })),
+  )
+  const attackerSet = new Set<string>([A.attacker, A.exploit, A.attacker2])
   const stolenOwners = chunksOf(abiBytes(stolenOwnersRaw), 32).map(addrOfWord)
 
   const snapshot: Snapshot = {
@@ -626,11 +639,9 @@ export async function runIndex(prev: IndexState | null, force = false): Promise<
     },
     recovery: {
       claimsEnabled,
-      victims: victims
-        .map((a, j) => ({ address: a, owed: claimed[j] + remaining[j], claimed: claimed[j] }))
-        .sort((x, y) => y.owed - x.owed),
+      victims: victimRows.sort((x, y) => y.owed - x.owed),
       stolenStillWithAttacker: stolenOwners.filter((o) => attackerSet.has(o)).length,
-      stolenTotal: owedData.ids.length,
+      stolenTotal: STOLEN_IDS.length,
     },
     whales: whaleRanked.map((w) => ({
       address: w.address,

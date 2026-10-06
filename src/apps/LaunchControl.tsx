@@ -71,7 +71,8 @@ export function LaunchControl({ navigate }: AppProps) {
   const mobile = useIsMobile()
   const tx = useTxUi()
   const launch = useLaunchState()
-  const { legacy, pool, claimsEnabled, ownerRb } = launch
+  const { legacy, pool, claimsEnabled, closedWaves, ownerRb } = launch
+  const nextClosed = closedWaves[0]
   const sent = seedFundsSent(launch)
 
   const steps: Step[] = [
@@ -100,13 +101,22 @@ export function LaunchControl({ navigate }: AppProps) {
       id: 'claims',
       icon: 'recovery',
       title: 'Enable claims',
-      plain: 'Gives the RemyReclaim contract minter rights on Remy Boys, so exploit victims can claim their re-mints in the Recovery Center.',
+      plain:
+        'Gives each RemyReclaim contract (one per theft wave) minter rights on Remy Boys, so exploit victims can claim their re-mints in the Recovery Center. One signature per wave.',
       done: claimsEnabled,
-      state: claimsEnabled === undefined ? 'Checking…' : claimsEnabled ? 'Claims are open' : 'Claims are closed',
+      state:
+        claimsEnabled === undefined
+          ? 'Checking…'
+          : claimsEnabled
+            ? 'Claims are open'
+            : `Claims are closed: ${closedWaves.map((w) => w.label).join(' and ') || 'no wave deployed yet'}`,
       signer: TEAM.owner,
-      action: {
-        label: 'Enable claims',
-        tx: { label: 'Enable claims', request: { address: ADDR.remy, abi: remyAbi, functionName: 'set_minter', args: [ADDR.reclaim, true] } },
+      action: nextClosed && {
+        label: closedWaves.length > 1 ? `Enable claims (1 of ${closedWaves.length})` : 'Enable claims',
+        tx: {
+          label: `Enable claims (${nextClosed.label})`,
+          request: { address: ADDR.remy, abi: remyAbi, functionName: 'set_minter', args: [nextClosed.address, true] },
+        },
       },
     },
     {

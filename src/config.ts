@@ -17,7 +17,6 @@ export const IPFS_GATEWAY = 'https://gateway.pinata.cloud/ipfs/'
 
 export const ADDR = {
   remy: getAddress('0x3e9e529E32aD2821BDBFDA348C2F9dA94b43976c'),
-  reclaim: getAddress('0x4bfa9df6F8CEeF97c9808C44a1c2b4BE2d4525aB'),
   paymentProcessor: getAddress('0x9A1D00bEd7CD04BCDA516d721A596eb22Aac6834'),
   openseaConduit: getAddress('0x1E0049783F008A0085193E00003D00cd54003c71'),
   seaport16: getAddress('0x0000000000000068F116a894984e2DB1123eB395'),
@@ -33,6 +32,16 @@ export const ADDR = {
   positionManager: getAddress('0x7C5f5A4bBd8fD63184577525326123B519429bDc'),
   permit2: getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3'),
 } as const
+
+/**
+ * RemyReclaim per Payment Processor v2 theft wave; each wallet is owed by exactly one. Wave 2 deploys through the
+ * CREATE2 factory (remy-boys-recovery `OWED=data/owed-2.json script/Deploy.s.sol`), so its address is fixed before
+ * it is live; the site treats an address without code as not deployed yet.
+ */
+export const RECLAIMS = [
+  { address: getAddress('0x4bfa9df6F8CEeF97c9808C44a1c2b4BE2d4525aB'), label: 'Wave 1, 2026-09-26' },
+  { address: getAddress('0xacDF2C2bcCDa8e13C1eC979E32Ad2628F4Eb4DE6'), label: 'Wave 2, 2026-09-28/29' },
+] as const
 
 /** Vault stack, live on Base (remy-boys-recovery `deployments/8453.json`). `VITE_*` overrides point at a fork deployment. */
 export const NEW = {

@@ -5,22 +5,25 @@ import { readContract } from 'wagmi/actions'
 import { erc20Abi, routerAbi, vaultAbi } from '../abis'
 import { EXPLORER, NEW } from '../config'
 import { deadline, fmt, shortAddr } from '../lib/format'
-import { type RangeSelection, liquiditySelection, resolveLiquidityRange } from '../lib/liquidityRange'
+import { type RangeSelection, edgePrice, formatFromMarket, formatPrice, presetSelection, resolveRange } from '../lib/liquidityRange'
 import { useQuote } from '../lib/pool'
 import { POOL_KEY, type PoolData, type Position, type Trade, closeStep, collectStep, mintSteps, removeStep, usePoolData, usePositions } from '../lib/trader'
 import type { TxStep } from '../lib/tx'
 import {
   type Range,
   amount0Delta,
+  amount1Delta,
   amountsForLiquidity,
   bandDepth,
   ethPriceAtSqrt,
   ethPriceAtTick,
   getSqrtPriceAtTick,
+  liquidityAt,
   mulDivUp,
   positionFor,
   rangeSide,
   simulateBuy,
+  simulateSell,
 } from '../lib/v4math'
 import type { AppProps } from '../os/apps'
 import { Icon } from '../os/icons'
@@ -479,9 +482,29 @@ function OrderTicket({ pool, tx, navigate }: { pool: PoolData; tx: TxUi; navigat
 
 /* --- Market Maker tab ---------------------------------------------------------------------------------- */
 
+/** ETH kept back for gas when a deposit uses the whole wallet. */
+const GAS_RESERVE = 5n * 10n ** 14n
+const SIDE_OF = { fremy: 'sell', eth: 'buy', both: 'both' } as const
+/** Market orders (in Remys) the impact table compares. */
+const IMPACT_SIZES = [1n, 5n, 10n, 25n].map((n) => n * ONE)
+
+/** A token amount for an input field: plain digits, at most `digits` decimals, no trailing zeros. */
+function amountText(v: bigint, digits: number) {
+  const [whole, frac = ''] = formatUnits(v, 18).split('.')
+  const cut = frac.slice(0, digits).replace(/0+$/, '')
+  return cut ? `${whole}.${cut}` : whole
+}
+
+/** Pad a derived amount for price movement before inclusion, without asking for more than the wallet holds. */
+function withBuffer(need: bigint, available: bigint | undefined) {
+  const padded = mulDivUp(need, 102n, 100n) + 1n
+  return available !== undefined && available >= need && available < padded ? available : padded
+}
+
 function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: () => void }) {
   const { address } = useAccount()
-  const [selection, setSelection] = useState<RangeSelection>(() => liquiditySelection('sell'))
+  const sqrtP = pool.sqrtPriceX96
+  const [selection, setSelection] = useState<RangeSelection>(() => presetSelection(sqrtP, 'sell', 2, SPACING))
   const [deposit, setDeposit] = useState<{ value: string; asset: 'eth' | 'fremy' }>({ value: '', asset: 'fremy' })
   const { data: eth } = useBalance({ address, query: { enabled: !!address } })
   const { data: fremyBal } = useReadContract({
@@ -490,176 +513,290 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
   })
+  const { data: open } = usePositions(address, sqrtP)
+  const ethSpendable = eth ? (eth.value > GAS_RESERVE ? eth.value - GAS_RESERVE : 0n) : undefined
 
-  const { range, error: rangeError } = resolveLiquidityRange(pool.sqrtPriceX96, selection, SPACING)
-  const ok = !!range
-  const tickLower = range?.tickLower ?? 0
-  const tickUpper = range?.tickUpper ?? 0
-  const side = ok ? rangeSide(pool.sqrtPriceX96, tickLower, tickUpper) : 'fremy'
-  const input: 'eth' | 'fremy' = side === 'eth' ? 'eth' : 'fremy'
-  const amt = deposit.asset === input ? deposit.value : ''
-  const setAmt = (value: string) => setDeposit({ value, asset: input })
-  const amount = parse(amt) ?? 0n
-  const bal = input === 'eth' ? eth?.value : fremyBal
-  const pos = ok && amount > 0n ? positionFor(pool.sqrtPriceX96, tickLower, tickUpper, input, amount) : undefined
-  // Straddling mints may need a little more of the paired token if the price moves before inclusion.
-  const amount0Max = pos && pos.amount0 > 0n ? (side === 'both' ? mulDivUp(pos.amount0, 102n, 100n) + 1n : pos.amount0) : 0n
-  const amount1Max = pos?.amount1 ?? 0n
-  const short = !!pos && ((eth !== undefined && eth.value < amount0Max) || (fremyBal !== undefined && fremyBal < amount1Max))
+  const { range, error } = resolveRange(sqrtP, selection, SPACING)
+  const tokens = range ? rangeSide(sqrtP, range.tickLower, range.tickUpper) : undefined
+  const side = tokens && SIDE_OF[tokens]
+  // The typed amount drives the position when this range takes that token; single-sided ranges take only one.
+  const driver: 'eth' | 'fremy' = tokens === 'eth' || tokens === 'fremy' ? tokens : deposit.asset
+  const typed = deposit.asset === driver ? deposit.value : ''
+  const amount = parse(typed) ?? 0n
+  const pos = range && amount > 0n ? positionFor(sqrtP, range.tickLower, range.tickUpper, driver, amount) : undefined
+  const live = pos && pos.liquidity > 0n ? pos : undefined
+  const amount0Max = !live ? 0n : tokens === 'both' && driver === 'fremy' ? withBuffer(live.amount0, ethSpendable) : live.amount0
+  const amount1Max = !live ? 0n : tokens === 'both' && driver === 'eth' ? withBuffer(live.amount1, fremyBal) : live.amount1
+  const shortEth = !!live && eth !== undefined && eth.value < amount0Max
+  const shortFremy = !!live && fremyBal !== undefined && fremyBal < amount1Max
 
+  const L = live?.liquidity ?? 0n
+  const tickLower = range?.tickLower
+  const tickUpper = range?.tickUpper
+  const baseline = useMemo(
+    () => IMPACT_SIZES.map((size) => ({ buy: simulateBuy(sqrtP, pool.ranges, size), sell: simulateSell(sqrtP, pool.ranges, size) })),
+    [sqrtP, pool.ranges],
+  )
   const preview = useMemo(() => {
-    if (!pos) return undefined
-    const mine: Range = { tickLower, tickUpper, liquidity: pos.liquidity }
-    const rows = [1, 5, 10, 25].map((n) => {
-      const now = simulateBuy(pool.sqrtPriceX96, pool.ranges, BigInt(n) * ONE)
-      const withMe = simulateBuy(pool.sqrtPriceX96, [...pool.ranges, mine], BigInt(n) * ONE)
-      return { n, now, withMe }
-    })
+    if (L === 0n || tickLower === undefined || tickUpper === undefined) return undefined
+    const mine: Range = { tickLower, tickUpper, liquidity: L }
     const sqrtA = getSqrtPriceAtTick(tickLower)
     const sqrtB = getSqrtPriceAtTick(tickUpper)
-    const raised = amount0Delta(sqrtA, sqrtB, pos.liquidity, false)
-    const fremyIfDip = amountsForLiquidity(sqrtB, sqrtA, sqrtB, pos.liquidity).amount1
-    return { mine, rows, raised, fremyIfDip }
-  }, [pos, tickLower, tickUpper, pool])
+    const now = amountsForLiquidity(sqrtP, sqrtA, sqrtB, L, true)
+    const eth = Number(formatUnits(now.amount0, 18))
+    const fremy = Number(formatUnits(now.amount1, 18))
+    // Fully converted ends: above the high price the position is all ETH, below the low price all fREMY.
+    const allEth = Number(formatUnits(amount0Delta(sqrtA, sqrtB, L, false), 18))
+    const allFremy = Number(formatUnits(amount1Delta(sqrtA, sqrtB, L, false), 18))
+    // Fee share where the price first enters the range: just inside the near edge, or right here for a straddle.
+    const entry = sqrtP >= sqrtB ? tickUpper - 1 : sqrtP <= sqrtA ? tickLower : pool.tick
+    const others = Number(liquidityAt(pool.ranges, entry))
+    const share = Number(L) / (others + Number(L))
+    const feesDay = ((Number(formatUnits(pool.volume24hEth, 18)) * pool.lpFee) / 1e6) * share
+    const value = eth + fremy * pool.price
+    const price = (r: { filled: bigint; sqrtAfter: bigint }, size: bigint) => (r.filled < size ? undefined : ethPriceAtSqrt(r.sqrtAfter))
+    const withMine = [...pool.ranges, mine]
+    const impact = IMPACT_SIZES.map((size, i) => ({
+      n: Number(size / ONE),
+      buy: [price(baseline[i].buy, size), price(simulateBuy(sqrtP, withMine, size), size)],
+      sell: [price(baseline[i].sell, size), price(simulateSell(sqrtP, withMine, size), size)],
+    }))
+    return { mine, eth, fremy, allEth, allFremy, share, feesDay, value, apr: value > 0 ? (feesDay * 365) / value : 0, impact }
+  }, [L, tickLower, tickUpper, sqrtP, pool, baseline])
+
+  const ends = range && { low: edgePrice(-range.tickUpper, SPACING), high: edgePrice(-range.tickLower, SPACING) }
+  const rangeText = ends ? `${formatPrice(ends.low)} – ${formatPrice(ends.high)}` : '—'
+  const qty = (x: number) => String(Number(x.toPrecision(5)))
+  const sym = (asset: 'eth' | 'fremy') => (asset === 'eth' ? 'ETH' : 'fREMY')
+  const depositText = `${amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}${amount1Max && amount0Max ? ' + ' : ''}${amount0Max ? `${tokens === 'both' && driver === 'fremy' ? 'up to ' : ''}${fmt(amount0Max, 18, 6)} ETH` : ''}`
 
   const submit = () => {
-    if (!address || !pos) return
+    if (!address || !live || !range) return
     messageBox({
       title: 'Add liquidity',
       icon: 'question',
-      text: `Add ${amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}${amount1Max && amount0Max ? ' and ' : ''}${amount0Max ? `up to ${fmt(amount0Max, 18, 6)} ETH` : ''} between ${px(ethPriceAtTick(tickUpper))} and ${px(ethPriceAtTick(tickLower))} ETH per fREMY. You receive a position NFT and earn a share of the ${pool.lpFee / 10_000}% LP fee on trades through your range. Continue?`,
+      text: `Deposit ${depositText} between ${rangeText} ETH per fREMY. You receive a position NFT and earn ${pool.lpFee / 10_000}% of every trade that moves through your range. Continue?`,
       onConfirm: async () => {
-        if (await tx.run(mintSteps(address, { tickLower, tickUpper, liquidity: pos.liquidity, amount0Max, amount1Max }))) {
-          setAmt('')
+        if (await tx.run(mintSteps(address, { ...range, liquidity: live.liquidity, amount0Max, amount1Max }))) {
+          setDeposit({ value: '', asset: driver })
           onDone()
         }
       },
     })
   }
 
-  const sideLabel = side === 'eth' ? 'ETH only' : side === 'fremy' ? 'fREMY only' : 'fREMY + ETH'
-  const changeRange = (next: RangeSelection) => {
-    const nextRange = resolveLiquidityRange(pool.sqrtPriceX96, next, SPACING).range
-    const nextInput = nextRange && rangeSide(pool.sqrtPriceX96, nextRange.tickLower, nextRange.tickUpper) === 'eth' ? 'eth' : 'fremy'
-    if (nextInput !== input) setAmt('')
-    setSelection(next)
+  const assets: ('fremy' | 'eth')[] = tokens === 'eth' ? ['eth'] : tokens === 'fremy' ? ['fremy'] : ['fremy', 'eth']
+  const balanceOf = (asset: 'eth' | 'fremy') => (asset === 'eth' ? eth?.value : fremyBal)
+  const spendable = (asset: 'eth' | 'fremy') => (asset === 'eth' ? ethSpendable : fremyBal)
+  const shownAmount = (asset: 'eth' | 'fremy') => {
+    if (asset === driver) return typed
+    if (!live) return ''
+    return amountText(asset === 'eth' ? live.amount0 : live.amount1, asset === 'eth' ? 8 : 4)
   }
+
   return (
     <div className="mm">
-      <TraderRange selection={selection} onChange={changeRange} floor={pool.price} spacing={SPACING} range={range} error={rangeError} />
+      <TraderRange
+        pool={pool}
+        spacing={SPACING}
+        selection={selection}
+        onChange={setSelection}
+        side={side}
+        error={error}
+        mine={preview?.mine}
+        others={open}
+      />
       <div className="mm-body">
-        <div className="mm-left">
-          <Group title="Your deposit" className="mm-deposit">
-            <div className="mm-deposit-heading">
-              <label htmlFor="mm-amt">Amount to provide</label>
-              <span className={`side-badge ${side}`}>{ok ? sideLabel : 'Choose a valid range'}</span>
-            </div>
-            <div className="input-wrap">
-              <label className="sr-only" htmlFor="mm-amt">
-                Amount in {input === 'eth' ? 'ETH' : 'fREMY'}
-              </label>
-              <input
-                id="mm-amt"
-                className="input num"
-                inputMode="decimal"
-                placeholder="0"
-                value={amt}
-                onChange={(e) => setAmt(e.target.value.replace(/[^0-9.]/g, ''))}
-              />
-              <button
-                type="button"
-                className="chip"
-                onClick={() => bal !== undefined && setAmt(formatUnits(input === 'eth' ? (bal * 95n) / 100n : bal, 18))}
-              >
-                Max
-              </button>
-              <span className="unit">{input === 'eth' ? 'ETH' : 'fREMY'}</span>
-            </div>
-            <p className="muted small">
-              Balance: {address ? `${fmt(bal, 18, input === 'eth' ? 5 : 4)} ${input === 'eth' ? 'ETH' : 'fREMY'}` : 'connect a wallet'}
-              {side === 'both' && pos ? ` · also needs up to ${fmt(amount0Max, 18, 8)} ETH` : ''}
-            </p>
-            {!address ? (
-              <ConnectPrompt why="Connect a wallet to provide liquidity." />
-            ) : (
-              <div className="row end">
-                {short && <span className="err small">Not enough balance.</span>}
-                <button type="button" className="btn default" disabled={tx.busy || !pos || pos.liquidity === 0n || short} onClick={submit}>
-                  <Icon name="coin" size={16} />
-                  Create position
-                </button>
+        <Group title="Your deposit" className="mm-deposit">
+          <div className="mm-deposit-heading">
+            <span>{tokens === 'both' ? 'Type either amount; the other follows from your range.' : 'Amount to provide'}</span>
+            <span className={`side-badge ${tokens ?? ''}`}>
+              {tokens === 'eth' ? 'ETH only' : tokens === 'fremy' ? 'fREMY only' : tokens === 'both' ? 'fREMY + ETH' : 'Fix the range'}
+            </span>
+          </div>
+          {assets.map((asset) => {
+            const bal = balanceOf(asset)
+            const max = spendable(asset)
+            const short = asset === 'eth' ? shortEth : shortFremy
+            return (
+              <div key={asset} className={`mm-amount${asset === driver ? ' driver' : ''}`}>
+                <div className="input-wrap">
+                  <label className="sr-only" htmlFor={`mm-amt-${asset}`}>
+                    Amount in {sym(asset)}
+                  </label>
+                  <input
+                    id={`mm-amt-${asset}`}
+                    className="input num"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0"
+                    aria-invalid={short}
+                    disabled={!range}
+                    value={shownAmount(asset)}
+                    onChange={(e) => setDeposit({ value: e.target.value.replace(/[^0-9.]/g, ''), asset })}
+                  />
+                  <span className="unit">{sym(asset)}</span>
+                </div>
+                <div className="mm-amount-meta">
+                  <span className={short ? 'err' : 'muted'}>
+                    {address ? `${short ? 'Not enough · ' : ''}Balance ${fmt(bal, 18, asset === 'eth' ? 5 : 4)} ${sym(asset)}` : 'Connect a wallet to see balances'}
+                  </span>
+                  {max !== undefined && max > 0n && (
+                    <span className="mm-pcts">
+                      {[25, 50, 75, 100].map((p) => (
+                        <button
+                          type="button"
+                          key={p}
+                          className="chip"
+                          disabled={!range}
+                          onClick={() => setDeposit({ value: amountText((max * BigInt(p)) / 100n, 18), asset })}
+                        >
+                          {p === 100 ? 'Max' : `${p}%`}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-          </Group>
-        </div>
-        <div className="mm-right">
-          <Group title="Your position" className="mm-summary">
-            <div className="mm-summary-range">
-              <small>Trades across this price range</small>
-              <b className="num">
-                {ok ? `${px(ethPriceAtTick(tickUpper))} → ${px(ethPriceAtTick(tickLower))}` : '—'} <small>ETH</small>
-              </b>
+            )
+          })}
+          {tokens === 'fremy' && <p className="muted small">No ETH needed: the whole range sits above the market, so it starts as fREMY.</p>}
+          {tokens === 'eth' && <p className="muted small">No fREMY needed: the whole range sits below the market, so it starts as ETH.</p>}
+          {tokens === 'both' && driver === 'fremy' && live && (
+            <p className="muted small">Up to 2% extra ETH is allowed in case the price moves before your transaction lands; unused ETH is refunded.</p>
+          )}
+          {pos && pos.liquidity === 0n && <p className="err small">That amount is too small for this range.</p>}
+          {!address ? (
+            <ConnectPrompt why="Connect a wallet to provide liquidity." />
+          ) : (
+            <div className="row end">
+              <button type="button" className="btn default" disabled={tx.busy || !live || shortEth || shortFremy} onClick={submit}>
+                <Icon name="coin" size={16} />
+                Create position
+              </button>
             </div>
-            {!preview ? (
-              <p className="muted small">Enter an amount to preview your deposit and what it becomes as the price moves.</p>
-            ) : (
-              <>
-                <dl className="kv">
-                  <dt>You deposit</dt>
-                  <dd className="num">
-                    {amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}
-                    {amount1Max && amount0Max ? ' + ' : ''}
-                    {amount0Max ? `${fmt(amount0Max, 18, 6)} ETH` : ''}
-                  </dd>
-                  <dt>At the upper price</dt>
-                  <dd className="num">≈ {fmt(preview.raised, 18, 5)} ETH</dd>
-                  <dt>At the lower price</dt>
-                  <dd className="num">≈ {fmt(preview.fremyIfDip, 18, 4)} fREMY</dd>
-                </dl>
-                <p className="muted small">End balances exclude fees earned.</p>
-              </>
+          )}
+        </Group>
+        <Group title="What happens" className="mm-summary">
+          <div className="mm-summary-range">
+            <small>Your range · ETH per fREMY</small>
+            <b className="num">{rangeText}</b>
+            {range && ends && (
+              <small className="num">
+                {formatFromMarket(ends.low, pool.price)} → {formatFromMarket(ends.high, pool.price)} · {(range.tickUpper - range.tickLower) / SPACING} steps
+              </small>
             )}
-            <p className="mm-fee-note">Earn a share of the {pool.lpFee / 10_000}% LP fee on trades through your range.</p>
-            <p className="muted small">Outside your range, the position holds one token and pauses earning fees until the price returns.</p>
-          </Group>
-        </div>
+          </div>
+          {!preview || !ends ? (
+            <p className="muted small">Enter an amount to see what your position turns into as the price moves, and what it can earn.</p>
+          ) : (
+            <>
+              <dl className="mm-outcomes">
+                <dt>You deposit</dt>
+                <dd className="num">
+                  {depositText}
+                  <small>≈ {qty(preview.value)} ETH at market</small>
+                </dd>
+                {Number.isFinite(ends.high) && (
+                  <>
+                    <dt>
+                      Price rises past <span className="num">{formatPrice(ends.high)}</span>
+                    </dt>
+                    <dd className="num">
+                      {tokens === 'eth' ? (
+                        <>
+                          Nothing fills
+                          <small>You keep your ETH</small>
+                        </>
+                      ) : (
+                        <>
+                          {qty(preview.allEth)} ETH
+                          {tokens === 'fremy' && (
+                            <small>
+                              All sold, average {formatPrice(preview.allEth / preview.fremy)} ({formatFromMarket(preview.allEth / preview.fremy, pool.price)})
+                            </small>
+                          )}
+                        </>
+                      )}
+                    </dd>
+                  </>
+                )}
+                {ends.low > 0 && (
+                  <>
+                    <dt>
+                      Price falls below <span className="num">{formatPrice(ends.low)}</span>
+                    </dt>
+                    <dd className="num">
+                      {tokens === 'fremy' ? (
+                        <>
+                          Nothing fills
+                          <small>You keep your fREMY</small>
+                        </>
+                      ) : (
+                        <>
+                          {qty(preview.allFremy)} fREMY
+                          {tokens === 'eth' && (
+                            <small>
+                              All bought, average {formatPrice(preview.eth / preview.allFremy)} ({formatFromMarket(preview.eth / preview.allFremy, pool.price)})
+                            </small>
+                          )}
+                        </>
+                      )}
+                    </dd>
+                  </>
+                )}
+              </dl>
+              <div className="mm-fees">
+                <b>Fees: {pool.lpFee / 10_000}% of every trade through your range</b>
+                <span>
+                  You would be <b className="num">{(preview.share * 100).toPrecision(3)}%</b> of the liquidity{' '}
+                  {tokens === 'both' ? 'at the current price' : 'where the price first reaches your range'}.
+                </span>
+                <span>
+                  If the last 24h of volume ({fmt(pool.volume24hEth, 18, 4)} ETH) traded inside it: ≈{' '}
+                  <b className="num">{preview.feesDay.toPrecision(3)} ETH/day</b>
+                  {preview.apr > 0 && <> · {(preview.apr * 100).toPrecision(3)}% APR</>}. Estimate only.
+                </span>
+              </div>
+            </>
+          )}
+          <p className="muted small">
+            Fees accrue only while the price is inside your range. Outside it the position holds a single token and waits. Collect fees or close
+            any time from My Positions.
+          </p>
+        </Group>
       </div>
       <details className="mm-details">
         <summary>
-          Market depth & price impact <span>See how your position changes liquidity</span>
+          Price impact <span>How your liquidity changes the price a trader moves for N Remys</span>
         </summary>
-        <div className="mm-body">
-          <Group title="Depth with your position">
-            <DepthLadder pool={pool} extra={preview?.mine} />
-          </Group>
-          <Group title="Buy impact">
-            {!preview || side === 'eth' ? (
-              <p className="muted small">Add a selling position to compare the price impact of buys.</p>
-            ) : (
-              <table className="impact">
-                <caption>Price after buying N Remys (ETH per fREMY)</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">N</th>
-                    <th scope="col">Now</th>
-                    <th scope="col">With yours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((r) => (
-                    <tr key={r.n}>
-                      <td>{r.n}</td>
-                      <td className="num">{r.now.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.now.sqrtAfter))}</td>
-                      <td className="num up">
-                        {r.withMe.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.withMe.sqrtAfter))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Group>
-        </div>
+        {!preview ? (
+          <p className="muted small">Enter an amount to compare.</p>
+        ) : (
+          <table className="impact">
+            <caption>Price after a market order (ETH per fREMY)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Remys</th>
+                <th scope="col">Buy · now</th>
+                <th scope="col">Buy · with yours</th>
+                <th scope="col">Sell · now</th>
+                <th scope="col">Sell · with yours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.impact.map((r) => (
+                <tr key={r.n}>
+                  <td>{r.n}</td>
+                  <td className="num">{r.buy[0] === undefined ? 'sold out' : formatPrice(r.buy[0])}</td>
+                  <td className="num up">{r.buy[1] === undefined ? 'sold out' : formatPrice(r.buy[1])}</td>
+                  <td className="num">{r.sell[0] === undefined ? 'no bids' : formatPrice(r.sell[0])}</td>
+                  <td className="num down">{r.sell[1] === undefined ? 'no bids' : formatPrice(r.sell[1])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </details>
     </div>
   )
@@ -692,11 +829,11 @@ function PositionCard({ p, pool, tx }: { p: Position; pool: PoolData; tx: TxUi }
         </a>
       </div>
       <div className="pos-range" title={`Price ${px(pool.price)} ETH`}>
-        <span className="num">{px(lo)}</span>
+        <span className="num">{formatPrice(edgePrice(-p.tickUpper, SPACING))}</span>
         <span className="pos-track">
           <i style={{ left: `${at * 100}%` }} />
         </span>
-        <span className="num">{px(hi)}</span>
+        <span className="num">{formatPrice(edgePrice(-p.tickLower, SPACING))}</span>
       </div>
       <dl className="pos-kv">
         <div>

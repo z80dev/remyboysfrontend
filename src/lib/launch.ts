@@ -1,8 +1,9 @@
 import { type Address, isAddressEqual } from 'viem'
-import { useReadContract, useReadContracts } from 'wagmi'
-import { erc20Abi, legacyVaultAbi, remyAbi } from '../abis'
+import { useReadContract } from 'wagmi'
+import { erc20Abi, legacyVaultAbi } from '../abis'
 import { ADDR, ADMINS, NEW, TEAM } from '../config'
 import { type PoolKey, usePoolKey, useQuote, useSpotPrice } from './pool'
+import { type ReclaimWave, useReclaimState } from './reclaim'
 
 const ONE = 10n ** 18n
 
@@ -25,7 +26,10 @@ export interface LegacyHandover {
 export interface LaunchState {
   legacy: LegacyHandover
   pool: PoolState
+  /** Every deployed RemyReclaim wave holds minter rights; undefined while loading. */
   claimsEnabled: boolean | undefined
+  /** Deployed waves still waiting for minter rights (the owner signs one set_minter each). */
+  closedWaves: ReclaimWave[]
   ownerRb: bigint | undefined
 }
 
@@ -54,17 +58,16 @@ export function useLegacyHandedOver(): LegacyHandover {
 export function useLaunchState(): LaunchState {
   const legacy = useLegacyHandedOver()
   const pool = usePoolState()
-  const { data } = useReadContracts({
-    contracts: [
-      { address: ADDR.remy, abi: remyAbi, functionName: 'is_minter', args: [ADDR.reclaim] },
-      { address: ADDR.rbRemy, abi: erc20Abi, functionName: 'balanceOf', args: [TEAM.owner] },
-    ],
-    allowFailure: true,
+  const reclaim = useReclaimState(undefined, 30_000)
+  const { data: ownerRb } = useReadContract({
+    address: ADDR.rbRemy,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [TEAM.owner],
     query: { refetchInterval: 30_000 },
   })
-  const claimsEnabled = data?.[0]?.status === 'success' ? (data[0].result as boolean) : undefined
-  const ownerRb = data?.[1]?.status === 'success' ? (data[1].result as bigint) : undefined
-  return { legacy, pool, claimsEnabled, ownerRb }
+  const closedWaves = reclaim.data?.waves.filter((w) => w.deployed && !w.minting) ?? []
+  return { legacy, pool, claimsEnabled: reclaim.data?.allMinting, closedWaves, ownerRb }
 }
 
 /** Launch role of a team wallet, as shown on the log-on tile and in the launch prompt. */

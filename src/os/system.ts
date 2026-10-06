@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Address } from 'viem'
-import { useAccount, useReadContracts } from 'wagmi'
-import { reclaimAbi, remyAbi } from '../abis'
+import { useAccount, useReadContract } from 'wagmi'
+import { remyAbi } from '../abis'
 import { ADDR } from '../config'
 import { useArtIndexes } from '../lib/art'
 import { shortAddr } from '../lib/format'
 import { pendingSignatures, teamRole, useLaunchState } from '../lib/launch'
 import { useOwnedIds } from '../lib/owned'
+import { useReclaimState } from '../lib/reclaim'
 import { type TxStatus, type TxStep, useTx } from '../lib/tx'
 import { chain } from '../wagmi'
 import { balloon, messageBox } from './shell'
@@ -22,23 +23,19 @@ export function useWalletRemy(address?: Address) {
 export function useSecurityState() {
   const { address } = useAccount()
   const acct = address as Address
-  const { data } = useReadContracts({
-    contracts: [
-      { address: ADDR.reclaim, abi: reclaimAbi, functionName: 'owed', args: [acct] },
-      { address: ADDR.reclaim, abi: reclaimAbi, functionName: 'claimed', args: [acct] },
-      { address: ADDR.remy, abi: remyAbi, functionName: 'is_minter', args: [ADDR.reclaim] },
-      { address: ADDR.remy, abi: remyAbi, functionName: 'isApprovedForAll', args: [acct, ADDR.paymentProcessor] },
-    ],
-    allowFailure: true,
+  const reclaim = useReclaimState(address ? acct : undefined, 60_000)
+  const { data: ppApproved } = useReadContract({
+    address: ADDR.remy,
+    abi: remyAbi,
+    functionName: 'isApprovedForAll',
+    args: [acct, ADDR.paymentProcessor],
     query: { enabled: !!address, refetchInterval: 60_000 },
   })
+  const r = reclaim.data
   return useMemo(() => {
-    if (!address || !data) return undefined
-    const ok = <T>(i: number) => (data[i]?.status === 'success' ? (data[i].result as T) : undefined)
-    const owed = ok<readonly bigint[]>(0)?.length ?? 0
-    const claimed = Number(ok<bigint>(1) ?? 0n)
-    return { address, owed, claimed, remaining: Math.max(0, owed - claimed), claimsOpen: !!ok<boolean>(2), ppApproved: !!ok<boolean>(3) }
-  }, [address, data])
+    if (!address || !r) return undefined
+    return { address, owed: r.owed.length, claimed: r.claimed, remaining: r.remaining, claimsOpen: r.claimsOpen, ppApproved: !!ppApproved }
+  }, [address, r, ppApproved])
 }
 
 /** Posts the real-state balloons from the notification area. */

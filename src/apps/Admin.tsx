@@ -10,7 +10,8 @@ import { Icon } from '../os/icons'
 import { balloon, useIsMobile } from '../os/shell'
 import { AppHeader, Badge, Banner, ConnectPrompt, Group, Loading, StatusBar } from '../os/ui'
 
-const ATTACKER = '0x28bc445b674940c53c227b45d4405c34e60027ad'
+/** Thieves of the two Payment Processor v2 waves (2026-09-26, 2026-09-28/29). */
+const ATTACKERS = ['0x28bc445b674940c53c227b45d4405c34e60027ad', '0x81691b7e2936413078c2b16a320412a6014b5053']
 
 /* --- formatting helpers -------------------------------------------------------------------------------- */
 
@@ -600,7 +601,9 @@ function RecoveryTab({ snap }: { snap: Snapshot }) {
         <div className="adm-stat">
           <small>Stolen still with attacker</small>
           <Meter value={pct(r.stolenStillWithAttacker, r.stolenTotal)} label={`${r.stolenStillWithAttacker} / ${r.stolenTotal}`} />
-          <Addr address={ATTACKER} label={labelOf(snap, ATTACKER)} />
+          {ATTACKERS.map((a) => (
+            <Addr key={a} address={a} label={labelOf(snap, a)} />
+          ))}
         </div>
       </div>
       <ListView

@@ -32,8 +32,12 @@ export const A = {
   stateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
   poolManager: '0x498581ff718922c3f8e6a244956af099b2652b2b',
   reclaim: '0x4bfa9df6f8ceef97c9808c44a1c2b4be2d4525ab',
+  /** Wave-2 RemyReclaim (CREATE2, address fixed before deploy; reads zero until it is live). */
+  reclaim2: '0xacdf2c2bccda8e13c1ec979e32ad2628f4eb4de6',
   attacker: '0x28bc445b674940c53c227b45d4405c34e60027ad',
   exploit: '0xc7b9b6f2f2b41f91dc409dc429efb2013774f676',
+  /** Wave-2 thief (2026-09-28/29); every theft was a contract creation, the NFTs landed on this EOA. */
+  attacker2: '0x81691b7e2936413078c2b16a320412a6014b5053',
   multicall3: '0xca11bde05977b3631167028862be2a173976ca11',
   // ENS UniversalResolver (mainnet) and Basenames reverse records (Base).
   ensUniversalResolver: '0xeeeeeeee14d718c2b47d9923deab1335e144eeee',
@@ -69,9 +73,11 @@ export const LABELS: Record<string, string> = {
   [A.positionManager]: 'Uniswap v4 PositionManager',
   [A.stateView]: 'Uniswap v4 StateView',
   [A.poolManager]: 'Uniswap v4 PoolManager',
-  [A.reclaim]: 'RemyReclaim',
+  [A.reclaim]: 'RemyReclaim (wave 1)',
+  [A.reclaim2]: 'RemyReclaim (wave 2)',
   [A.attacker]: 'Attacker',
   [A.exploit]: 'Attacker exploit contract',
+  [A.attacker2]: 'Attacker (wave 2)',
 }
 
 /** Protocol contracts left out of the whale ranking (their holdings are other people's Remys). */
@@ -127,7 +133,6 @@ export const SEL = {
   getPoolAndPositionInfo: '0x7ba03aad',
   getPositionLiquidity: '0x1efeed33',
   claimed: '0xc884ef83',
-  remaining: '0xb399b0bc',
   isMinter: '0x92c94f65',
   getCurrentBlockTimestamp: '0x0f28c97d',
   nameForAddr: '0x4ec3bd23',

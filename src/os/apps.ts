@@ -10,6 +10,7 @@ import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
 import { Quest } from '../apps/Quest'
 import { Recovery } from '../apps/Recovery'
+import { Send } from '../apps/Send'
 import { Trader } from '../apps/Trader'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
@@ -76,6 +77,7 @@ export const APPS: AppDef[] = [
     size: [980, 680],
     Component: Trader,
   },
+  { id: 'send', title: 'Send fREMY', short: 'Send fREMY', desc: 'Transfer fREMY to any wallet', icon: 'coin', size: [520, 460], Component: Send },
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
   { id: 'remix', title: 'Remy Remix Studio', short: 'Remix Studio', desc: 'Reimagine original Remy art', icon: 'remix', size: [980, 720], Component: Remix },
   { id: 'quest', title: 'Remy Quest', short: 'Remy Quest', desc: 'A Remy adventure on Base', icon: 'quest', size: [900, 660], Component: Quest },
