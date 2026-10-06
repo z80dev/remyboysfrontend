@@ -6,6 +6,7 @@ import { erc20Abi, routerAbi } from '../abis'
 import { EXPLORER, NEW } from '../config'
 import { useDataSnapshot } from '../lib/data'
 import { deadline, fmt, shortAddr } from '../lib/format'
+import { type RangeSelection, liquiditySelection, resolveLiquidityRange } from '../lib/liquidityRange'
 import { useQuote } from '../lib/pool'
 import { POOL_KEY, type PoolData, type Position, type Trade, closeStep, collectStep, mintSteps, removeStep, usePoolData, usePositions } from '../lib/trader'
 import type { TxStep } from '../lib/tx'
@@ -18,7 +19,6 @@ import {
   ethPriceAtTick,
   getSqrtPriceAtTick,
   mulDivUp,
-  nearestTickForEthPrice,
   positionFor,
   rangeSide,
   simulateBuy,
@@ -29,6 +29,7 @@ import { messageBox, useIsMobile } from '../os/shell'
 import { type TxUi, useTxUi } from '../os/system'
 import { Banner, ConnectPrompt, Group, Loading, StatusBar } from '../os/ui'
 import { config } from '../wagmi'
+import { TraderRange } from './TraderRange'
 
 const ONE = 10n ** 18n
 const SPACING = POOL_KEY.tickSpacing
@@ -489,51 +490,10 @@ function OrderTicket({ pool, tx, navigate }: { pool: PoolData; tx: TxUi; navigat
 
 /* --- Market Maker tab ---------------------------------------------------------------------------------- */
 
-/** One grid step of the pool: ranges start and end on multiples of the tick spacing (1.0001^200 ≈ +2.02%). */
-const STEP = `${((1.0001 ** SPACING - 1) * 100).toFixed(2)}%`
-
-/** Range presets pinned to exact ticks; "curve" is the launch position's range (#3094976). */
-const PRESETS = [
-  {
-    id: 'curve',
-    name: 'Stack on the floor curve',
-    label: '0.0015–0.015',
-    tickLower: 41800,
-    tickUpper: 65000,
-    blurb: 'fREMY spread from the floor to 10×, alongside the launch position.',
-  },
-  {
-    id: 'near',
-    name: 'Near the floor',
-    label: '0.0015–0.005',
-    tickLower: 52800,
-    tickUpper: 65000,
-    blurb: 'fREMY concentrated close to the floor: earns the most while the price stays low.',
-  },
-  {
-    id: 'bid',
-    name: 'Floor bid',
-    label: '0.001–0.0015',
-    tickLower: 65000,
-    tickUpper: 69000,
-    blurb: 'ETH that buys fREMY back if the price dips under the floor.',
-  },
-  {
-    id: 'custom',
-    name: 'Custom range',
-    label: '',
-    tickLower: 0,
-    tickUpper: 0,
-    blurb: `Your own min and max price, on ${STEP} steps.`,
-  },
-] as const
-
 function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: () => void }) {
   const { address } = useAccount()
-  const [preset, setPreset] = useState<(typeof PRESETS)[number]['id']>('curve')
-  const [cMin, setCMin] = useState('0.002')
-  const [cMax, setCMax] = useState('0.01')
-  const [amt, setAmt] = useState('')
+  const [selection, setSelection] = useState<RangeSelection>(() => liquiditySelection('sell'))
+  const [deposit, setDeposit] = useState<{ value: string; asset: 'eth' | 'fremy' }>({ value: '', asset: 'fremy' })
   const { data: eth } = useBalance({ address, query: { enabled: !!address } })
   const { data: fremyBal } = useReadContract({
     address: NEW.fremy,
@@ -542,32 +502,14 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
     args: address ? [address] : undefined,
   })
 
-  const p = PRESETS.find((x) => x.id === preset) ?? PRESETS[0]
-  // Custom prices snap to the nearest grid step; the min price sets the upper tick (ETH per fREMY = 1.0001^-tick).
-  const cUpper = nearestTickForEthPrice(Number(cMin), SPACING)
-  const cLower = nearestTickForEthPrice(Number(cMax), SPACING)
-  const rangeError =
-    preset !== 'custom'
-      ? undefined
-      : cUpper === undefined || cLower === undefined
-        ? 'Enter positive prices in ETH per fREMY.'
-        : Number(cMax) <= Number(cMin)
-          ? 'Max must be above min.'
-          : cLower >= cUpper
-            ? `Min and max round to the same ${STEP} step. Widen the range.`
-            : undefined
-  const ok = rangeError === undefined
-  const tickLower = preset === 'custom' ? (ok ? (cLower as number) : 0) : p.tickLower
-  const tickUpper = preset === 'custom' ? (ok ? (cUpper as number) : 0) : p.tickUpper
-  /** ▲ raises a price one grid step (one tick spacing down), ▼ lowers it. */
-  const nudge = (which: 'min' | 'max', up: boolean) => {
-    const current = nearestTickForEthPrice(Number(which === 'min' ? cMin : cMax), SPACING) ?? Math.round(pool.tick / SPACING) * SPACING
-    const next = String(Number(ethPriceAtTick(current + (up ? -SPACING : SPACING)).toPrecision(6)))
-    if (which === 'min') setCMin(next)
-    else setCMax(next)
-  }
+  const { range, error: rangeError } = resolveLiquidityRange(pool.sqrtPriceX96, selection, SPACING)
+  const ok = !!range
+  const tickLower = range?.tickLower ?? 0
+  const tickUpper = range?.tickUpper ?? 0
   const side = ok ? rangeSide(pool.sqrtPriceX96, tickLower, tickUpper) : 'fremy'
   const input: 'eth' | 'fremy' = side === 'eth' ? 'eth' : 'fremy'
+  const amt = deposit.asset === input ? deposit.value : ''
+  const setAmt = (value: string) => setDeposit({ value, asset: input })
   const amount = parse(amt) ?? 0n
   const bal = input === 'eth' ? eth?.value : fremyBal
   const pos = ok && amount > 0n ? positionFor(pool.sqrtPriceX96, tickLower, tickUpper, input, amount) : undefined
@@ -596,7 +538,7 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
     messageBox({
       title: 'Add liquidity',
       icon: 'question',
-      text: `Add ${amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}${amount1Max && amount0Max ? ' and ' : ''}${amount0Max ? `up to ${fmt(amount0Max, 18, 6)} ETH` : ''} between ${px(ethPriceAtTick(tickUpper))} and ${px(ethPriceAtTick(tickLower))} ETH per fREMY. You receive a position NFT and earn 1% on trades through your range. Continue?`,
+      text: `Add ${amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}${amount1Max && amount0Max ? ' and ' : ''}${amount0Max ? `up to ${fmt(amount0Max, 18, 6)} ETH` : ''} between ${px(ethPriceAtTick(tickUpper))} and ${px(ethPriceAtTick(tickLower))} ETH per fREMY. You receive a position NFT and earn a share of the ${pool.lpFee / 10_000}% LP fee on trades through your range. Continue?`,
       onConfirm: async () => {
         if (await tx.run(mintSteps(address, { tickLower, tickUpper, liquidity: pos.liquidity, amount0Max, amount1Max }))) {
           setAmt('')
@@ -606,159 +548,130 @@ function MarketMaker({ pool, tx, onDone }: { pool: PoolData; tx: TxUi; onDone: (
     })
   }
 
-  const sideLabel = side === 'eth' ? 'ETH only' : side === 'fremy' ? 'fREMY only' : 'fREMY + a little ETH'
+  const sideLabel = side === 'eth' ? 'ETH only' : side === 'fremy' ? 'fREMY only' : 'fREMY + ETH'
+  const changeRange = (next: RangeSelection) => {
+    const nextRange = resolveLiquidityRange(pool.sqrtPriceX96, next, SPACING).range
+    const nextInput = nextRange && rangeSide(pool.sqrtPriceX96, nextRange.tickLower, nextRange.tickUpper) === 'eth' ? 'eth' : 'fremy'
+    if (nextInput !== input) setAmt('')
+    setSelection(next)
+  }
   return (
     <div className="mm">
-      <div className="mm-left">
-        <Group title="1. Choose a range">
-          <fieldset className="presets">
-            <legend className="sr-only">Range preset</legend>
-            {PRESETS.map((x) => (
-              <label key={x.id} className={`preset${preset === x.id ? ' on' : ''}`}>
-                <input type="radio" name="preset" className="sr-only" checked={preset === x.id} onChange={() => setPreset(x.id)} />
-                <b>{x.name}</b>
-                <small>{x.id === 'custom' ? x.blurb : `${x.label} ETH · ${x.blurb}`}</small>
+      <TraderRange selection={selection} onChange={changeRange} floor={pool.price} spacing={SPACING} range={range} error={rangeError} />
+      <div className="mm-body">
+        <div className="mm-left">
+          <Group title="Your deposit" className="mm-deposit">
+            <div className="mm-deposit-heading">
+              <label htmlFor="mm-amt">Amount to provide</label>
+              <span className={`side-badge ${side}`}>{ok ? sideLabel : 'Choose a valid range'}</span>
+            </div>
+            <div className="input-wrap">
+              <label className="sr-only" htmlFor="mm-amt">
+                Amount in {input === 'eth' ? 'ETH' : 'fREMY'}
               </label>
-            ))}
-          </fieldset>
-          {preset === 'custom' && (
-            <div className="row">
-              <label htmlFor="mm-min">Min</label>
               <input
-                id="mm-min"
-                className="input num grow"
+                id="mm-amt"
+                className="input num"
                 inputMode="decimal"
-                value={cMin}
-                onChange={(e) => setCMin(e.target.value.replace(/[^0-9.]/g, ''))}
+                placeholder="0"
+                value={amt}
+                onChange={(e) => setAmt(e.target.value.replace(/[^0-9.]/g, ''))}
               />
-              <span className="spin">
-                <button type="button" aria-label={`Raise min price one ${STEP} step`} onClick={() => nudge('min', true)}>
-                  ▲
-                </button>
-                <button type="button" aria-label={`Lower min price one ${STEP} step`} onClick={() => nudge('min', false)}>
-                  ▼
-                </button>
-              </span>
-              <label htmlFor="mm-max">Max</label>
-              <input
-                id="mm-max"
-                className="input num grow"
-                inputMode="decimal"
-                value={cMax}
-                onChange={(e) => setCMax(e.target.value.replace(/[^0-9.]/g, ''))}
-              />
-              <span className="spin">
-                <button type="button" aria-label={`Raise max price one ${STEP} step`} onClick={() => nudge('max', true)}>
-                  ▲
-                </button>
-                <button type="button" aria-label={`Lower max price one ${STEP} step`} onClick={() => nudge('max', false)}>
-                  ▼
-                </button>
-              </span>
-            </div>
-          )}
-          {ok ? (
-            <p className="mm-snap small">
-              {preset === 'custom' ? `Nearest ${STEP} steps: ` : 'Range: '}
-              <b className="num">{px(ethPriceAtTick(tickUpper))}</b> – <b className="num">{px(ethPriceAtTick(tickLower))}</b> ETH (ticks {tickLower} to{' '}
-              {tickUpper}) · <span className={`side-badge ${side}`}>{sideLabel}</span>
-            </p>
-          ) : (
-            <p className="err small">{rangeError}</p>
-          )}
-        </Group>
-        <Group title="2. Amount">
-          <div className="input-wrap">
-            <label className="sr-only" htmlFor="mm-amt">
-              Amount in {input === 'eth' ? 'ETH' : 'fREMY'}
-            </label>
-            <input
-              id="mm-amt"
-              className="input num"
-              inputMode="decimal"
-              placeholder="0"
-              value={amt}
-              onChange={(e) => setAmt(e.target.value.replace(/[^0-9.]/g, ''))}
-            />
-            <button type="button" className="chip" onClick={() => bal !== undefined && setAmt(formatUnits(input === 'eth' ? (bal * 95n) / 100n : bal, 18))}>
-              Max
-            </button>
-            <span className="unit">{input === 'eth' ? 'ETH' : 'fREMY'}</span>
-          </div>
-          <p className="muted small">
-            Balance: {address ? `${fmt(bal, 18, input === 'eth' ? 5 : 4)} ${input === 'eth' ? 'ETH' : 'fREMY'}` : 'connect a wallet'}
-            {side === 'both' && pos ? ` · also needs ≈ ${fmt(pos.amount0, 18, 8)} ETH` : ''}
-          </p>
-          {!address ? (
-            <ConnectPrompt why="Connect a wallet to provide liquidity." />
-          ) : (
-            <div className="row end">
-              {short && <span className="err small">Not enough balance.</span>}
-              <button type="button" className="btn default" disabled={tx.busy || !pos || pos.liquidity === 0n || short} onClick={submit}>
-                <Icon name="coin" size={16} />
-                Add liquidity
+              <button
+                type="button"
+                className="chip"
+                onClick={() => bal !== undefined && setAmt(formatUnits(input === 'eth' ? (bal * 95n) / 100n : bal, 18))}
+              >
+                Max
               </button>
+              <span className="unit">{input === 'eth' ? 'ETH' : 'fREMY'}</span>
             </div>
-          )}
-        </Group>
+            <p className="muted small">
+              Balance: {address ? `${fmt(bal, 18, input === 'eth' ? 5 : 4)} ${input === 'eth' ? 'ETH' : 'fREMY'}` : 'connect a wallet'}
+              {side === 'both' && pos ? ` · also needs up to ${fmt(amount0Max, 18, 8)} ETH` : ''}
+            </p>
+            {!address ? (
+              <ConnectPrompt why="Connect a wallet to provide liquidity." />
+            ) : (
+              <div className="row end">
+                {short && <span className="err small">Not enough balance.</span>}
+                <button type="button" className="btn default" disabled={tx.busy || !pos || pos.liquidity === 0n || short} onClick={submit}>
+                  <Icon name="coin" size={16} />
+                  Create position
+                </button>
+              </div>
+            )}
+          </Group>
+        </div>
+        <div className="mm-right">
+          <Group title="Your position" className="mm-summary">
+            <div className="mm-summary-range">
+              <small>Trades across this price range</small>
+              <b className="num">
+                {ok ? `${px(ethPriceAtTick(tickUpper))} → ${px(ethPriceAtTick(tickLower))}` : '—'} <small>ETH</small>
+              </b>
+            </div>
+            {!preview ? (
+              <p className="muted small">Enter an amount to preview your deposit and what it becomes as the price moves.</p>
+            ) : (
+              <>
+                <dl className="kv">
+                  <dt>You deposit</dt>
+                  <dd className="num">
+                    {amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}
+                    {amount1Max && amount0Max ? ' + ' : ''}
+                    {amount0Max ? `${fmt(amount0Max, 18, 6)} ETH` : ''}
+                  </dd>
+                  <dt>At the upper price</dt>
+                  <dd className="num">≈ {fmt(preview.raised, 18, 5)} ETH</dd>
+                  <dt>At the lower price</dt>
+                  <dd className="num">≈ {fmt(preview.fremyIfDip, 18, 4)} fREMY</dd>
+                </dl>
+                <p className="muted small">End balances exclude fees earned.</p>
+              </>
+            )}
+            <p className="mm-fee-note">Earn a share of the {pool.lpFee / 10_000}% LP fee on trades through your range.</p>
+            <p className="muted small">Outside your range, the position holds one token and pauses earning fees until the price returns.</p>
+          </Group>
+        </div>
       </div>
-      <div className="mm-right">
-        <Group title="3. Preview">
-          {!preview ? (
-            <p className="muted small">Pick a range and an amount to see how your position changes the market.</p>
-          ) : (
-            <>
-              <dl className="kv">
-                <dt>Liquidity</dt>
-                <dd className="num">{preview.mine.liquidity.toString()}</dd>
-                <dt>You deposit</dt>
-                <dd className="num">
-                  {amount1Max ? `${fmt(amount1Max, 18, 4)} fREMY` : ''}
-                  {amount1Max && amount0Max ? ' + ' : ''}
-                  {amount0Max ? `${fmt(amount0Max, 18, 6)} ETH` : ''}
-                </dd>
-                {side !== 'eth' ? (
-                  <>
-                    <dt>ETH if fully bought</dt>
-                    <dd className="num">≈ {fmt((preview.raised * 101n) / 100n, 18, 5)} ETH</dd>
-                  </>
-                ) : (
-                  <>
-                    <dt>fREMY if fully sold into</dt>
-                    <dd className="num">≈ {fmt(preview.fremyIfDip, 18, 4)} fREMY</dd>
-                  </>
-                )}
-                <dt>Fee tier</dt>
-                <dd className="num">1% of every trade in range</dd>
-              </dl>
-              {side !== 'eth' && (
-                <table className="impact">
-                  <caption>Price after buying N Remys (ETH per fREMY)</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">N</th>
-                      <th scope="col">Now</th>
-                      <th scope="col">With yours</th>
+      <details className="mm-details">
+        <summary>
+          Market depth & price impact <span>See how your position changes liquidity</span>
+        </summary>
+        <div className="mm-body">
+          <Group title="Depth with your position">
+            <DepthLadder pool={pool} extra={preview?.mine} />
+          </Group>
+          <Group title="Buy impact">
+            {!preview || side === 'eth' ? (
+              <p className="muted small">Add a selling position to compare the price impact of buys.</p>
+            ) : (
+              <table className="impact">
+                <caption>Price after buying N Remys (ETH per fREMY)</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">N</th>
+                    <th scope="col">Now</th>
+                    <th scope="col">With yours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((r) => (
+                    <tr key={r.n}>
+                      <td>{r.n}</td>
+                      <td className="num">{r.now.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.now.sqrtAfter))}</td>
+                      <td className="num up">
+                        {r.withMe.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.withMe.sqrtAfter))}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {preview.rows.map((r) => (
-                      <tr key={r.n}>
-                        <td>{r.n}</td>
-                        <td className="num">{r.now.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.now.sqrtAfter))}</td>
-                        <td className="num up">{r.withMe.filled < BigInt(r.n) * ONE ? 'sold out' : px(ethPriceAtSqrt(r.withMe.sqrtAfter))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </>
-          )}
-        </Group>
-        <Group title="Depth with your position">
-          <DepthLadder pool={pool} extra={preview?.mine} />
-        </Group>
-      </div>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Group>
+        </div>
+      </details>
     </div>
   )
 }
