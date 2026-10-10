@@ -575,6 +575,22 @@ const icons: Record<string, ReactNode> = {
       <path d="M7.4 9h6M7.4 12h6M7.4 15h4.4M18.4 9h6M18.4 12h4" stroke="#8c96a8" strokeWidth="1" />
     </>
   ),
+  /* Sheet of paper written in Wingdings, with a pencil: Remy TextEdit. */
+  textedit: (
+    <>
+      <Shadow />
+      <path d="M5.4 3.4h15.4l5.8 5.8v19.4H5.4z" fill="url(#xi-paper)" stroke="#5a6478" strokeWidth=".8" />
+      <path d="M20.8 3.4v5.8h5.8" fill="#dfe4ee" stroke="#5a6478" strokeWidth=".8" />
+      <circle cx="9.4" cy="12.6" r="1.3" fill="#2a2a2a" />
+      <rect x="12" y="11.3" width="2.6" height="2.6" fill="#2a2a2a" />
+      <path d="m17.2 11.2 1.5 1.5-1.5 1.5-1.5-1.5z" fill="#2a2a2a" />
+      <path d="M8 17.6h3M13 17.6h2.6" stroke="#2a2a2a" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="m8.4 23 1.4-1.6 1.4 1.6M13 21.6h2.4v2.4H13" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+      <path d="m28.4 12.6 1.8 1.8-11.6 11.6-2.8 1 1-2.8z" fill="#ffbe1a" stroke="#8a5a24" strokeWidth=".7" strokeLinejoin="round" />
+      <path d="m27 14 1.8 1.8" stroke="#8a5a24" strokeWidth=".7" />
+      <path d="m15.8 27 .4-1.2.8.8z" fill="#2a2a2a" />
+    </>
+  ),
 }
 
 export type IconName = keyof typeof icons

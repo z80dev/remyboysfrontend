@@ -3986,6 +3986,25 @@ button.thumb {
   background: #fff;
 }
 
+/* --- Remy TextEdit ------------------------------------------------------------ */
+
+.textedit-page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-top: 1px solid var(--face-dark);
+  border-radius: 0;
+  outline: none;
+  resize: none;
+  background: #fff;
+  font: 16px / 1.5 'Noto Sans Symbols 2', 'Noto Sans Symbols', 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* --- Remy Trader ----------------------------------------------------------------------------------------- */
 
 .trader {
