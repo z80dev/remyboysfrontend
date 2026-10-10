@@ -38,6 +38,11 @@ const ENTRIES: Entry[] = [
   { id: 'remy:demoscene', artist: 'Remy Boys', load: async () => (await import('../songs/demoscene')).default },
   { id: 'remy:eurodance', artist: 'Remy Boys', load: async () => (await import('../songs/eurodance')).default },
   { id: 'remy:lofi', artist: 'Remy Boys', load: async () => (await import('../songs/lofi')).default },
+  { id: 'remy:mountainking', artist: 'Remy Boys', load: async () => (await import('../songs/mountainking')).default },
+  { id: 'remy:furelise', artist: 'Remy Boys', load: async () => (await import('../songs/furelise')).default },
+  { id: 'remy:odetojoy', artist: 'Remy Boys', load: async () => (await import('../songs/odetojoy')).default },
+  { id: 'remy:canon', artist: 'Remy Boys', load: async () => (await import('../songs/canon')).default },
+  { id: 'remy:bumblebee', artist: 'Remy Boys', load: async () => (await import('../songs/bumblebee')).default },
   ...QUEST.map((track): Entry => ({ id: `quest:${track}`, artist: 'Remy Quest OST', load: () => loadSong(track) })),
   {
     id: 'haunt:cabald',
