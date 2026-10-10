@@ -141,6 +141,51 @@
   --header: linear-gradient(100deg, #4d4f72 0%, #6e7096 45%, #9c9eba 100%);
 }
 
+.theme-halloween {
+  --title: linear-gradient(to bottom, #7d45c4 0%, #a56be6 3%, #8a52d4 6%, #6a34b2 12%, #55259a 24%, #4a1f8a 50%, #4f2292 66%, #5a29a0 80%, #4a1f8a 90%, #34126a 96%, #240a4c 100%);
+  --title-in: linear-gradient(to bottom, #a08cbc 0%, #b8a6d0 5%, #a895c4 12%, #9b88b9 50%, #8f7cad 90%, #7e6b9c 100%);
+  --title-fg: #ffb24d;
+  --title-fg-in: #f2e6ff;
+  --title-shadow: 1px 1px 0 #1a0630;
+  --frame: #4a1f8a;
+  --frame-hi: #8a52d4;
+  --frame-lo: #240a4c;
+  --frame-in: #9b88b9;
+  --cap: radial-gradient(circle at 85% 85%, #3a1570 0%, #5a29a0 45%, #8a5ad0 70%, #d6c2f2 92%, #fff 100%);
+  --cap-close: radial-gradient(circle at 85% 85%, #b84a00 0%, #e8701a 45%, #ff9a3e 70%, #ffd9b0 92%, #fff 100%);
+  --cap-fg: #fff;
+  --taskbar: linear-gradient(to bottom, #12061f 0%, #6a34b2 4%, #4a1f8a 9%, #3a1570 18%, #2e1060 40%, #2a0e58 70%, #220a4a 92%, #12061f 100%);
+  --tray: linear-gradient(to bottom, #7a2c00 0%, #ff9a3e 7%, #f47a16 14%, #e06a10 40%, #d9600c 80%, #b84a00 100%);
+  --tray-edge: #5a1f00;
+  --task: linear-gradient(to bottom, #8a5ad0 0%, #6a34b2 12%, #5a29a0 60%, #4a1f8a 100%);
+  --task-hover: linear-gradient(to bottom, #a476e6 0%, #8050c8 12%, #7444bc 60%, #6234ac 100%);
+  --task-on: linear-gradient(to bottom, #1a0838 0%, #22094a 30%, #2a0e58 100%);
+  --task-fg: #fff;
+  --pane: linear-gradient(to bottom, #6a4a96 0%, #3a1f62 100%);
+  --box-head: linear-gradient(to right, #fff 0%, #f6d9bb 100%);
+  --box-head-fg: #a8420a;
+  --box-primary: linear-gradient(to right, #b84a00 0%, #e8701a 60%, #ff9a3e 100%);
+  --box-body: #f4e7da;
+  --box-body-primary: #fff6ec;
+  --sel: #c2560d;
+  --sm-head: linear-gradient(to bottom, #2a0e58 0%, #3a1570 14%, #4a1f8a 34%, #55259a 52%, #6a34b2 70%, #7d45c4 100%);
+  --header: linear-gradient(100deg, #1a0638 0%, #4a1f8a 50%, #d9600c 100%);
+}
+
+.theme-halloween .start-btn {
+  background: linear-gradient(to bottom, #a8420a 0%, #ffb24d 6%, #ff9330 14%, #f47a16 40%, #e8701a 70%, #d9600c 88%, #a8420a 100%);
+  text-shadow: 1px 1px 2px rgba(60, 15, 0, 0.75);
+}
+
+.theme-halloween .start-btn.open,
+.theme-halloween .start-btn:active {
+  background: linear-gradient(to bottom, #7a2c00 0%, #a8420a 10%, #b84a00 50%, #a8420a 100%);
+}
+
+.theme-halloween .mini-start {
+  background: #e8701a;
+}
+
 /* --- Base ---------------------------------------------------------------- */
 
 *,
@@ -670,6 +715,139 @@ dialog {
   background: url(/wallpaper/remy-bliss.svg) center / cover no-repeat, #4a8fe8;
 }
 
+/* Haunted Remys: the Halloween Remy art is the inline background-image; a moonlit vignette, fog and bats go on top. */
+.wallpaper.halloween {
+  background: #12061f center / cover no-repeat;
+}
+
+.wallpaper.halloween::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 75% 70% at 55% 42%, transparent 40%, rgba(14, 4, 26, 0.78) 100%),
+    linear-gradient(to bottom, rgba(40, 10, 70, 0.35), transparent 35%, transparent 70%, rgba(14, 4, 26, 0.55));
+  pointer-events: none;
+}
+
+.wallpaper.halloween .watermark i {
+  color: #c8f26b;
+}
+
+.haunted {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.haunted-flight {
+  position: absolute;
+  left: 0;
+  animation: haunted-fly 22s linear infinite;
+}
+
+.haunted-flight.h1 {
+  top: 9%;
+  animation-delay: -4s;
+}
+
+.haunted-flight.h2 {
+  top: 18%;
+  animation-duration: 31s;
+  animation-delay: -19s;
+  animation-direction: reverse;
+}
+
+.haunted-flight.h3 {
+  top: 27%;
+  animation-duration: 26s;
+  animation-delay: -11s;
+}
+
+.haunted-flight.h4 {
+  top: 6%;
+  animation-duration: 37s;
+  animation-delay: -27s;
+  animation-direction: reverse;
+}
+
+.haunted-flight.h5 {
+  top: 40%;
+  animation-duration: 45s;
+  animation-delay: -8s;
+}
+
+.spooky-bat.haunted-bat {
+  position: relative;
+  display: block;
+  width: 30px;
+  fill: #0c0418;
+  filter: drop-shadow(0 0 4px rgba(255, 170, 80, 0.35));
+  animation: haunted-flap 0.32s ease-in-out infinite alternate;
+}
+
+.h2 .haunted-bat,
+.h4 .haunted-bat {
+  width: 20px;
+  opacity: 0.8;
+}
+
+.h5 .haunted-bat {
+  width: 16px;
+  opacity: 0.6;
+}
+
+@keyframes haunted-fly {
+  0% {
+    transform: translate(-80px, 0);
+  }
+  25% {
+    transform: translate(25vw, -28px);
+  }
+  50% {
+    transform: translate(50vw, 12px);
+  }
+  75% {
+    transform: translate(75vw, -18px);
+  }
+  100% {
+    transform: translate(calc(100vw + 80px), 0);
+  }
+}
+
+@keyframes haunted-flap {
+  to {
+    transform: scaleY(0.35);
+  }
+}
+
+.haunted-fog {
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  bottom: -8%;
+  height: 42%;
+  background:
+    radial-gradient(ellipse 22% 48% at 18% 72%, rgba(196, 168, 236, 0.2), transparent 70%),
+    radial-gradient(ellipse 18% 40% at 46% 82%, rgba(196, 168, 236, 0.16), transparent 70%),
+    radial-gradient(ellipse 26% 52% at 74% 70%, rgba(196, 168, 236, 0.18), transparent 70%);
+  animation: haunted-drift 70s ease-in-out infinite alternate;
+}
+
+.haunted-fog.f2 {
+  bottom: -16%;
+  opacity: 0.75;
+  animation-duration: 95s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes haunted-drift {
+  to {
+    transform: translateX(22%);
+  }
+}
+
 .kite {
   position: absolute;
   top: 5%;
@@ -814,12 +992,47 @@ dialog {
   }
 }
 
-.spooky-pumpkin {
+.spooky-portrait {
   position: relative;
   flex: none;
-  width: 76px;
-  filter: drop-shadow(0 0 10px rgba(255, 140, 30, 0.6));
+  width: 84px;
+  height: 84px;
   animation: spooky-bob 3s ease-in-out infinite;
+}
+
+.spooky-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 2px solid #ff8a1f;
+  border-radius: 8px;
+  background: #170a2b;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 14px rgba(255, 140, 30, 0.6);
+}
+
+.spooky-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.spooky-frame img.on {
+  opacity: 1;
+}
+
+.spooky-pumpkin {
+  position: absolute;
+  right: -12px;
+  bottom: -10px;
+  width: 36px;
+  filter: drop-shadow(0 0 6px rgba(255, 140, 30, 0.7));
 }
 
 .spooky-face {
@@ -964,8 +1177,9 @@ dialog {
   margin: 0 10px 6px;
 }
 
-.pocket-spooky .spooky-pumpkin {
-  width: 64px;
+.pocket-spooky .spooky-portrait {
+  width: 72px;
+  height: 72px;
 }
 
 .desktop-icons {

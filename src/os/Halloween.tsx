@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HALLOWEEN_MINT } from "../config";
+import { HALLOWEEN_IDS } from "../lib/halloweenIds";
+import { halloweenImg } from "../lib/media";
 
 const KEY = "remyxp.halloween-mint";
+/** This visit's Halloween Remys, in random order: the flyer cycles through them; the haunted wallpaper shows the first unless the user pinned one. */
+const FLYER_ART = [...new Set(Array.from({ length: 8 }, () => HALLOWEEN_IDS[Math.floor(Math.random() * HALLOWEEN_IDS.length)]))].slice(0, 6);
+export const VISIT_HALLOWEEN = FLYER_ART[0];
+const FLYER_MS = 3600;
 
 function Pumpkin() {
   return (
@@ -27,6 +33,40 @@ function Bat({ className }: { className: string }) {
     <svg className={`spooky-bat ${className}`} viewBox="0 0 24 10" aria-hidden="true" focusable="false">
       <path d="M0 4c3-3 6-2 8 0 1-2 2-3 4-1 2-2 3-1 4 1 2-2 5-3 8 0-3 0-5 1-6 4-1-1-3-2-4 0-1-1-2-2-2-2s-1 1-2 2c-1-2-3-1-4 0-1-3-3-4-6-4z" />
     </svg>
+  );
+}
+
+/** Fog and bats over the Halloween wallpaper (the art itself is the wallpaper background). */
+export function HauntedSky() {
+  return (
+    <div className="haunted" aria-hidden="true">
+      {["h1", "h2", "h3", "h4", "h5"].map((c) => (
+        <span key={c} className={`haunted-flight ${c}`}>
+          <Bat className="haunted-bat" />
+        </span>
+      ))}
+      <div className="haunted-fog f1" />
+      <div className="haunted-fog f2" />
+    </div>
+  );
+}
+
+/** Framed Halloween Remys, cross-fading every few seconds, with the jack-o'-lantern as a badge. */
+function Portrait() {
+  const [on, setOn] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setOn((i) => (i + 1) % FLYER_ART.length), FLYER_MS);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="spooky-portrait">
+      <div className="spooky-frame">
+        {FLYER_ART.map((id, i) => (
+          <img key={id} className={i === on ? "on" : ""} {...halloweenImg(id, "84px")} alt={i === on ? `Halloween Remy #${id}` : ""} />
+        ))}
+      </div>
+      <Pumpkin />
+    </div>
   );
 }
 
@@ -57,7 +97,7 @@ export function HalloweenMint({ pocket }: { pocket?: boolean }) {
         title="Dismiss"
         onClick={dismiss}
       />
-      <Pumpkin />
+      <Portrait />
       <div className="spooky-copy">
         <span className="spooky-tag">Remy holders only</span>
         <b className="spooky-title">

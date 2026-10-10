@@ -5,8 +5,9 @@
  *   node scripts/media.mjs sync    build, then upload new or changed objects (MEDIA_UPLOAD_TOKEN required)
  *
  * Keys (see src/lib/media.ts):
- *   remy/<recipe>/<width>/<idx>.webp   128/320 px resized from media/remy/Character<idx>.webp; 600 is the original bytes
- *   quest/<hash>/<path>                media/quest/<path>, versioned by a content hash of the whole directory
+ *   remy/<recipe>/<width>/<idx>.webp       128/320 px resized from media/remy/Character<idx>.webp; 600 is the original bytes
+ *   halloween/<recipe>/<width>/<id>.webp   the same for Halloween Remys, from media/halloween/<id>.webp (scripts/halloween-art.mjs)
+ *   quest/<hash>/<path>                    media/quest/<path>, versioned by a content hash of the whole directory
  * Sync compares local MD5s with the R2 ETags from the Worker's list endpoint, so reruns only upload what changed.
  * vite.config.ts imports questVersion() and localFile() to serve the same keys in dev.
  */
@@ -16,11 +17,12 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { REMY_RECIPE, REMY_WIDTHS, remyKey } from '../src/lib/media.ts'
+import { HALLOWEEN_WIDTHS, REMY_RECIPE, REMY_WIDTHS, halloweenKey, remyKey } from '../src/lib/media.ts'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const ORIGINALS = join(ROOT, 'media/remy')
 const QUEST = join(ROOT, 'media/quest')
+const HALLOWEEN = join(ROOT, 'media/halloween')
 const CACHE = join(ROOT, '.cache/media')
 const REMY_COUNT = 4490
 const QUALITY = 82
@@ -55,11 +57,10 @@ export async function questVersion() {
 }
 
 let sharp
-/** Local file for a Remy variant; resized variants are generated into .cache/media on first use. */
-async function remyFile(idx, width) {
-  const original = join(ORIGINALS, `Character${idx}.webp`)
-  if (width === 600) return original
-  const file = join(CACHE, remyKey(idx, width))
+/** Local file for a square-art variant: the largest width is the source bytes; smaller ones are generated into .cache/media on first use. */
+async function variantFile(original, key, width, sourceWidth) {
+  if (width === sourceWidth) return original
+  const file = join(CACHE, key)
   if (existsSync(file)) return file
   sharp ??= (await import('sharp')).default
   const webp = await sharp(original).resize({ width, height: width, fit: 'inside' }).webp({ quality: QUALITY, effort: 6 }).toBuffer()
@@ -70,7 +71,20 @@ async function remyFile(idx, width) {
   return file
 }
 
+const remyFile = (idx, width) => variantFile(join(ORIGINALS, `Character${idx}.webp`), remyKey(idx, width), width, 600)
+const halloweenFile = (id, width) => variantFile(join(HALLOWEEN, `${id}.webp`), halloweenKey(id, width), width, 1024)
+
+/** Halloween Remy token ids with art in media/halloween, sorted. */
+async function halloweenIds() {
+  if (!existsSync(HALLOWEEN)) return []
+  return (await readdir(HALLOWEEN))
+    .filter((f) => /^\d+\.webp$/.test(f))
+    .map((f) => Number.parseInt(f, 10))
+    .sort((a, b) => a - b)
+}
+
 const REMY_KEY = new RegExp(`^remy/${REMY_RECIPE}/(\\d+)/(\\d+)\\.webp$`)
+const HALLOWEEN_KEY = new RegExp(`^halloween/${REMY_RECIPE}/(\\d+)/(\\d+)\\.webp$`)
 const QUEST_KEY = /^quest\/[0-9a-f]{16}\/([\w-]+(?:\/[\w-]+)*\.(?:webp|json))$/
 
 /** Dev server: a /media key to a local file (Quest keys ignore the hash), or null when it isn't one of ours. */
@@ -81,6 +95,13 @@ export async function localFile(key) {
     const idx = Number(remy[2])
     if (!REMY_WIDTHS.includes(width) || idx >= REMY_COUNT) return null
     return remyFile(idx, width)
+  }
+  const halloween = HALLOWEEN_KEY.exec(key)
+  if (halloween) {
+    const width = Number(halloween[1])
+    const id = Number(halloween[2])
+    if (!HALLOWEEN_WIDTHS.includes(width) || !existsSync(join(HALLOWEEN, `${id}.webp`))) return null
+    return halloweenFile(id, width)
   }
   const quest = QUEST_KEY.exec(key)
   if (quest) {
@@ -111,6 +132,12 @@ async function build() {
     e.file = await remyFile(e.idx, e.w)
     if (++done % 1000 === 0) console.log(`variants ${done}/${entries.length}`)
   })
+  const halloween = []
+  for (const id of await halloweenIds()) for (const w of HALLOWEEN_WIDTHS) halloween.push({ key: halloweenKey(id, w), id, w })
+  await pool(halloween, availableParallelism(), async (e) => {
+    e.file = await halloweenFile(e.id, e.w)
+  })
+  entries.push(...halloween)
   const version = await questVersion()
   for (const [rel, file] of await questFiles()) entries.push({ key: `quest/${version}/${rel}`, file })
   return { entries, version }
@@ -137,6 +164,7 @@ async function sync() {
   const { entries, version } = await build()
   const remote = new Map([
     ...(await remoteEtags(origin, token, `remy/${REMY_RECIPE}/`)),
+    ...(await remoteEtags(origin, token, `halloween/${REMY_RECIPE}/`)),
     ...(await remoteEtags(origin, token, `quest/${version}/`)),
   ])
   const todo = []

@@ -14,8 +14,8 @@ export interface Env {
 const PREFIX = "/media/";
 const IMMUTABLE = "public, max-age=31536000, immutable";
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-/** remy/<recipe>/<width>/<idx>.webp and quest/<hash>/<path>.(webp|json); no dot segments. */
-const KEY = /^(?:remy\/v\d+\/\d+\/\d+\.webp|quest\/[0-9a-f]{16}\/[\w-]+(?:\/[\w-]+)*\.(?:webp|json))$/;
+/** (remy|halloween)/<recipe>/<width>/<id>.webp and quest/<hash>/<path>.(webp|json); no dot segments. */
+const KEY = /^(?:(?:remy|halloween)\/v\d+\/\d+\/\d+\.webp|quest\/[0-9a-f]{16}\/[\w-]+(?:\/[\w-]+)*\.(?:webp|json))$/;
 const TYPES: Record<string, string> = { webp: "image/webp", json: "application/json" };
 
 const text = (body: string, status: number) =>
@@ -36,7 +36,7 @@ async function authorized(request: Request, env: Env): Promise<boolean> {
 async function list(url: URL, request: Request, env: Env): Promise<Response> {
   if (!(await authorized(request, env))) return text("Unauthorized", 401);
   const prefix = url.searchParams.get("prefix") ?? "";
-  if (!/^(?:remy|quest)\//.test(prefix)) return text("Bad prefix", 400);
+  if (!/^(?:remy|halloween|quest)\//.test(prefix)) return text("Bad prefix", 400);
   const page = await env.MEDIA.list({ prefix, cursor: url.searchParams.get("cursor") || undefined, limit: 1000 });
   return Response.json(
     {

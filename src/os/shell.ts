@@ -10,8 +10,13 @@ export type Balloon = { key: string; title: string; text: string; icon: string; 
 /** XP message box. With `onConfirm` it becomes a Yes/No question and runs the callback on Yes. */
 export type MessageBox = { id: number; title: string; text: string; icon: 'error' | 'warning' | 'info' | 'question'; onConfirm?: () => void }
 
-export type Wallpaper = { kind: 'bliss' } | { kind: 'solid' } | { kind: 'remy'; art: number; fit: 'stretch' | 'center' | 'tile' }
-export type Theme = 'blue' | 'olive' | 'silver'
+/** `halloween`: a Halloween Remy under a haunted overlay; without `art`, a different one each visit. */
+export type Wallpaper =
+  | { kind: 'bliss' }
+  | { kind: 'solid' }
+  | { kind: 'remy'; art: number; fit: 'stretch' | 'center' | 'tile' }
+  | { kind: 'halloween'; art?: number }
+export type Theme = 'blue' | 'olive' | 'silver' | 'halloween'
 export type Prefs = { wallpaper: Wallpaper; theme: Theme }
 
 type State = { balloons: Balloon[]; boxes: MessageBox[]; prefs: Prefs }
@@ -20,7 +25,9 @@ const PREFS_KEY = 'remyxp.prefs'
 const SEEN_KEY = 'remyxp.balloons'
 
 function loadPrefs(): Prefs {
-  const fallback: Prefs = { wallpaper: { kind: 'bliss' }, theme: 'blue' }
+  // Through October, visitors who never saved Display Properties get the Halloween look.
+  const fallback: Prefs =
+    new Date().getMonth() === 9 ? { wallpaper: { kind: 'halloween' }, theme: 'halloween' } : { wallpaper: { kind: 'bliss' }, theme: 'blue' }
   try {
     return { ...fallback, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') }
   } catch {

@@ -26,5 +26,20 @@ export function remyImg(idx: number, sizes: string) {
   }
 }
 
+/** Halloween Remys by token id (media/halloween/<id>.webp, scripts/halloween-art.mjs). 1024 is the source; the rest use the Remy recipe. */
+export const HALLOWEEN_WIDTHS = [128, 320, 600, 1024] as const
+export type HalloweenWidth = (typeof HALLOWEEN_WIDTHS)[number]
+
+export const halloweenKey = (id: number, width: HalloweenWidth) => `halloween/${REMY_RECIPE}/${width}/${id}.webp`
+export const halloweenSrc = (id: number, width: HalloweenWidth = 1024) => `/media/${halloweenKey(id, width)}`
+
+export function halloweenImg(id: number, sizes: string) {
+  return {
+    src: halloweenSrc(id, 320),
+    srcSet: HALLOWEEN_WIDTHS.map((w) => `${halloweenSrc(id, w)} ${w}w`).join(', '),
+    sizes,
+  }
+}
+
 /** Remy Quest art (media/quest/<path>) under its content-hash version. */
 export const questSrc = (path: string) => `/media/quest/${__QUEST_MEDIA__}/${path}`

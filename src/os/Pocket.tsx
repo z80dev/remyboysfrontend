@@ -4,12 +4,14 @@ import { LINKS } from '../config'
 import { useDataSnapshot } from '../lib/data'
 import { shortAddr } from '../lib/format'
 import { usePoolState } from '../lib/launch'
+import { halloweenSrc } from '../lib/media'
 import { BalloonHost } from './Balloons'
-import { HalloweenMint } from './Halloween'
+import { HalloweenMint, VISIT_HALLOWEEN } from './Halloween'
 import { UserPicture } from './StartMenu'
 import { WalletPanel, useClock, useOutside } from './Taskbar'
 import { appById, useVisibleApps } from './apps'
 import { FlagMark, Icon } from './icons'
+import { useShell } from './shell'
 import { useSecurityState } from './system'
 
 type Props = {
@@ -176,6 +178,7 @@ function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWalle
   const { data } = useDataSnapshot()
   const inv = data ? BigInt(data.stats.inventory) : undefined
   const pool = usePoolState()
+  const wallpaper = useShell((s) => s.prefs.wallpaper)
 
   const recovery = !address
     ? { tone: undefined, text: 'Connect to check for stolen Remys' }
@@ -191,7 +194,17 @@ function Today({ onLaunch, onWallet }: { onLaunch: (id: string) => void; onWalle
           : { tone: 'ok' as const, text: 'Nothing to reclaim' }
 
   return (
-    <div className="today">
+    <div
+      className="today"
+      style={
+        wallpaper.kind === 'halloween'
+          ? {
+              backgroundImage: `linear-gradient(rgba(18, 6, 31, 0.35), rgba(18, 6, 31, 0.75)), url(${halloweenSrc(wallpaper.art ?? VISIT_HALLOWEEN)})`,
+              backgroundPosition: 'center top',
+            }
+          : undefined
+      }
+    >
       <div className="today-date">
         <FlagMark size={28} />
         <span>

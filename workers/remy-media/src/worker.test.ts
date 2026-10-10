@@ -68,11 +68,12 @@ test("uploads need the token and a valid key", async () => {
   env.MEDIA_UPLOAD_TOKEN = undefined;
   expect((await upload(KEY, "abc", { authorization: "Bearer " })).status).toBe(401);
   env.MEDIA_UPLOAD_TOKEN = "secret";
-  for (const bad of ["remy/v1/128/../x.webp", "quest/abc/art.json", "secrets.txt", "quest/0123456789abcdef/.env"])
+  for (const bad of ["remy/v1/128/../x.webp", "halloween/v1/128/7.json", "halloweens/v1/128/7.webp", "quest/abc/art.json", "secrets.txt", "quest/0123456789abcdef/.env"])
     expect((await upload(bad, "abc")).status).toBe(404);
   expect(r2.objects.size).toBe(0);
   expect((await upload(KEY, "abc")).status).toBe(200);
   expect(r2.objects.get(KEY)?.type).toBe("image/webp");
+  expect((await upload("halloween/v1/320/666.webp", "abc")).status).toBe(200);
 });
 
 test("serves objects immutable, from the edge cache after the first hit, with 304 revalidation", async () => {

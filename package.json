@@ -9,6 +9,7 @@
     "lint": "biome check .",
     "preview": "vite preview",
     "quest:art": "node scripts/quest-art.mjs && uv run --python 3.12 --with 'rembg[cpu]' --with numpy --with pillow python scripts/quest-art.py",
+    "halloween:art": "node scripts/halloween-art.mjs",
     "media:build": "node scripts/media.mjs build",
     "media:sync": "node --env-file-if-exists=.env.local scripts/media.mjs sync"
   },

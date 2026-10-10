@@ -12,6 +12,7 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'blue', label: 'Default (blue)' },
   { id: 'olive', label: 'Olive Green' },
   { id: 'silver', label: 'Silver' },
+  { id: 'halloween', label: 'Halloween' },
 ]
 
 const FEATURED = [2069, 420, 777, 42, 1337, 7]
@@ -29,12 +30,22 @@ export function DisplayProperties({ close }: AppProps) {
     .map((id) => ({ id, art: map.get(id) }))
     .filter((x, i, all): x is { id: bigint; art: number } => x.art !== undefined && all.findIndex((y) => y.art === x.art) === i)
 
-  const fit = draft.wallpaper.kind === 'remy' ? draft.wallpaper.fit : 'stretch'
-  const current = draft.wallpaper.kind === 'remy' ? `remy-${draft.wallpaper.art}` : draft.wallpaper.kind
+  const w = draft.wallpaper
+  const fit = w.kind === 'remy' ? w.fit : 'stretch'
+  const current = w.kind === 'remy' ? `remy-${w.art}` : w.kind === 'halloween' && w.art !== undefined ? `halloween-${w.art}` : w.kind
   const pickRemy = (art: number) => setDraft((d) => ({ ...d, wallpaper: { kind: 'remy', art, fit } }))
   const options: { key: string; label: string; icon: string; pick: () => void }[] = [
     { key: 'solid', label: '(None)', icon: 'display', pick: () => setDraft((d) => ({ ...d, wallpaper: { kind: 'solid' } })) },
     { key: 'bliss', label: 'Remy Bliss', icon: 'gallery', pick: () => setDraft((d) => ({ ...d, wallpaper: { kind: 'bliss' } })) },
+    {
+      key: 'halloween',
+      label: 'Haunted Remys (new each visit)',
+      icon: 'gallery',
+      pick: () => setDraft((d) => ({ ...d, wallpaper: { kind: 'halloween' } })),
+    },
+    ...(w.kind === 'halloween' && w.art !== undefined
+      ? [{ key: current, label: `Halloween Remy #${w.art}`, icon: 'gallery', pick: () => setDraft((d) => ({ ...d, wallpaper: w })) }]
+      : []),
     ...mine.map((m) => ({ key: `remy-${m.art}`, label: `My Remy #${m.id}`, icon: 'gallery', pick: () => pickRemy(m.art) })),
     ...FEATURED.filter((art) => !mine.some((m) => m.art === art)).map((art) => ({
       key: `remy-${art}`,
@@ -43,8 +54,8 @@ export function DisplayProperties({ close }: AppProps) {
       pick: () => pickRemy(art),
     })),
   ]
-  if (draft.wallpaper.kind === 'remy' && !options.some((o) => o.key === current)) {
-    const { art } = draft.wallpaper
+  if (w.kind === 'remy' && !options.some((o) => o.key === current)) {
+    const { art } = w
     options.push({ key: current, label: `Remy Boy #${art}`, icon: 'gallery', pick: () => pickRemy(art) })
   }
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved)

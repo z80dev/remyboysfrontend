@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, type MouseEvent, useCallback, useEffect, useState } from 'react'
 import { TOTAL_SUPPLY_HINT } from '../config'
-import { remySrc } from '../lib/media'
+import { HALLOWEEN_IDS } from '../lib/halloweenIds'
+import { halloweenSrc, remySrc } from '../lib/media'
+import { HauntedSky, VISIT_HALLOWEEN } from './Halloween'
 import { useVisibleApps } from './apps'
 import { FLAG_COLORS, Icon } from './icons'
 import { type Wallpaper as WallpaperPref, setPrefs, useShell } from './shell'
@@ -15,6 +17,7 @@ export function wallpaperStyle(w: WallpaperPref): CSSProperties {
     if (w.fit === 'center') return { background: `${img} center / min(60vh, 600px) no-repeat, #004e98` }
     return { background: `${img} center / cover no-repeat, #004e98` }
   }
+  if (w.kind === 'halloween') return { backgroundImage: `url(${halloweenSrc(w.art ?? VISIT_HALLOWEEN)})` }
   return {}
 }
 
@@ -71,8 +74,10 @@ export function Wallpaper() {
   return (
     <div className={`wallpaper ${w.kind}`} style={wallpaperStyle(w)} aria-hidden="true">
       {w.kind === 'bliss' && <Kite />}
+      {w.kind === 'halloween' && <HauntedSky />}
       <div className="watermark">
-        Remy OS <i>xp</i> · Based Edition · Build 4490
+        Remy OS <i>xp</i> ·{' '}
+        {w.kind === 'halloween' ? `Haunted Edition · Halloween Remy #${w.art ?? VISIT_HALLOWEEN}` : 'Based Edition · Build 4490'}
       </div>
     </div>
   )
@@ -123,7 +128,7 @@ export function useDesktopMenu(open: (id: string) => void) {
   const onContextMenu = (e: MouseEvent) => {
     if ((e.target as HTMLElement).closest('.window, .taskbar, input, textarea, a')) return
     e.preventDefault()
-    setMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 190) })
+    setMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 214) })
   }
 
   const item = (label: string, act: () => void, bold = false) => (
@@ -147,6 +152,9 @@ export function useDesktopMenu(open: (id: string) => void) {
       {item('Open a random Remy', () => open(`gallery/${Math.floor(Math.random() * TOTAL_SUPPLY_HINT)}`))}
       {item('Shuffle wallpaper', () => setPrefs({ wallpaper: { kind: 'remy', art: Math.floor(Math.random() * TOTAL_SUPPLY_HINT), fit: 'stretch' } }))}
       {item('Restore Remy Bliss', () => setPrefs({ wallpaper: { kind: 'bliss' } }))}
+      {item('Summon a Halloween Remy', () =>
+        setPrefs({ wallpaper: { kind: 'halloween', art: HALLOWEEN_IDS[Math.floor(Math.random() * HALLOWEEN_IDS.length)] } }),
+      )}
       <hr />
       {item('Properties', () => open('display'), true)}
     </div>
