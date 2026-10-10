@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
-import { appById, isTeam } from './os/apps'
 import { MessageBoxHost } from './os/Balloons'
 import { DesktopIcons, Wallpaper, useDesktopMenu } from './os/Desktop'
 import { HalloweenMint } from './os/Halloween'
-import { IconDefs } from './os/icons'
 import { Pocket } from './os/Pocket'
 import { Session, type SessionStage, TurnOffDialog } from './os/Session'
+import { Taskbar } from './os/Taskbar'
+import { TASKBAR_H, type WinGeom, Window } from './os/Window'
+import { appById, isTeam } from './os/apps'
+import { IconDefs } from './os/icons'
 import { MobileContext, useShell } from './os/shell'
 import { TeamPrompt, useSecurityBalloons } from './os/system'
-import { Taskbar } from './os/Taskbar'
-import { TASKBAR_H, Window, type WinGeom } from './os/Window'
 
 type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean }
 
@@ -144,12 +144,13 @@ export default function App() {
         maximized={w.max}
         mobile={mobile}
         dialog={def.dialog}
+        resizable={def.resizable}
         skinned={def.skinned}
         hidden={hidden}
         onFocus={() => focus(w.id)}
         onClose={() => close(w.id)}
         onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
-        onToggleMax={() => update(w.id, (x) => ({ ...x, max: !x.max }))}
+        onToggleMax={() => def.resizable !== false && update(w.id, (x) => ({ ...x, max: !x.max }))}
         onGeom={(geom) => update(w.id, (x) => ({ ...x, geom }))}
       >
         <Component param={params[w.id]} navigate={navigate} close={() => close(w.id)} />

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { GAMES } from '../games/registry'
 import { remySrc } from '../lib/media'
 
 /*
@@ -613,6 +614,18 @@ const icons: Record<string, ReactNode> = {
       <path d="m18 7.4-6.2 7.6h3" fill="none" stroke="#fffbe0" strokeWidth=".8" strokeLinecap="round" opacity=".8" />
     </>
   ),
+  /* Folder holding a playing card and a joystick: the Games folder. */
+  games: (
+    <>
+      <ellipse cx="16" cy="29" rx="13" ry="2" fill="#143b70" opacity=".2" />
+      <path d="M3 7h10l3 3h13v17H3z" fill="#e2a824" stroke="#98630b" />
+      <path d="M3 13h27l-3 14H3z" fill="#ffdc65" stroke="#b98018" />
+      <path d="M15 13h9v12h-9z" fill="white" stroke="#58779a" transform="rotate(12 19 19)" />
+      <path d="m20 15-3 4 3 4 3-4z" fill="#db302b" />
+      <path d="M7 22v-5h3v5m-5 1h8v3H5z" fill="#486795" stroke="#203855" />
+      <circle cx="8.5" cy="15" r="3" fill="#dc3d31" stroke="#8a2019" />
+    </>
+  ),
 }
 
 export type IconName = keyof typeof icons
@@ -620,7 +633,7 @@ export type IconName = keyof typeof icons
 export function Icon({ name, size = 32, className }: { name: string; size?: number; className?: string }) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      {icons[name] ?? icons.folder}
+      {GAMES.find((game) => game.id === name)?.icon ?? icons[name] ?? icons.folder}
     </svg>
   )
 }

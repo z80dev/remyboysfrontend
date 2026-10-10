@@ -1,0 +1,42 @@
+.remy-deck-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  font: 11px var(--font);
+}
+.remy-deck-choice {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 3px 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: inherit;
+  color: #000;
+  cursor: default;
+}
+.remy-deck-choice canvas { max-width: 100%; height: auto !important; }
+.remy-deck-choice span { min-height: 28px; line-height: 14px; text-align: center; }
+.remy-deck-choice.selected { border: 1px dotted #000; background: #d8e4f8; }
+.remy-deck-choice:focus-visible { outline: 1px dotted #000; outline-offset: -3px; }
+.remy-deck-index { display: flex; align-items: center; gap: 10px; font: 11px var(--font); }
+.remy-deck-index input { min-width: 0; width: 85px; }
+.remy-deck-error { min-height: 28px; color: #800000; font: 11px var(--font); }
+.remy-card-help-tabs { display: flex; gap: 3px; }
+.remy-card-help-tabs .btn { min-width: 0; flex: 1; }
+.remy-card-help-body { padding: 12px; min-height: 160px; background: #fff; border: 1px solid #808080; line-height: 1.5; }
+.remy-card-help-body p { margin: 0 0 10px; }
+.remy-card-help-body ul { padding-left: 18px; }
+.remy-card-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.remy-card-hold { position: absolute; pointer-events: none; border: 2px solid #fff; border-radius: 50%; width: 34px; height: 34px; }
+.remy-card-status { display: flex; height: 20px; flex-shrink: 0; align-items: center; padding: 1px 2px; background: #ece9d8; font: 11px var(--font); }
+.remy-card-status > span { padding: 1px 6px; border-top: 1px solid #808080; border-left: 1px solid #808080; border-bottom: 1px solid #fff; border-right: 1px solid #fff; white-space: nowrap; }
+.remy-card-status > span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 719px) {
+  .remy-deck-grid { gap: 1px; padding: 0; }
+  .remy-deck-choice { padding: 3px 0; }
+  .remy-deck-choice span { font-size: 9px; line-height: 11px; min-height: 33px; }
+}

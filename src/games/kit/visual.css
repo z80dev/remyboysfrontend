@@ -1,0 +1,26 @@
+/* Win9x 3D bevels for classic game panels (Minesweeper, Chip's Challenge, ...). Mirrors drawBevel() in bevel.ts:
+   shadow edge listed first so it wins the top-right / bottom-left corner pixels, as in the real GDI edge. Box-shadow only:
+   add your own background (#c0c0c0) and padding. */
+
+.w9x-raised {
+  box-shadow: inset -1px -1px #808080, inset 1px 1px #fff;
+}
+
+.w9x-sunken {
+  box-shadow: inset -1px -1px #fff, inset 1px 1px #808080;
+}
+
+.w9x-raised-2 {
+  box-shadow: inset -2px -2px #808080, inset 2px 2px #fff;
+}
+
+.w9x-sunken-2 {
+  box-shadow: inset -2px -2px #fff, inset 2px 2px #808080;
+}
+
+/* LedCounter: the canvas is sized from its logical pixels by the component; never smooth it. */
+.gk-led {
+  display: inline-block;
+  vertical-align: top;
+  image-rendering: pixelated;
+}

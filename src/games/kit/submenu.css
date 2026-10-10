@@ -1,0 +1,7 @@
+/* Cascading submenus of the games kit menu bar (menu.tsx): the arrow on a parent row. Flyouts reuse `.ctx-menu.gk-menu` from kit.css. */
+
+.gk-mi-arrow {
+  position: absolute;
+  right: 6px;
+  font-size: 7px;
+}

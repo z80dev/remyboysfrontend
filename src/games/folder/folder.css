@@ -1,0 +1,122 @@
+/* === Games: Explorer folder and shell cascade === */
+.games-folder {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  font: 11px Tahoma, sans-serif;
+}
+.games-folder-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #aca899;
+}
+.games-folder-address b {
+  flex: 1;
+  background: white;
+  border: 1px solid #7f9db9;
+  padding: 3px;
+  font-weight: normal;
+}
+.games-folder-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.games-folder-tasks {
+  width: 180px;
+  flex-shrink: 0;
+  padding: 16px;
+  background: linear-gradient(#7ba4e0, #c4d6f2);
+  color: #173a77;
+}
+.games-folder-tasks h2 {
+  font-size: 13px;
+  background: linear-gradient(white, #d7e5fb);
+  margin: 0 -4px 12px;
+  padding: 7px;
+  border-radius: 4px 4px 0 0;
+}
+.games-folder-tasks p {
+  line-height: 1.5;
+}
+.games-folder-icons {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: white;
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 12px;
+}
+.games-folder-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 85px;
+  min-height: 76px;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  padding: 5px;
+}
+.games-folder-item.selected span {
+  background: var(--sel);
+  color: white;
+}
+.games-folder-item:focus-visible {
+  outline: 1px dotted #333;
+}
+.games-folder-empty {
+  color: #777;
+  text-align: center;
+  width: 100%;
+  margin: 30px 0;
+}
+.games-folder-status {
+  border-top: 1px solid #aca899;
+  padding: 4px 8px;
+  display: flex;
+  gap: 24px;
+}
+.sm-games-cascade {
+  position: relative;
+}
+.sm-games-cascade > .fly-item {
+  width: 100%;
+}
+.sm-games-arrow {
+  margin-left: auto;
+}
+.sm-games-submenu {
+  position: absolute;
+  left: 100%;
+  bottom: 0;
+  min-width: 190px;
+  padding: 3px;
+  background: var(--face);
+  border: 1px solid #6d8ed6;
+  box-shadow: 3px 3px 5px #0005;
+}
+.sm-games-submenu .fly-item {
+  width: 100%;
+  white-space: nowrap;
+}
+.sm-games-submenu .fly-item:disabled {
+  color: #888;
+  background: none;
+}
+@media (max-width: 720px) {
+  .games-folder-tasks {
+    display: none;
+  }
+  .games-folder-item {
+    width: 94px;
+    min-height: 90px;
+  }
+}

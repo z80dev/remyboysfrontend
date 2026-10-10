@@ -1,4 +1,5 @@
-import { type PointerEvent as ReactPointerEvent, type ReactNode, createContext, useRef } from 'react'
+import { type ReactNode, type PointerEvent as ReactPointerEvent, createContext, useCallback, useRef } from 'react'
+import { GameWindowContext } from '../games/kit/window'
 import { Icon } from './icons'
 
 /** What a skinned app (no Luna frame) needs from its window: it draws its own title bar and caption buttons. */
@@ -21,6 +22,7 @@ type Props = {
   maximized: boolean
   mobile: boolean
   dialog?: boolean
+  resizable?: boolean
   /** Draws no Luna frame; the app paints its own chrome through ChromeContext and sizes itself. */
   skinned?: boolean
   /** Minimized but kept mounted (apps that keep working in the background, e.g. a playing Winamp). */
@@ -54,13 +56,38 @@ function track(e: ReactPointerEvent, move: (dx: number, dy: number) => void) {
 /** Luna window: rounded blue title bar, XP caption buttons, beige client area, 3px frame. */
 export function Window(p: Props) {
   const start = useRef(p.geom)
+  const frame = useRef<HTMLElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const latest = useRef(p)
+  latest.current = p
+  const fit = useCallback(function fit(clientW: number, clientH: number) {
+    const p = latest.current
+    if (p.mobile || p.maximized || p.skinned) return
+    if (!Number.isFinite(clientW) || !Number.isFinite(clientH) || clientW <= 0 || clientH <= 0) return
+    if (!frame.current || !body.current) {
+      requestAnimationFrame(() => {
+        if (frame.current && body.current) fit(clientW, clientH)
+      })
+      return
+    }
+    const outer = frame.current.getBoundingClientRect()
+    const inner = body.current.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight - TASKBAR_H
+    const w = Math.min(vw, Math.ceil(clientW + outer.width - inner.width))
+    const h = Math.min(vh, Math.ceil(clientH + outer.height - inner.height))
+    const x = Math.max(0, Math.min(p.geom.x, vw - w))
+    const y = Math.max(0, Math.min(p.geom.y, vh - h))
+    if (w !== p.geom.w || h !== p.geom.h || x !== p.geom.x || y !== p.geom.y) p.onGeom({ x, y, w, h })
+  }, [])
+  const content = <GameWindowContext.Provider value={{ active: p.active, hidden: !!p.hidden, fit }}>{p.children}</GameWindowContext.Provider>
   const free = !p.mobile && !p.maximized
 
   if (p.mobile)
     return (
       <section className={`window pocket-window${p.skinned ? ' skinned' : ''}`} aria-label={p.title} hidden={p.hidden}>
         <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: () => {} }}>
-          <div className="window-body">{p.children}</div>
+          <div className="window-body">{content}</div>
         </ChromeContext.Provider>
       </section>
     )
@@ -94,7 +121,7 @@ export function Window(p: Props) {
         aria-label={p.title}
         hidden={p.hidden}
       >
-        <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: onDrag }}>{p.children}</ChromeContext.Provider>
+        <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: onDrag }}>{content}</ChromeContext.Provider>
       </section>
     )
 
@@ -102,13 +129,14 @@ export function Window(p: Props) {
 
   return (
     <section
+      ref={frame}
       className={`window${p.active ? ' active' : ''}${p.maximized ? ' maximized' : ''}${p.dialog ? ' dialog' : ''}`}
       style={style}
       onPointerDownCapture={p.onFocus}
       aria-label={p.title}
       hidden={p.hidden}
     >
-      <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.dialog && p.onToggleMax()}>
+      <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.dialog && p.resizable !== false && p.onToggleMax()}>
         <Icon name={p.icon} size={16} className="title-icon" />
         <span className="title-text">{p.title}</span>
         <div className="title-controls">
@@ -121,14 +149,17 @@ export function Window(p: Props) {
                 aria-label={p.maximized ? 'Restore' : 'Maximize'}
                 title={p.maximized ? 'Restore Down' : 'Maximize'}
                 onClick={p.onToggleMax}
+                disabled={p.resizable === false}
               />
             </>
           )}
           <button type="button" className="cap close" aria-label="Close" title="Close" onClick={p.onClose} />
         </div>
       </header>
-      <div className="window-body">{p.children}</div>
-      {free && !p.dialog && <div className="resize-grip" onPointerDown={onResize} />}
+      <div className="window-body" ref={body}>
+        {content}
+      </div>
+      {free && !p.dialog && p.resizable !== false && <div className="resize-grip" onPointerDown={onResize} />}
     </section>
   )
 }

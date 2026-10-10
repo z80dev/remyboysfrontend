@@ -1,7 +1,6 @@
-import type { ComponentType } from 'react'
+import { type ComponentType, Suspense, createElement, lazy } from 'react'
 import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
-import { Remix } from '../apps/Remix'
 import { Approvals } from '../apps/Approvals'
 import { DisplayProperties } from '../apps/DisplayProperties'
 import { Gallery } from '../apps/Gallery'
@@ -10,13 +9,17 @@ import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
 import { Quest } from '../apps/Quest'
 import { Recovery } from '../apps/Recovery'
+import { Remix } from '../apps/Remix'
 import { Send } from '../apps/Send'
-import { Trader } from '../apps/Trader'
 import { TextEdit } from '../apps/TextEdit'
+import { Trader } from '../apps/Trader'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
 import { Winamp } from '../apps/Winamp'
+import GamesFolder from '../games/folder'
+import { GAMES } from '../games/registry'
 import { teamRole } from '../lib/launch'
+import { Loading } from './ui'
 
 export type AppProps = { param?: string; navigate: (hash: string) => void; close: () => void }
 
@@ -35,6 +38,10 @@ export type AppDef = {
   team?: boolean
   /** Fixed-size dialog chrome: close button only, no resize. */
   dialog?: boolean
+  /** Fixed-size apps retain minimize but cannot maximize or drag a resize grip. */
+  resizable?: boolean
+  /** Games are listed in the Games folder and All Programs cascade only. */
+  game?: boolean
   /** No Luna frame: the app paints its own skinned chrome (ChromeContext in Window.tsx). `size` only places it. */
   skinned?: boolean
   /** Stays mounted while minimized (keeps playing); unmounting means it was closed. */
@@ -127,6 +134,30 @@ export const APPS: AppDef[] = [
     dialog: true,
     Component: DisplayProperties,
   },
+  {
+    id: 'games',
+    title: 'Games',
+    short: 'Games',
+    desc: 'Classic games for Remy OS',
+    icon: 'games',
+    size: [640, 480],
+    Component: GamesFolder,
+  },
+  ...GAMES.map((game): AppDef => {
+    const Component = lazy(game.load)
+    return {
+      id: game.id,
+      title: game.title,
+      short: game.short,
+      desc: game.desc,
+      icon: game.id,
+      size: game.size,
+      resizable: game.resizable,
+      game: true,
+      persistent: true,
+      Component: (props) => createElement(Suspense, { fallback: createElement(Loading, null, 'Loading game…') }, createElement(Component, props)),
+    }
+  }),
 ]
 
 export const appById = (id: string) => APPS.find((a) => a.id === id)
@@ -137,5 +168,5 @@ export const isTeam = (address?: Address) => teamRole(address) !== undefined
 export function useVisibleApps() {
   const { address } = useAccount()
   const team = isTeam(address)
-  return APPS.filter((a) => !a.hidden && (!a.team || team))
+  return APPS.filter((a) => !a.hidden && !a.game && (!a.team || team))
 }

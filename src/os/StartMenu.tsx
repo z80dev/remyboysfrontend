@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Address } from 'viem'
 import { useAccount } from 'wagmi'
 import { LINKS } from '../config'
+import { GAMES } from '../games/registry'
 import { shortAddr } from '../lib/format'
 import { remyImg } from '../lib/media'
 import { useVisibleApps } from './apps'
@@ -34,6 +35,7 @@ export function StartMenu({ onLaunch, onLogOff, onTurnOff }: Props) {
   const { address } = useAccount()
   const { id: firstId } = useWalletRemy(address)
   const [all, setAll] = useState(false)
+  const [gamesOpen, setGamesOpen] = useState(false)
   const visible = useVisibleApps()
   const pinned = visible.filter((a) => PINNED.includes(a.id))
   const rest = visible.filter((a) => !PINNED.includes(a.id))
@@ -78,12 +80,73 @@ export function StartMenu({ onLaunch, onLogOff, onTurnOff }: Props) {
             </button>
             {all && (
               <div className="sm-flyout" role="menu">
-                {visible.map((a) => (
-                  <button type="button" role="menuitem" key={a.id} className="fly-item" onClick={() => onLaunch(a.id)}>
-                    <Icon name={a.icon} size={16} />
-                    {a.title}
+                {visible
+                  .filter((a) => a.id !== 'games')
+                  .map((a) => (
+                    <button type="button" role="menuitem" key={a.id} className="fly-item" onClick={() => onLaunch(a.id)}>
+                      <Icon name={a.icon} size={16} />
+                      {a.title}
+                    </button>
+                  ))}
+                <div
+                  className="sm-games-cascade"
+                  onMouseEnter={() => setGamesOpen(true)}
+                  onMouseLeave={() => setGamesOpen(false)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setGamesOpen(false)
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fly-item"
+                    aria-haspopup="menu"
+                    aria-expanded={gamesOpen}
+                    onClick={() => setGamesOpen((open) => !open)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                        event.preventDefault()
+                        setGamesOpen(true)
+                        const parent = event.currentTarget.parentElement
+                        requestAnimationFrame(() => parent?.querySelector<HTMLButtonElement>('.sm-games-submenu button:not(:disabled)')?.focus())
+                      }
+                    }}
+                  >
+                    <Icon name="games" size={16} />
+                    Games
+                    <span className="sm-games-arrow" aria-hidden="true">
+                      ▸
+                    </span>
                   </button>
-                ))}
+                  {gamesOpen && (
+                    <div
+                      className="sm-games-submenu"
+                      role="menu"
+                      aria-label="Games"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape' || event.key === 'ArrowLeft') {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setGamesOpen(false)
+                          event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(':scope > button')?.focus()
+                        }
+                      }}
+                    >
+                      {GAMES.length ? (
+                        GAMES.map((game) => (
+                          <button type="button" role="menuitem" key={game.id} className="fly-item" onClick={() => onLaunch(game.id)}>
+                            <Icon name={game.id} size={16} />
+                            {game.title}
+                          </button>
+                        ))
+                      ) : (
+                        <button type="button" role="menuitem" className="fly-item" disabled>
+                          (Empty)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <hr />
                 {LINKS.map((l) => (
                   <a key={l.href} role="menuitem" className="fly-item" href={l.href} target="_blank" rel="noreferrer">
