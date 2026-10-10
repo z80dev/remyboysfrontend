@@ -30,3 +30,6 @@ __pycache__/
 
 # filmkit renders
 output/
+
+# wrangler local state
+.wrangler/
