@@ -42,6 +42,10 @@ export default defineConfig(async () => ({
       // Remy OS shell, the standalone Remy Quest game (embedded by the OS, also playable full screen at /quest/) and
       // Night of the Cabald (/halloween/, also the X player card that plays inside a post).
       input: { main: 'index.html', quest: 'quest/index.html', halloween: 'halloween/index.html' },
+      // Hex hashes give every asset a new URL. The 2026-10-09 deploy race got the edge to cache index.html as
+      // /assets/main-CLVgZjkY.css and a WalletConnect chunk (immutable, one year); functions/assets/_middleware.ts
+      // stops that recurring. Switching back to base64 hashes could reuse a poisoned URL.
+      output: { hashCharacters: 'hex' },
     },
   },
 }))
