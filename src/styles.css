@@ -1305,6 +1305,33 @@ dialog {
   box-shadow: 2px 4px 12px rgba(0, 20, 60, 0.25);
 }
 
+.window[hidden] {
+  display: none;
+}
+
+/* Skinned apps (Winamp) paint their own frame: the section is only a positioned origin for their windows. */
+.window.skinned,
+.window.skinned:not(.active):not(.pocket-window) {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.window.pocket-window.skinned {
+  width: auto;
+  height: auto;
+  background: #000;
+}
+
+.window.pocket-window.skinned > .window-body {
+  overflow: auto;
+  background: #000;
+}
+
 .titlebar {
   flex: none;
   display: flex;

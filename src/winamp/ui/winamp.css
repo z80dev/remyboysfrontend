@@ -1,0 +1,191 @@
+/* Winamp 2.x skinned windows: 1 skin pixel = 1 CSS pixel (scaled as a whole for double size / phones). */
+
+.wa-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  image-rendering: pixelated;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: default;
+}
+
+.wa-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.wa-win {
+  position: absolute;
+  overflow: hidden;
+  background-repeat: no-repeat;
+}
+
+.wa-abs,
+.wa-text,
+.wa-btn {
+  position: absolute;
+  background-repeat: no-repeat;
+}
+
+.wa-btn {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background-color: transparent;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wa-text {
+  display: flex;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.wa-text > span {
+  flex: none;
+  width: 5px;
+  height: 6px;
+  background-repeat: no-repeat;
+}
+
+.wa-marquee {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.wa-marquee > .wa-text {
+  will-change: transform;
+}
+
+.wa-slider,
+.wa-grip {
+  touch-action: none;
+}
+
+.wa-vis {
+  image-rendering: pixelated;
+}
+
+/* Paused: the time display blinks (1 s on, 1 s off). */
+.wa-blink > * {
+  animation: wa-blink 2s step-start 1s infinite;
+}
+
+@keyframes wa-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.wa-minitime > .wa-text {
+  position: absolute;
+}
+
+/* Playlist rows: PLEDIT.TXT colours and font. */
+.wa-list {
+  overflow: hidden;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  touch-action: none;
+}
+
+.wa-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  height: 13px;
+  line-height: 13px;
+  white-space: nowrap;
+}
+
+.wa-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 1px;
+}
+
+.wa-row-time {
+  flex: none;
+  padding: 0 3px 0 4px;
+}
+
+.wa-phone {
+  position: relative;
+  flex: none;
+  margin: 0 auto;
+}
+
+/* Win32 menu (desktop `.ctx-menu` look) with check marks, accelerators and cascades. */
+.ctx-menu.wa-menu {
+  position: fixed;
+  min-width: 0;
+  font-family: Tahoma, "Segoe UI", sans-serif;
+}
+
+.wa-mi {
+  position: relative;
+  gap: 0;
+  height: 20px;
+  padding: 0 18px 0 22px;
+  font-size: 11px;
+}
+
+.wa-mi:disabled {
+  color: #aca899;
+  background: none;
+}
+
+.wa-mi.open {
+  background: var(--sel);
+  color: #fff;
+}
+
+.wa-mi-check {
+  position: absolute;
+  left: 6px;
+  width: 12px;
+  font-size: 10px;
+  text-align: center;
+}
+
+.wa-mi-label {
+  flex: 1 0 auto;
+}
+
+.wa-mi-key {
+  margin-left: 24px;
+}
+
+.wa-mi-arrow {
+  position: absolute;
+  right: 6px;
+  font-size: 7px;
+}
+
+.window.wa-url {
+  position: relative;
+  width: min(360px, 100%);
+}
+
+.wa-url .window-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 4px;
+}
+
+.wa-url input {
+  height: 21px;
+  padding: 0 4px;
+  border: 1px solid #7f9db9;
+  background: #fff;
+}

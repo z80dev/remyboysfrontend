@@ -591,6 +591,28 @@ const icons: Record<string, ReactNode> = {
       <path d="m15.8 27 .4-1.2.8.8z" fill="#2a2a2a" />
     </>
   ),
+  /* Tilted dark badge with the gold lightning bolt: Winamp. */
+  winamp: (
+    <>
+      <defs>
+        <linearGradient id="xi-wa-plate" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#6d7192" />
+          <stop offset=".55" stopColor="#30334a" />
+          <stop offset="1" stopColor="#1a1b28" />
+        </linearGradient>
+        <linearGradient id="xi-wa-bolt" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff3b0" />
+          <stop offset=".45" stopColor="#ffbe1a" />
+          <stop offset="1" stopColor="#c46a08" />
+        </linearGradient>
+      </defs>
+      <Shadow />
+      <rect x="5.4" y="4.4" width="21.2" height="21.2" rx="4.4" transform="rotate(-12 16 15)" fill="url(#xi-wa-plate)" stroke="#0e0f18" strokeWidth=".9" />
+      <rect x="6.6" y="5.6" width="18.8" height="18.8" rx="3.6" transform="rotate(-12 16 15)" fill="none" stroke="#a9adc8" strokeOpacity=".55" strokeWidth=".7" />
+      <path d="M19.6 4.2 9.2 16.4h6.2l-3.6 11.4 11.4-14h-6.4z" fill="url(#xi-wa-bolt)" stroke="#5a3204" strokeWidth=".9" strokeLinejoin="round" />
+      <path d="m18 7.4-6.2 7.6h3" fill="none" stroke="#fffbe0" strokeWidth=".8" strokeLinecap="round" opacity=".8" />
+    </>
+  ),
 }
 
 export type IconName = keyof typeof icons

@@ -40,7 +40,9 @@ function initialGeom(id: string, count: number): WinGeom {
   const W = Math.min(w, vw - 120)
   const H = Math.min(h, vh - 24)
   const off = (count % 6) * 26
-  return { w: W, h: H, x: Math.min(Math.max(112, (vw - W) / 2 + off), Math.max(8, vw - W - 8)), y: Math.max(8, Math.min((vh - H) / 2 - 12 + off, vh - H - 8)) }
+  const x = Math.min(Math.max(112, (vw - W) / 2 + off), Math.max(8, vw - W - 8))
+  const y = Math.max(8, Math.min((vh - H) / 2 - 12 + off, vh - H - 8))
+  return { w: W, h: H, x: Math.round(x), y: Math.round(y) }
 }
 
 export default function App() {
@@ -125,7 +127,9 @@ export default function App() {
     setSession('login')
   }
 
-  const renderWindow = (w: Win) => {
+  // Apps flagged `persistent` (Winamp) stay mounted while minimized so they keep playing; unmount means closed.
+  const persistent = (w: Win) => !!appById(w.id)?.persistent
+  const renderWindow = (w: Win, hidden = false) => {
     const def = appById(w.id)
     if (!def) return null
     const { Component } = def
@@ -140,6 +144,8 @@ export default function App() {
         maximized={w.max}
         mobile={mobile}
         dialog={def.dialog}
+        skinned={def.skinned}
+        hidden={hidden}
         onFocus={() => focus(w.id)}
         onClose={() => close(w.id)}
         onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
@@ -152,7 +158,6 @@ export default function App() {
   }
 
   const menu = useDesktopMenu(navigate)
-  const activeWin = wins.find((w) => w.id === active)
 
   return (
     <MobileContext.Provider value={mobile}>
@@ -160,14 +165,14 @@ export default function App() {
       <div className={`xp theme-${theme}${powerDialog ? ' fading' : ''}`}>
         {mobile ? (
           <Pocket active={active} open={wins.map((w) => w.id)} onLaunch={navigate} onClose={close} onToday={minimizeAll} onLogOff={logOff}>
-            {activeWin ? renderWindow(activeWin) : null}
+            {wins.filter((w) => w.id === active || persistent(w)).map((w) => renderWindow(w, w.id !== active))}
           </Pocket>
         ) : (
           <div className="desktop" onContextMenu={menu.onContextMenu}>
             <Wallpaper />
             <DesktopIcons open={navigate} />
             <HalloweenMint />
-            {wins.filter((w) => !w.min).map(renderWindow)}
+            {wins.filter((w) => !w.min || persistent(w)).map((w) => renderWindow(w, w.min))}
             {menu.element}
             <Taskbar
               wins={wins.map((w) => ({ id: w.id, min: w.min }))}

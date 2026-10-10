@@ -21,6 +21,7 @@ type Props = {
   onClose: (id: string) => void
   onToday: () => void
   onLogOff: () => void
+  /** Open windows: the active one, plus hidden persistent ones that must stay mounted. */
   children: ReactNode
 }
 
@@ -123,7 +124,10 @@ export function Pocket({ active, open, onLaunch, onClose, onToday, onLogOff, chi
         <BalloonHost />
       </header>
 
-      <main className="pk-body">{children ?? <Today onLaunch={onLaunch} onWallet={() => setWallet(true)} />}</main>
+      <main className="pk-body">
+        {!app && <Today onLaunch={onLaunch} onWallet={() => setWallet(true)} />}
+        {children}
+      </main>
 
       <nav className="pk-keys" aria-label="Soft keys">
         <button type="button" className="pk-key" onClick={onToday} aria-current={!active ? 'page' : undefined}>

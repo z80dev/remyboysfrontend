@@ -15,6 +15,7 @@ import { Trader } from '../apps/Trader'
 import { TextEdit } from '../apps/TextEdit'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
+import { Winamp } from '../apps/Winamp'
 import { teamRole } from '../lib/launch'
 
 export type AppProps = { param?: string; navigate: (hash: string) => void; close: () => void }
@@ -34,6 +35,10 @@ export type AppDef = {
   team?: boolean
   /** Fixed-size dialog chrome: close button only, no resize. */
   dialog?: boolean
+  /** No Luna frame: the app paints its own skinned chrome (ChromeContext in Window.tsx). `size` only places it. */
+  skinned?: boolean
+  /** Stays mounted while minimized (keeps playing); unmounting means it was closed. */
+  persistent?: boolean
   Component: ComponentType<AppProps>
 }
 
@@ -80,6 +85,17 @@ export const APPS: AppDef[] = [
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
   { id: 'remix', title: 'Remy Remix Studio', short: 'Remix Studio', desc: 'Reimagine original Remy art', icon: 'remix', size: [980, 720], Component: Remix },
   { id: 'textedit', title: 'Remy TextEdit', short: 'TextEdit', desc: 'A word processor in Wingdings', icon: 'textedit', size: [640, 480], Component: TextEdit },
+  {
+    id: 'winamp',
+    title: 'Winamp',
+    short: 'Winamp',
+    desc: 'It really whips the llama’s ass',
+    icon: 'winamp',
+    size: [275, 464],
+    skinned: true,
+    persistent: true,
+    Component: Winamp,
+  },
   { id: 'quest', title: 'Remy Quest', short: 'Remy Quest', desc: 'A Remy adventure on Base', icon: 'quest', size: [900, 660], Component: Quest },
   {
     id: 'halloween',

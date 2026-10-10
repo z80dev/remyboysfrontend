@@ -1,5 +1,14 @@
-import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from 'react'
+import { type PointerEvent as ReactPointerEvent, type ReactNode, createContext, useRef } from 'react'
 import { Icon } from './icons'
+
+/** What a skinned app (no Luna frame) needs from its window: it draws its own title bar and caption buttons. */
+export type Chrome = {
+  active: boolean
+  minimize: () => void
+  /** Start moving the window from a pointerdown on the app's own title bar. No-op on the Pocket shell. */
+  drag: (e: ReactPointerEvent) => void
+}
+export const ChromeContext = createContext<Chrome | undefined>(undefined)
 
 export type WinGeom = { x: number; y: number; w: number; h: number }
 
@@ -12,6 +21,10 @@ type Props = {
   maximized: boolean
   mobile: boolean
   dialog?: boolean
+  /** Draws no Luna frame; the app paints its own chrome through ChromeContext and sizes itself. */
+  skinned?: boolean
+  /** Minimized but kept mounted (apps that keep working in the background, e.g. a playing Winamp). */
+  hidden?: boolean
   onFocus: () => void
   onClose: () => void
   onMinimize: () => void
@@ -45,8 +58,10 @@ export function Window(p: Props) {
 
   if (p.mobile)
     return (
-      <section className="window pocket-window" aria-label={p.title}>
-        <div className="window-body">{p.children}</div>
+      <section className={`window pocket-window${p.skinned ? ' skinned' : ''}`} aria-label={p.title} hidden={p.hidden}>
+        <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: () => {} }}>
+          <div className="window-body">{p.children}</div>
+        </ChromeContext.Provider>
       </section>
     )
 
@@ -70,6 +85,19 @@ export function Window(p: Props) {
     })
   }
 
+  if (p.skinned)
+    return (
+      <section
+        className={`window skinned${p.active ? ' active' : ''}`}
+        style={{ left: p.geom.x, top: p.geom.y, zIndex: p.z }}
+        onPointerDownCapture={p.onFocus}
+        aria-label={p.title}
+        hidden={p.hidden}
+      >
+        <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: onDrag }}>{p.children}</ChromeContext.Provider>
+      </section>
+    )
+
   const style = free ? { left: p.geom.x, top: p.geom.y, width: p.geom.w, height: p.geom.h, zIndex: p.z } : { zIndex: p.z }
 
   return (
@@ -78,6 +106,7 @@ export function Window(p: Props) {
       style={style}
       onPointerDownCapture={p.onFocus}
       aria-label={p.title}
+      hidden={p.hidden}
     >
       <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.dialog && p.onToggleMax()}>
         <Icon name={p.icon} size={16} className="title-icon" />
