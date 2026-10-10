@@ -6,9 +6,20 @@ import { parseMml } from '../../src/games/qbasic/mml'
 describe('original QBasic bitmap screen', () => {
   test('ASCII and DOS symbols have complete 8×16 bitmap rows', () => {
     for (let i = 32; i <= 126; i++) expect(FONT[String.fromCharCode(i)]?.length).toBe(16)
-    for (const char of '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬█▀▄±↑↓←→♥☺') expect(FONT[char]?.length).toBe(16)
+    for (const char of '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬╒╕╘╛╓╖╙╜╞╡╟╢╤╧╥╨╪╫█▀▄±↑↓←→♥☺') expect(FONT[char]?.length).toBe(16)
     expect(glyph('☃')).toBe(FONT['?'])
     expect(FONT.a).not.toEqual(FONT.A)
+  })
+  test('single, double and mixed box lines meet adjacent cell edges', () => {
+    expect(FONT['─'][7]).toBe(255)
+    expect(FONT['═'][6]).toBe(255)
+    expect(FONT['═'][9]).toBe(255)
+    expect(FONT['│'][0]).toBe(0x18)
+    expect(FONT['║'][15]).toBe(0x24)
+    expect(FONT['╒'][6] & 0x0f).toBe(0x0f)
+    expect(FONT['╒'][15]).toBe(0x18)
+    expect(FONT['╓'][7] & 0x0f).toBe(0x0f)
+    expect(FONT['╓'][15]).toBe(0x24)
   })
   test('half blocks fill exactly the corresponding eight scanlines', () => {
     expect([...FONT['█']]).toEqual(Array(16).fill(255))

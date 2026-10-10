@@ -1,0 +1,121 @@
+.reversi {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #c0c0c0;
+  font: 11px var(--font);
+  color: #000;
+  overflow: hidden;
+}
+.reversi-play-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  container-type: size;
+}
+.reversi-frame {
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  padding: 14px;
+  background: #8b5a2b;
+  border: 2px solid;
+  border-color: #c79a64 #4a2c14 #4a2c14 #c79a64;
+  box-shadow: inset 1px 1px #e3b987, inset -1px -1px #633a1b;
+}
+.reversi-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  height: 100%;
+  border: 1px solid #000;
+  box-sizing: border-box;
+  background: #008000;
+  touch-action: none;
+  overflow: hidden;
+}
+.reversi-board:focus { outline: none; }
+.reversi-board:focus-visible { outline: 1px dotted #fff3b0; outline-offset: 2px; }
+.reversi-cell {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  font-family: var(--font);
+  cursor: not-allowed;
+  touch-action: none;
+}
+.reversi-cell:nth-of-type(8n) { border-right: 0; }
+.reversi-cell:nth-of-type(n+57) { border-bottom: 0; }
+.reversi-cell.legal { cursor: crosshair; }
+.reversi-thinking, .reversi-thinking .reversi-cell { cursor: wait; }
+.reversi-cell.cursor::after, .reversi-cell.hint::after {
+  position: absolute;
+  content: '';
+  inset: 3px;
+  border: 1px dotted #fff3b0;
+  pointer-events: none;
+}
+.reversi-cell.hint::after { border-style: solid; border-width: 2px; }
+.reversi-cell.illegal { background: #b04539; }
+.reversi-coin {
+  position: absolute;
+  width: 84%;
+  height: 84%;
+  top: 8%;
+  left: 8%;
+  box-sizing: border-box;
+  border: 3px solid;
+  outline: 1px solid #24170d;
+  border-radius: 50%;
+  box-shadow: 1px 1px #003600, inset 1px 1px #fff3b0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: clamp(12px, 4cqw, 40px);
+  font-weight: bold;
+  pointer-events: none;
+}
+.reversi-coin.remy { background: #cf8d00; border-color: #f2bf4e #8b5a00 #8b5a00 #f2bf4e; color: #805700; }
+.reversi-coin.cabald { background: #5b4a7a; border-color: #9687ad #3d3053 #3d3053 #9687ad; color: #b3a5c8; }
+.reversi-coin img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; pointer-events: none; }
+.reversi-coin > span { text-shadow: 1px 1px #fff3b0; }
+.reversi-legal-ring { position: absolute; inset: 36%; border: 1px solid #fff; border-radius: 50%; opacity: 0.4; pointer-events: none; }
+.reversi-dot { position: absolute; width: 5px; height: 5px; transform: translate(-50%, -50%); border-radius: 50%; background: #000; pointer-events: none; }
+.reversi-hair { position: absolute; z-index: 2; width: max(1px, 0.54cqw); height: max(1px, 0.54cqw); top: 25%; left: calc(42% + var(--clump) * 5%); box-shadow: 1px 1px #302015; pointer-events: none; }
+.reversi-sparkle { position: absolute; z-index: 2; top: 14%; left: 68%; width: 2px; height: 10px; background: #fff3b0; pointer-events: none; }
+.reversi-sparkle::after { position: absolute; content: ''; width: 10px; height: 2px; top: 4px; left: -4px; background: #fff3b0; }
+.reversi-status {
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid;
+  border-color: #808080 #fff #fff #808080;
+  box-sizing: border-box;
+  background: #ece9d8;
+  white-space: pre;
+}
+.reversi-status-coin { box-sizing: border-box; width: 16px; height: 16px; border-radius: 50%; border: 2px solid; text-align: center; font-size: 9px; font-weight: bold; line-height: 12px; }
+.reversi-status-coin.remy { background: #cf8d00; border-color: #8b5a00; }
+.reversi-status-coin.cabald { margin-left: 10px; background: #5b4a7a; border-color: #30233f; color: #fff; }
+.reversi-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.reversi-help-tabs { display: flex; flex-wrap: wrap; gap: 2px; }
+.reversi-help-tabs [aria-selected='true'] { background: #fff; font-weight: bold; }
+@media (max-width: 719px) {
+  .reversi-play-area { align-items: flex-start; }
+}

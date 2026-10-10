@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createState, step, replay, passwordLevel, levelScore } from '../../src/games/remys-challenge/engine'
 import { Tile, index, type ActorSpec, type Direction, type Level, type MonsterKind } from '../../src/games/remys-challenge/types'
+import { buildLevel, LEGEND } from '../../src/games/remys-challenge/levels/build'
 
 function fixture(tiles: [number, number, Tile][] = [], actors: ActorSpec[] = [], extra: Partial<Level> = {}): Level {
   const bottom = Array<Tile>(1024).fill(Tile.Wall)
@@ -125,10 +126,12 @@ describe('Microsoft tile rules', () => {
     step(blocked, 1)
     expect(blocked.player.pos).toBe(index(2, 2))
   })
-  test('force floor auto-pushes, orthogonal override and suction boots', () => {
-    for (const [override, boots, expected] of [[undefined, false, index(4, 2)], [2, false, index(3, 3)], [3, false, index(4, 2)], [3, true, index(2, 2)]] as const) {
-      const s = createState(fixture([[3, 2, Tile.ForceE]]))
+  test('MS force override follows an involuntary move, permits backward, and suction boots bypass it', () => {
+    for (const [override, boots, expected] of [[undefined, false, index(5, 2)], [2, false, index(4, 3)], [3, false, index(3, 2)], [3, true, index(3, 2)]] as const) {
+      const s = createState(fixture([[3, 2, Tile.ForceE], [4, 2, Tile.ForceE]]))
       step(s, 1)
+      step(s, 2)
+      expect(s.player.pos).toBe(index(4, 2))
       s.boots[3] = boots
       step(s, override)
       expect(s.player.pos).toBe(expected)
@@ -192,6 +195,56 @@ describe('Microsoft tile rules', () => {
       step(s, 1)
       expect(s.actors.filter(a => a.alive && a.kind === 'tank').length).toBe(blocked ? 1 : 2)
       expect(s.actors[1].pos).toBe(index(6, 6))
+      if (!blocked) expect(s.actors.find(a => a.alive && a.kind === 'tank' && !a.clone)?.pos).toBe(index(7, 6))
+    }
+  })
+  test('pushed blocks start sliding next tick, not twice in the push tick', () => {
+    const s = createState(fixture([[4, 2, Tile.Ice], [5, 2, Tile.Ice]], [{ kind: 'block', x: 3, y: 2 }]))
+    step(s, 1)
+    expect(s.actors[1].pos).toBe(index(4, 2))
+    step(s)
+    expect(s.actors[1].pos).toBe(index(5, 2))
+  })
+  test('force-floor directions and random floors are deterministic', () => {
+    for (let dir = 0; dir < 4; dir++) {
+      const s = createState(fixture())
+      s.tiles[s.player.pos] = Tile.ForceN + dir
+      step(s)
+      expect(s.player.pos).toBe(index(2, 2) + [-32, 1, 32, -1][dir])
+    }
+    const a = createState(fixture([[2, 2, Tile.ForceRandom]]))
+    const b = createState(fixture([[2, 2, Tile.ForceRandom]]))
+    step(a); step(b)
+    expect(a.player.pos).toBe(b.player.pos)
+  })
+  test('map boundaries do not wrap horizontally or vertically', () => {
+    for (const [pos, dir] of [[0, 0], [0, 3], [31, 1], [1023, 2]] as const) {
+      const s = createState(fixture())
+      s.tiles.fill(Tile.Floor)
+      s.player.pos = pos
+      step(s, dir)
+      expect(s.player.pos).toBe(pos)
+    }
+  })
+  test('teleports skip destinations occupied by an actor', () => {
+    const s = createState(fixture([[3, 2, Tile.Teleport], [8, 8, Tile.Teleport], [5, 5, Tile.Teleport]],
+      [{ kind: 'block', x: 8, y: 8 }]))
+    step(s, 1)
+    expect(s.player.pos).toBe(index(6, 5))
+  })
+  test('MS corner ice permits stepping over the corner with skates', () => {
+    const s = createState(fixture([[2, 2, Tile.IceNW]]))
+    s.boots[2] = true
+    step(s, 0); step(s, 3)
+    expect(s.player.pos).toBe(index(1, 1))
+  })
+  test('actors starting on slide floors are not moved until leaving the initial square', () => {
+    for (const tile of [Tile.ForceE, Tile.Ice]) {
+      const s = createState(fixture([[2, 2, tile]]))
+      step(s)
+      expect(s.player.pos).toBe(index(2, 2))
+      step(s, 1); step(s, 3); step(s)
+      expect(s.player.pos).toBe(tile === Tile.ForceE ? index(3, 2) : index(1, 2))
     }
   })
 })
@@ -287,5 +340,28 @@ describe('progression contracts', () => {
     const level = fixture([[3, 2, Tile.Exit]], [], { solution: 'EEE' })
     expect(replay(level).status).toBe('won')
     expect(replay(level).tick).toBe(1)
+  })
+})
+
+describe('typed two-layer level decoder', () => {
+  const blueprint = { number: 1, title: 'Fixture', hint: '', password: 'TEST', time: 10, rows: ['@$.OX'], legend: LEGEND, solution: 'EEEE' }
+  test('pads to 32×32, decodes actor layer independently, counts chips and replays', () => {
+    const level = buildLevel(blueprint)
+    expect(level.bottom).toHaveLength(1024)
+    expect(level.bottom[index(0, 0)]).toBe(Tile.Wall)
+    expect(level.top).toEqual([{ kind: 'player', x: 1, y: 1, dir: 1 }])
+    expect(level.chips).toBe(1)
+    expect(replay(level).status).toBe('won')
+  })
+  test('supports blocks on buttons and explicit required chip counts', () => {
+    const level = buildLevel({ ...blueprint, rows: ['@$.OX', 'A'], legend: { ...LEGEND, A: { kind: 'block', tile: Tile.BrownButton } }, chips: 0 })
+    expect(level.bottom[index(1, 2)]).toBe(Tile.BrownButton)
+    expect(level.top[1].kind).toBe('block')
+    expect(level.chips).toBe(0)
+  })
+  test('rejects unknown symbols and out-of-map blueprints', () => {
+    expect(() => buildLevel({ ...blueprint, rows: ['&'] })).toThrow()
+    expect(() => buildLevel({ ...blueprint, rows: ['.'.repeat(32)] })).toThrow()
+    expect(() => buildLevel({ ...blueprint, rows: Array(32).fill('.') })).toThrow()
   })
 })

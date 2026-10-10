@@ -152,6 +152,33 @@ export const STRINGS = {
 
 export const S = STRINGS
 
+// Printed playfield inserts (pre-rendered into the table art).
+export const TABLE_LABELS = {
+  reentry: 'RE-ENTRY',
+  bonus: 'BONUS',
+  mission: 'MISSION',
+  hyperspace: 'HYPERSPACE',
+  extraBall: 'EXTRA BALL',
+  hazard: 'HAZARD',
+  launchRamp: 'LAUNCH',
+  attack: 'ATTACK',
+  engine: 'ENGINE',
+  satellite: 'SATELLITE',
+  fuel: 'FUEL',
+  flags: 'FLAGS',
+  blackHole: 'BLACK HOLE',
+  wormhole: 'WORMHOLE',
+  booster: 'BOOSTER',
+  spaceWarp: 'SPACE WARP',
+  rank: 'RANK',
+  shootAgain: 'SHOOT AGAIN',
+  multipliers: ['x1', 'x2', 'x3', 'x4', 'x5'],
+  apron: 'BASE CADET',
+  apronSub: 'BASE FEDERATION FLEET',
+  tilt: 'TILT',
+  cabaldRing: 'C'
+} as const
+
 export const PANEL_COPY = {
   title: 'BASE CADET',
   federation: 'BASE FEDERATION',
@@ -253,47 +280,70 @@ export function missionGoal(id: MissionId | string, stage: number, remaining: nu
   }
 }
 
-// Dot-matrix messages. detail: mission name, rank name, player number (1-based), count or formatted amount.
-export function ruleMessage(id: string, detail?: string | number): string {
+export type MessageId =
+  | 'awaiting'
+  | 'launched'
+  | 'selected'
+  | 'accepted'
+  | 'completed'
+  | 'promotion'
+  | 'reorg'
+  | 'recoveryCompleted'
+  | 'cabaldCompleted'
+  | 'lowFuel'
+  | 'noFuel'
+  | 'refuel'
+  | 'saved'
+  | 'extraBall'
+  | 'extraBallLit'
+  | 'replay'
+  | 'tilt'
+  | 'player'
+  | 'gameOver'
+  | 'bonus'
+  | 'clock'
+  | 'postRaised'
+  | 'testMode'
+  | 'bumperUpgrade'
+  | 'engineUpgrade'
+  | 'flagUpgrade'
+  | 'multiplier'
+  | 'anonymous'
+
+// Dot-matrix messages. detail: mission name (selected/accepted), rank name (promotion/reorg), replay count,
+// 1-based player number, formatted bonus amount, bumper level or multiplier.
+export function ruleMessage(id: MessageId, detail?: string | number): string {
   switch (id) {
     case 'awaiting':
       return 'Awaiting Deployment'
+    case 'launched':
+      return 'Deployed. Good hunting, Cadet.'
     case 'selected':
-    case 'selectMission':
-      return detail === undefined ? 'Select a Mission' : `Mission Selected: ${detail}`
+      return `Mission Selected: ${detail}`
     case 'accepted':
       return `Mission Accepted: ${detail}`
     case 'completed':
       return 'Mission Completed'
     case 'promotion':
       return `Promotion to ${detail}`
-    case 'demotion':
-      return `Demotion to ${detail}`
     case 'reorg':
       return `Chain reorganised. You are now ${detail}. Or were you always?`
-    case 'recovery':
+    case 'recoveryCompleted':
       return 'Stolen Remys returned. Reclaim honoured.'
-    case 'cabald':
+    case 'cabaldCompleted':
       return 'There is no Cabald. I love you.'
     case 'lowFuel':
-    case 'gasLow':
       return 'Gas Low'
     case 'noFuel':
-    case 'gasEmpty':
       return 'Out of Gas. Refuel at the Fuel Chute'
-    case 'rampLocked':
-      return 'Ramp Closed: Refuel'
     case 'refuel':
       return 'Refueled'
     case 'saved':
-    case 'ballSaved':
       return 'Ball Saved'
     case 'extraBall':
       return 'Extra Ball'
     case 'extraBallLit':
       return 'Extra Ball Lit'
-    case 'shootAgain':
-      return 'Shoot Again'
     case 'replay':
       return detail === undefined || detail === 1 ? 'Replay Awarded' : `Replay Awarded (${detail})`
     case 'tilt':
@@ -307,10 +357,7 @@ export function ruleMessage(id: string, detail?: string | number): string {
     case 'clock':
       return 'You have gone round the clock'
     case 'postRaised':
-    case 'postUp':
       return 'Centre Post Raised'
-    case 'gateArmed':
-      return 'Out-lane Gate Closed'
     case 'testMode':
       return 'Test Mode'
     case 'bumperUpgrade':
@@ -321,13 +368,7 @@ export function ruleMessage(id: string, detail?: string | number): string {
       return 'Flags Upgraded'
     case 'multiplier':
       return `Field Multiplier x${detail}`
-    case 'hyperspace':
-      return 'Hyperspace Bonus'
-    case 'wormholeMatch':
-      return 'Wormhole Match'
-    case 'jackpot':
-      return 'Jackpot'
-    default:
-      return ''
+    case 'anonymous':
+      return 'Anonymous'
   }
 }

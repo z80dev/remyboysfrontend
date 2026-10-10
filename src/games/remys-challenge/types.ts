@@ -26,7 +26,9 @@ export interface Level {
   solution: string // one 200 ms tick per N/E/S/W/. character
   seed?: number
 }
-export interface Actor { kind: ActorSpec['kind']; pos: number; dir: Direction; alive: boolean; trapped: boolean; clone: boolean }
+export interface Actor {
+  kind: ActorSpec['kind']; pos: number; dir: Direction; alive: boolean; trapped: boolean; clone: boolean; movedTick: number; initialSlidePos: number
+}
 export type Death = 'fire' | 'water' | 'monster' | 'bomb' | 'time'
 export type GameEvent = 'chip' | 'socket' | 'door' | 'key' | 'boots' | 'push' | 'splash' | 'burn' | 'bomb' | 'teleport' | 'button' | 'toggle' | 'death' | 'exit' | 'tick'
 export interface State {
@@ -45,6 +47,7 @@ export interface State {
   events: GameEvent[]
   thief: boolean
   randomForce: Direction
+  lastMoveForced: boolean
 }
 export const index = (x: number, y: number) => y * MAP_SIZE + x
 export const opposite = (d: Direction) => ((d + 2) % 4) as Direction

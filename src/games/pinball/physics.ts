@@ -1,8 +1,11 @@
-import { ARCS, CIRCLES, EventType, FLIPPERS, LAUNCH, SEGMENTS, SENSORS, TABLE_HEIGHT, TABLE_WIDTH } from './geometry'
+import {
+  ARCS, BALL_RADIUS, CIRCLES, EventType, FLIPPERS, FLIPPER_DOWN_SPEED, FLIPPER_UP_SPEED, GRAVITY,
+  KICKER_HOLD, LAUNCH, MAX_SPEED, RAMP, SEGMENTS, SENSORS, SLOT_COUNT, TABLE_HEIGHT, TABLE_WIDTH, slotOf
+} from './geometry'
 
 export const PHYSICS_STEP = 1 / 480
-export const MAX_BALL_SPEED = 2000
-export const GRAVITY = 1100
+export const MAX_BALL_SPEED = MAX_SPEED
+export { GRAVITY } from './geometry'
 const EPSILON = 0.00001
 const TAU = Math.PI * 2
 const CONTACT_CAPACITY = 16384
@@ -33,12 +36,18 @@ export interface Physics {
   plunger: number
   time: number
   postRaised: boolean
+  /** Bit 0/1 closes the left/right out-lane ball-save gate. */
+  gates: number
   tilted: boolean
   /** Bit i removes drop target i from collision until the rules reset the bank. */
   dropTargets: number
   /** Packed [EventType, zero-based index] pairs, valid up to eventCount; reused every call. */
   contacts: Int32Array
   eventCount: number
+  hitTime: Float32Array
+  spinnerAngle: number
+  spinnerVelocity: number
+  searchCount: number
   accumulator: number
   lastContactTime: number
   capturedBy: number
@@ -68,7 +77,7 @@ function onArc(angle: number, start: number, end: number) {
 }
 
 function candidate(out: Collision, time: number, nx: number, ny: number, penetration = 0) {
-  if (time < -EPSILON || time > out.time) return
+  if (time < -EPSILON || Math.max(0, time) >= out.time) return
   out.time = Math.max(0, time)
   out.normalX = nx
   out.normalY = ny
@@ -169,10 +178,11 @@ export function sweepArc(out: Collision, x: number, y: number, vx: number, vy: n
 
 export function createPhysics(): Physics {
   const physics: Physics = {
-    ball: { x: LAUNCH.x, y: LAUNCH.y, vx: 0, vy: 0, radius: 7.5, height: 0, layer: 0, active: false },
+    ball: { x: LAUNCH.x, y: LAUNCH.y, vx: 0, vy: 0, radius: BALL_RADIUS, height: 0, layer: 0, active: false },
     leftAngle: FLIPPERS[0].rest, rightAngle: FLIPPERS[1].rest, plunger: 0, time: 0,
-    postRaised: false, tilted: false, dropTargets: 0,
+    postRaised: false, gates: 0, tilted: false, dropTargets: 0,
     contacts: new Int32Array(CONTACT_CAPACITY * 2), eventCount: 0,
+    hitTime: new Float32Array(SLOT_COUNT).fill(-100), spinnerAngle: 0, spinnerVelocity: 0, searchCount: 0,
     accumulator: 0, lastContactTime: 0, capturedBy: -1, releaseAt: 0, rampSince: 0,
     collision: { time: 0, normalX: 0, normalY: 0, penetration: 0 },
     colliderCooldown: new Float64Array(SEGMENTS.length + CIRCLES.length + ARCS.length + 2),
@@ -204,12 +214,13 @@ export function resetBall(p: Physics) {
 }
 
 function emit(p: Physics, event: number, index: number) {
-  if (event <= EventType.None) return
+  if (event < 0) return
   // The pool covers over thirty seconds of sustained contacts in one caller update.
   if (p.eventCount === CONTACT_CAPACITY) throw new RangeError('Pinball contact queue capacity exceeded')
   p.contacts[p.eventCount * 2] = event
   p.contacts[p.eventCount * 2 + 1] = index
   p.eventCount++
+  p.hitTime[slotOf(event, index)] = p.time
 }
 
 function capSpeed(b: Ball) {
@@ -241,7 +252,9 @@ function matchesLayer(layer: number, ball: Ball) {
 }
 
 function enabled(p: Physics, kind: string | undefined, index: number) {
-  return kind !== 'post' || p.postRaised ? kind !== 'drop' || !(p.dropTargets & (1 << index)) : false
+  if (kind === 'post') return p.postRaised
+  if (kind === 'gate') return !!(p.gates & (1 << index))
+  return kind !== 'drop' || !(p.dropTargets & (1 << index))
 }
 
 function flipperCollision(p: Physics, index: number, elapsed: number, duration: number) {
@@ -271,8 +284,9 @@ function flipperCollision(p: Physics, index: number, elapsed: number, duration: 
     const svy = angular * (qx - f.x)
     if (gap <= EPSILON) {
       if ((b.vx - svx) * nx + (b.vy - svy) * ny < 0 || gap < -EPSILON) {
+        const before = p.collision.time
         candidate(p.collision, t, nx, ny, Math.max(0, -gap))
-        if (p.collision.time === t) {
+        if (p.collision.time < before) {
           p.hitKind = 3
           p.hitIndex = index
           p.hitVelocityX = svx
@@ -311,7 +325,7 @@ function collectCollision(p: Physics, duration: number, elapsed: number) {
   }
   for (let i = 0; i < ARCS.length; i++) {
     const a = ARCS[i]
-    if (!matchesLayer(a.layer, b) || !enabled(p, a.kind, a.index)) continue
+    if (!matchesLayer(a.layer, b)) continue
     const before = out.time
     sweepArc(out, b.x, b.y, b.vx, b.vy, a.x, a.y, a.radius, a.start, a.end, b.radius)
     if (out.time !== before) { p.hitKind = 2; p.hitIndex = i }
@@ -340,6 +354,9 @@ function sensors(p: Physics, fromX: number, fromY: number, toX: number, toY: num
   const lengthSquared = dx * dx + dy * dy
   for (let i = 0; i < SENSORS.length; i++) {
     const s = SENSORS[i]
+    if (s.kind === 'drain') continue // Horizontal open drain, not the decorative circle's radius.
+    if (s.kind === 'ramp-enter' && b.vy >= 0 || s.kind === 'ramp-exit' && b.vy <= 0) continue
+    if (s.kind === 'ramp-enter' && Math.abs(toX - RAMP.upX) > RAMP.laneWidth / 2 - b.radius) continue
     if (!matchesLayer(s.layer, b)) { p.sensorInside[i] = 0; continue }
     const radius = s.radius + b.radius
     const endInside = (toX - s.x) ** 2 + (toY - s.y) ** 2 <= radius * radius
@@ -350,7 +367,9 @@ function sensors(p: Physics, fromX: number, fromY: number, toX: number, toY: num
     if (!trigger) continue
     p.sensorCooldown[i] = p.time + 0.12
     p.lastContactTime = p.time
-    emit(p, s.event, s.index)
+    if (s.kind === 'spinner') {
+      p.spinnerVelocity = Math.min(100, p.spinnerVelocity + Math.hypot(b.vx, b.vy) / 12)
+    } else emit(p, s.event, s.index)
     if (s.kind === 'ramp-enter') {
       b.layer = s.toLayer ?? 1
       p.rampSince = p.time
@@ -360,15 +379,11 @@ function sensors(p: Physics, fromX: number, fromY: number, toX: number, toY: num
       b.height = 0
     } else if (s.kind === 'kicker') {
       p.capturedBy = i
-      p.releaseAt = p.time + 0.65
+      p.releaseAt = p.time + KICKER_HOLD
       b.x = s.x
       b.y = s.y
       b.vx = 0
       b.vy = 0
-      return false
-    } else if (s.kind === 'drain') {
-      if (s.event !== EventType.Drain) drain(p, s.index)
-      else { b.active = false; b.vx = 0; b.vy = 0 }
       return false
     }
   }
@@ -392,7 +407,7 @@ function respond(p: Physics) {
   const b = p.ball
   let restitution = 0.72
   let impulse = 0
-  let event = EventType.None
+  let event: number = -1
   let index = p.hitIndex
   let slot = index
   if (p.hitKind === 0) {
@@ -450,8 +465,10 @@ function advanceFlippers(p: Physics, left: boolean, right: boolean) {
   const rightUp = right && !p.tilted
   const lt = leftUp ? l.raised : l.rest
   const rt = rightUp ? r.raised : r.rest
-  p.leftAngle += Math.max(-(leftUp ? 30 : 15) * PHYSICS_STEP, Math.min((leftUp ? 30 : 15) * PHYSICS_STEP, lt - p.leftAngle))
-  p.rightAngle += Math.max(-(rightUp ? 30 : 15) * PHYSICS_STEP, Math.min((rightUp ? 30 : 15) * PHYSICS_STEP, rt - p.rightAngle))
+  const ls = leftUp ? FLIPPER_UP_SPEED : FLIPPER_DOWN_SPEED
+  const rs = rightUp ? FLIPPER_UP_SPEED : FLIPPER_DOWN_SPEED
+  p.leftAngle += Math.max(-ls * PHYSICS_STEP, Math.min(ls * PHYSICS_STEP, lt - p.leftAngle))
+  p.rightAngle += Math.max(-rs * PHYSICS_STEP, Math.min(rs * PHYSICS_STEP, rt - p.rightAngle))
   p.leftVelocity = (p.leftAngle - p.previousLeftAngle) / PHYSICS_STEP
   p.rightVelocity = (p.rightAngle - p.previousRightAngle) / PHYSICS_STEP
 }
@@ -459,6 +476,10 @@ function advanceFlippers(p: Physics, left: boolean, right: boolean) {
 function fixedStep(p: Physics, left: boolean, right: boolean) {
   p.time += PHYSICS_STEP
   advanceFlippers(p, left, right)
+  const oldRevolutions = Math.floor(p.spinnerAngle / TAU)
+  p.spinnerAngle += p.spinnerVelocity * PHYSICS_STEP
+  p.spinnerVelocity *= 1 - 1.8 * PHYSICS_STEP
+  if (Math.floor(p.spinnerAngle / TAU) > oldRevolutions) emit(p, EventType.Spinner, 0)
   const b = p.ball
   if (!b.active) return
   if (p.time - p.lastContactTime >= 8) {
@@ -469,7 +490,7 @@ function fixedStep(p: Physics, left: boolean, right: boolean) {
       capSpeed(b)
     }
     p.lastContactTime = p.time
-    emit(p, EventType.Search, 0)
+    p.searchCount++
   }
   if (p.capturedBy >= 0) {
     if (p.time >= p.releaseAt) kickCaptured(p)
@@ -479,19 +500,26 @@ function fixedStep(p: Physics, left: boolean, right: boolean) {
   b.vx *= 1 - 0.08 * PHYSICS_STEP
   b.vy *= 1 - 0.08 * PHYSICS_STEP
   capSpeed(b)
-  if (b.layer > 0) b.height = Math.min(12, b.height + 50 * PHYSICS_STEP)
+  if (b.layer > 0) b.height = Math.min(1, b.height + 5 * PHYSICS_STEP)
   let remaining = PHYSICS_STEP
   for (let iteration = 0; iteration < 16 && remaining > EPSILON / MAX_BALL_SPEED; iteration++) {
     const collision = collectCollision(p, remaining, PHYSICS_STEP - remaining)
     const travel = collision ? p.collision.time : remaining
     const x = b.x
     const y = b.y
+    const layer = b.layer
     b.x += b.vx * travel
     b.y += b.vy * travel
     if (!sensors(p, x, y, b.x, b.y)) return
     remaining -= travel
     if (!collision) break
+    if (b.layer !== layer) continue // Recompute against the newly entered ramp layer.
     respond(p)
+  }
+  // A weak ramp shot may roll back out of its entrance rather than reach the apex.
+  if (b.layer === 1 && b.y > RAMP.bottom && b.vy > 0) {
+    b.layer = 0
+    b.height = 0
   }
   // Do not advance unconsumed time after a pathological contact cluster: that would tunnel.
   if (b.y - b.radius > TABLE_HEIGHT) drain(p)

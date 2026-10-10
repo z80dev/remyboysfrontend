@@ -11,13 +11,45 @@ export const WALL_TICK = 40
 export const STEP = 4
 export type Orientation = 'horizontal' | 'vertical'
 export type Phase = 'playing' | 'complete' | 'over'
-export type Half = { active: boolean; completed: boolean; direction: number; length: number; target: number; clock: number }
-export type Tally = { area: number; lives: number; time: number; total: number }
+export type Half = {
+  active: boolean
+  completed: boolean
+  direction: number
+  length: number
+  target: number
+  clock: number
+}
+export type Tally = { area: number, lives: number, time: number, total: number }
 export type Game = {
-  level: number; seed: number; fast: boolean; phase: Phase; lives: number; score: number; remaining: number; elapsed: number; accumulator: number
-  cells: Uint8Array; visited: Uint8Array; queue: Int16Array; x: Float64Array; y: Float64Array; vx: Float64Array; vy: Float64Array
-  bounceAt: Float64Array; bounceAxis: Uint8Array; atomCount: number; cleared: number; area: number; revision: number
-  wallX: number; wallY: number; orientation: Orientation; halves: [Half, Half]; starts: number; completions: number; losses: number
+  level: number
+  seed: number
+  fast: boolean
+  phase: Phase
+  lives: number
+  score: number
+  remaining: number
+  elapsed: number
+  accumulator: number
+  cells: Uint8Array
+  visited: Uint8Array
+  queue: Int16Array
+  x: Float64Array
+  y: Float64Array
+  vx: Float64Array
+  vy: Float64Array
+  bounceAt: Float64Array
+  bounceAxis: Uint8Array
+  atomCount: number
+  cleared: number
+  area: number
+  revision: number
+  wallX: number
+  wallY: number
+  orientation: Orientation
+  halves: [Half, Half]
+  starts: number
+  completions: number
+  losses: number
   tally: Tally
 }
 
@@ -136,7 +168,10 @@ export function fillRegions(g: Game): number {
     const x = Math.max(0, Math.min(COLS - 1, Math.floor(g.x[i] / CELL)))
     const y = Math.max(0, Math.min(ROWS - 1, Math.floor(g.y[i] / CELL)))
     const p = y * COLS + x
-    if (!g.cells[p] && !g.visited[p]) { g.visited[p] = 1; g.queue[end++] = p }
+    if (!g.cells[p] && !g.visited[p]) {
+      g.visited[p] = 1
+      g.queue[end++] = p
+    }
   }
   while (read < end) {
     const p = g.queue[read++]
@@ -190,7 +225,12 @@ function completeHalf(g: Game, h: Half): void {
 function tick(g: Game, ms: number): void {
   g.remaining = Math.max(0, g.remaining - ms)
   g.elapsed += ms
-  if (g.remaining === 0) { g.phase = 'over'; g.halves[0].active = false; g.halves[1].active = false; return }
+  if (g.remaining === 0) {
+    g.phase = 'over'
+    g.halves[0].active = false
+    g.halves[1].active = false
+    return
+  }
   // Check growth before it commits: an atom touching the last new cell destroys the half, not the atom.
   for (let i = 0; i < 2; i++) {
     const h = g.halves[i]

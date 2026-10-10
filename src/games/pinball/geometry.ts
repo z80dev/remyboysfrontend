@@ -181,6 +181,7 @@ export const LAUNCH = { x: 350.5, y: 396 - BALL_RADIUS - 0.5 } as const
 
 // Launch ramp (layer 1): up-lane x 84..106, U-turn around (110, 96), down-lane x 114..136.
 export const RAMP = {
+  laneWidth: 22,
   upX: 95,
   downX: 125,
   bottom: 250,
@@ -322,7 +323,8 @@ export const SENSORS: readonly Sensor[] = [
   kick(286, 226, EventType.Wormhole, 1, 280, 238, -260, 220),
   kick(108, 300, EventType.Wormhole, 2, 116, 306, 200, 160),
   { x: LAUNCH.x, y: LANE_WALL_TOP + 20, radius: 9, layer: 0, event: EventType.Launch, index: 0, kind: 'launch' },
-  { x: PLAYFIELD_CENTRE, y: 432, radius: 200, layer: -1, event: EventType.Drain, index: 0, kind: 'drain' }
+  // Drain: physics treats this as the horizontal line y > TABLE_HEIGHT + radius across the whole width.
+  { x: PLAYFIELD_CENTRE, y: TABLE_HEIGHT + 600, radius: 600, layer: -1, event: EventType.Drain, index: 0, kind: 'drain' }
 ]
 
 // Light insert positions for the renderer (no collision).
@@ -333,28 +335,62 @@ export const FUEL_LIGHTS = [
   [325, 126]
 ] as const
 export const MULTIPLIER_LIGHTS = [
-  [143, 330],
-  [159, 336],
-  [175, 338],
-  [191, 336],
-  [207, 330]
+  [143, 322],
+  [159, 327],
+  [175, 329],
+  [191, 327],
+  [207, 322]
 ] as const
 export const BUMPER_LEVEL_LIGHTS = [
-  [196, 178],
-  [208, 182],
-  [220, 184],
-  [232, 182]
+  [184, 104],
+  [181, 118],
+  [182, 132],
+  [187, 146]
 ] as const
 export const FLAG_LEVEL_LIGHTS = [
-  [322, 268],
-  [322, 278],
-  [322, 288]
+  [325, 256],
+  [325, 264],
+  [325, 272],
+  [325, 280]
 ] as const
+export const ENGINE_LEVEL_LIGHTS = [
+  [161, 199],
+  [168, 199],
+  [175, 199],
+  [182, 199]
+] as const
+export const REENTRY_LIGHTS = [
+  [200, 90],
+  [230, 90],
+  [260, 90]
+] as const
+export const SPOT_LIGHTS = [
+  [54, 167],
+  [54, 189],
+  [54, 211]
+] as const
+export const LEFT_HAZARD_LIGHTS = [
+  [66, 260],
+  [78, 272],
+  [90, 284]
+] as const
+export const RIGHT_HAZARD_LIGHTS = [
+  [298, 167],
+  [298, 189],
+  [298, 211]
+] as const
+export const ENGINE_LIGHTS = [
+  [153, 182],
+  [171, 182],
+  [189, 182]
+] as const
+export const BONUS_LIGHT = [130, 60] as const
+export const RAMP_LIGHT = [95, 258] as const
 export const CHUTE_LIGHTS = [
   [26, 230],
   [26, 214],
   [26, 198]
 ] as const
-export const RANK_LIGHTS: readonly (readonly [number, number])[] = Array.from({ length: 9 }, (_, i) => [131 + i * 11, 360] as const)
+export const RANK_LIGHTS: readonly (readonly [number, number])[] = Array.from({ length: 9 }, (_, i) => [131 + i * 11, 344] as const)
 export const SHOOT_AGAIN = [PLAYFIELD_CENTRE, 380] as const
 export const EXTRA_BALL = [56, 140] as const

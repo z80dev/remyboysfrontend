@@ -29,8 +29,9 @@ export function stopPinballAudio(): void {
 
 /** Canonical effect names mirror table/rule events; level is bumper upgrade or plunger strength. */
 export function sound(event: string, level = 1): void {
+  if (isGamesMuted()) return
   const audio = getGamesAudio()
-  if (isGamesMuted() || !audio || audio.ctx.state !== 'running') return
+  if (!audio || audio.ctx.state !== 'running') return
   const now = audio.ctx.currentTime
   const previous = last.get(event)
   const spacing = event === 'wormhole' || event === 'hyperspace' || event === 'black-hole' || event === 'tilt' ? 0.12

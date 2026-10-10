@@ -1,11 +1,12 @@
-import { drawBevel, drawLed, FLAG_COLORS, type RemyPalette } from '../kit'
-import { FLAG, HIDDEN, QUESTION, REVEALED, mineCounter, type Game } from './engine'
+import { drawBevel, drawLed, FLAG_COLORS } from '../kit'
+import type { FrontRemyHeads, RemyPalette } from '../kit'
+import { FLAG, QUESTION, REVEALED, mineCounter } from './engine'
+import type { Game } from './engine'
 
 export const HEADER_HEIGHT = 49
 export const BOARD_X = 12
 export const BOARD_Y = 6
-export type Heads = Awaited<ReturnType<typeof import('../kit').loadHeads>>
-export type MineArt = { heads: Heads; ids: number[] }
+export type MineArt = { heads: FrontRemyHeads; ids: number[] }
 export const FALLBACK_PALETTE: RemyPalette = { skin: '#ffff00', hair: '#805000', shirt: '#0000ff', bg: '#c0c0c0', accent: '#ffffff', eye: '#000000' }
 const NUMBER_COLORS = ['#000000', '#0000ff', '#008000', '#ff0000', '#000080', '#800000', '#008080', '#000000', '#808080']
 const DIGITS = [
@@ -121,8 +122,8 @@ export function drawHeader(ctx: CanvasRenderingContext2D, game: Game, width: num
   drawBevel(ctx, 0, 0, width, game.config.rows * 16 + 63, { width: 3, face: true })
   drawBevel(ctx, 9, 6, width - 17, 37, { inset: true, width: 2, face: true })
   for (const x of [12, width - 53]) drawBevel(ctx, x, 12, 41, 25, { inset: true, width: 1, face: true })
-  drawLed(ctx, mineCounter(game), 13, 13)
-  drawLed(ctx, game.seconds, width - 52, 13)
+  drawLed(ctx, mineCounter(game), 13, 13, { off: '#800000' })
+  drawLed(ctx, game.seconds, width - 52, 13, { off: '#800000' })
   const x = Math.floor(width / 2) - 12
   drawBevel(ctx, x, 12, 24, 24, { inset: facePressed, width: 2, face: true })
   const state = game.status === 'lost' ? 'dead' : game.status === 'won' ? 'win' : pressing ? 'surprise' : 'smile'

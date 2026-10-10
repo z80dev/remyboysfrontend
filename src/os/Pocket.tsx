@@ -16,6 +16,7 @@ import { useSecurityState } from './system'
 
 type Props = {
   active?: string
+  title?: string
   open: string[]
   onLaunch: (id: string) => void
   onClose: (id: string) => void
@@ -29,7 +30,7 @@ type Props = {
  * Pocket PC shell for phones: Luna title strip on top (Start, app title, tray, clock, ok),
  * a full-screen app or the Today screen, and a soft-key bar at the bottom.
  */
-export function Pocket({ active, open, onLaunch, onClose, onToday, onLogOff, children }: Props) {
+export function Pocket({ active, title, open, onLaunch, onClose, onToday, onLogOff, children }: Props) {
   const [start, setStart] = useState(false)
   const [wallet, setWallet] = useState(false)
   const closeStart = useCallback(() => setStart(false), [])
@@ -110,7 +111,7 @@ export function Pocket({ active, open, onLaunch, onClose, onToday, onLogOff, chi
             </div>
           )}
         </div>
-        <h1 className="pk-title">{app ? app.title : 'Remy OS'}</h1>
+        <h1 className="pk-title">{title ?? (app ? app.title : 'Remy OS')}</h1>
         <span className="pk-tray" aria-hidden="true">
           <Icon name="network" size={16} />
           <span className={`pk-dot${address ? ' on' : ''}`} />

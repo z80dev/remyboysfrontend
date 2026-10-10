@@ -210,21 +210,18 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
   const navRef = useRef<Nav | null>(null)
   const [nav, setNav] = useState<Nav | null>(null)
 
-  const go = useCallback((next: Nav | null) => {
-    navRef.current = next
-    setNav(next)
-  }, [])
-
-  // Report entering/leaving menu mode through the latest callback; only real transitions fire it.
   const onOpenChangeRef = useRef(onOpenChange)
   onOpenChangeRef.current = onOpenChange
   const reported = useRef(false)
-  const inMenu = nav !== null
-  useEffect(() => {
-    if (reported.current === inMenu) return
-    reported.current = inMenu
-    onOpenChangeRef.current?.(inMenu)
-  }, [inMenu])
+  const go = useCallback((next: Nav | null) => {
+    navRef.current = next
+    const open = next !== null
+    if (reported.current !== open) {
+      reported.current = open
+      onOpenChangeRef.current?.(open)
+    }
+    setNav(next)
+  }, [])
   useEffect(
     () => () => {
       if (reported.current) onOpenChangeRef.current?.(false)
@@ -362,7 +359,7 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
         if (!accelMatches(accel, e)) continue
         if (typing && !accel.ctrl && !accel.alt && !/^f\d+$/.test(accel.key)) continue
         eat(e)
-        run(cmd)
+        if (!e.repeat) run(cmd)
         return
       }
     }

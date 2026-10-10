@@ -144,7 +144,7 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
           grid.current?.querySelector<HTMLButtonElement>(`[data-back="${next}"]`)?.focus()
         }}>
           {BACKS.map((back) => <button key={back.id} type="button" role="radio" aria-checked={selected === back.id}
-            aria-label={back.name} title={back.tooltip ?? back.name} className={`remy-deck-choice${selected === back.id ? ' selected' : ''}`}
+            aria-label={back.name} title={'tooltip' in back ? back.tooltip : back.name} className={`remy-deck-choice${selected === back.id ? ' selected' : ''}`}
             data-back={back.id} data-autofocus={selected === back.id ? '' : undefined} tabIndex={selected === back.id ? 0 : -1}
             onClick={() => choose(back.id)} onDoubleClick={() => {
               if (back.id !== 12) {

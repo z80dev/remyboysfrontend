@@ -8,14 +8,19 @@ const iceTiles = new Set([Tile.Ice, Tile.IceNW, Tile.IceNE, Tile.IceSW, Tile.Ice
 
 export function createState(level: Level): State {
   if (level.bottom.length !== 1024) throw new Error('A level must contain 32 × 32 tiles')
-  const actors: Actor[] = level.top.map(a => ({ kind: a.kind, pos: index(a.x, a.y), dir: a.dir ?? 2, alive: true, trapped: false, clone: level.bottom[index(a.x, a.y)] === Tile.Clone }))
+  const actors: Actor[] = level.top.map(a => {
+    const pos = index(a.x, a.y)
+    const tile = level.bottom[pos]
+    return { kind: a.kind, pos, dir: a.dir ?? 2, alive: true, trapped: false, clone: tile === Tile.Clone, movedTick: -1,
+      initialSlidePos: iceTiles.has(tile) || tile >= Tile.ForceN && tile <= Tile.ForceRandom ? pos : -1 }
+  })
   const player = actors.find(a => a.kind === 'player')
   if (!player || actors.filter(a => a.kind === 'player').length !== 1) throw new Error('A level requires exactly one player')
-  for (let n = actors.length; n < 1024; n++) actors.push({ kind: 'block', pos: -1, dir: 0, alive: false, trapped: false, clone: false })
+  for (let n = actors.length; n < 1024; n++) actors.push({ kind: 'block', pos: -1, dir: 0, alive: false, trapped: false, clone: false, movedTick: -1, initialSlidePos: -1 })
   return {
     level, tiles: Array.from(level.bottom), actors, player, keys: [0, 0, 0, 0], boots: [false, false, false, false],
     chipsLeft: level.chips, timeLeft: level.time, tick: 0, rng: (level.seed ?? level.number * 7919) >>> 0,
-    status: 'playing', events: [], thief: false, randomForce: 0
+    status: 'playing', events: [], thief: false, randomForce: 0, lastMoveForced: false
   }
 }
 
@@ -51,7 +56,7 @@ function allowed(s: State, a: Actor, dir: Direction, pos = a.pos, reveal = false
     if (reveal && a.kind === 'player' && tile === Tile.HiddenWall) s.tiles[target] = Tile.Wall
     return false
   }
-  // The solid edges of corner ice occupy the named outside corner.
+  // MS corner ice blocks entry across the corner, but permits a booted actor to step out.
   if (tile === Tile.IceNW && (dir === 1 || dir === 2) || tile === Tile.IceNE && (dir === 2 || dir === 3) ||
     tile === Tile.IceSW && (dir === 0 || dir === 1) || tile === Tile.IceSE && (dir === 0 || dir === 3)) return false
   if (tile === Tile.Clone) return false
@@ -102,6 +107,8 @@ function press(s: State, tile: Tile, pos: number) {
       spawned.alive = true
       spawned.trapped = false
       spawned.clone = false
+      spawned.movedTick = -1
+      spawned.initialSlidePos = -1
       move(s, spawned, spawned.dir, true)
     }
   }
@@ -197,6 +204,8 @@ function move(s: State, a: Actor, dir: Direction, bypassTrap = false, teleport =
   if (a.kind === 'player' && (oldTile === Tile.Popup || oldTile === Tile.RecessedWall)) s.tiles[a.pos] = Tile.Wall
   a.pos = target
   a.trapped = false
+  a.movedTick = s.tick
+  a.initialSlidePos = -1
   if (other && other.kind !== 'block' && (a.kind === 'player' || other.kind === 'player')) {
     kill(s, 'monster')
     return true
@@ -207,6 +216,7 @@ function move(s: State, a: Actor, dir: Direction, bypassTrap = false, teleport =
 
 function forced(s: State, a: Actor): Direction | undefined {
   const tile = s.tiles[a.pos]
+  if (a.initialSlidePos === a.pos) return undefined
   if (iceTiles.has(tile) && !(a.kind === 'player' && s.boots[2])) {
     let dir = a.dir
     if (tile === Tile.IceNW) dir = dir === 0 ? 1 : dir === 3 ? 2 : dir
@@ -236,13 +246,21 @@ export function step(s: State, input?: Direction): State {
   const push = forced(s, player)
   if (push !== undefined) {
     const onIce = iceTiles.has(s.tiles[player.pos])
-    // MS permits an orthogonal override of force floors; ice never permits it without skates.
-    if (!onIce && input !== undefined && input !== push && input !== opposite(push) && allowed(s, player, input)) move(s, player, input)
-    else if (!move(s, player, push) && onIce) move(s, player, opposite(push))
-  } else if (input !== undefined) move(s, player, input)
+    // In MS, any legal direction may override a force floor after an involuntary move.
+    if (!onIce && s.lastMoveForced && input !== undefined && allowed(s, player, input)) {
+      move(s, player, input)
+      s.lastMoveForced = false
+    } else {
+      if (!move(s, player, push) && onIce) move(s, player, opposite(push))
+      s.lastMoveForced = true
+    }
+  } else if (input !== undefined) {
+    move(s, player, input)
+    s.lastMoveForced = false
+  }
   if (s.status !== 'playing') return s
   for (const a of s.actors) {
-    if (!a.alive || a === player || a.clone) continue
+    if (!a.alive || a === player || a.clone || a.movedTick === s.tick) continue
     const slide = forced(s, a)
     if (slide !== undefined) {
       if (!move(s, a, slide) && iceTiles.has(s.tiles[a.pos])) move(s, a, opposite(slide))

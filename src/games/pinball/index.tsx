@@ -8,14 +8,14 @@ import {
 import { Panel } from './Panel'
 import { CONTROL_ACTIONS, DEFAULT_CONTROLS, controlForKey, normalizeKey, validControls, type Controls } from './controls'
 import { createPhysics, launchBall, nudgePhysics, resetBall, stepPhysics } from './physics'
-import { EVENT_NAMES } from './geometry'
+import { EVENT_NAMES, FLIPPERS } from './geometry'
 import { createTableLayer, drawTable } from './render'
 import {
-  createGame, drainBall, highScoreCandidates, hit, launchRules, missionGoal, missionName, nudgeRules,
-  qualifiesHighScore, recordHighScore, RANKS, sanitizeHighScores, tickRules, type HighScore, type TableEvent,
+  createGame, drainBall, enableTestMode, highScoreCandidates, hit, launchRules, missionGoal, missionName, nudgeRules,
+  qualifiesHighScore, recordHighScore, RANKS, rotateReentry, sanitizeHighScores, tickRules, type HighScore, type TableEvent,
 } from './rules'
 import { setPinballMusic, sound, stopPinballAudio } from './audio'
-import { STRINGS as S } from './strings'
+import { PANEL_COPY, STRINGS as S } from './strings'
 import icon from './icon'
 import './pinball.css'
 
@@ -38,6 +38,7 @@ export default function Pinball({ close }: AppProps) {
   const physicsRef = useRef(initialPhysics)
   const [revision, refresh] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [demo, setDemo] = useState(false)
   const [dialog, setDialog] = useState<'help' | 'about' | 'scores' | 'controls' | 'remy' | null>(null)
   const [helpTab, setHelpTab] = useState(0)
@@ -46,9 +47,9 @@ export default function Pinball({ close }: AppProps) {
   const [draftControls, setDraftControls] = useState<Controls>({ ...options.controls })
   const [touch, setTouch] = useState(() => window.innerWidth < 720)
   const [portrait, setPortrait] = useState<string>()
-  const [scoreQueue, setScoreQueue] = useState<HighScore[]>([])
+  const [scoreQueue, setScoreQueue] = useState<{ player: number; score: number; rank: number }[]>([])
   const { player } = useGamesPlayer()
-  const [muted, setMuted] = useGamesMuted()
+  const { muted, setMuted } = useGamesMuted()
   const { active, hidden } = useWindowState()
   const fit = useWindowFit()
   const root = useRef<HTMLDivElement>(null)
@@ -62,7 +63,7 @@ export default function Pinball({ close }: AppProps) {
   const game = gameRef.current
   const physics = physicsRef.current
   const canvas = useCrispCanvas(375, 416, { onResize: (scale) => { staticLayer.current = createTableLayer(scale) } })
-  const suspended = paused || !!dialog || scoreQueue.length > 0 || game.phase === 'over'
+  const suspended = paused || menuOpen || !!dialog || scoreQueue.length > 0 || game.phase === 'over'
 
   const redraw = () => {
     if (!canvas.ctx.current) return
@@ -107,6 +108,7 @@ export default function Pinball({ close }: AppProps) {
     inputs.current.plunger = true
     inputs.current.pull = 0
     sound('plunger-pull')
+    refresh((n) => n + 1)
   }
   const launchCommand = () => {
     if (launchRules(gameRef.current)) {
@@ -129,14 +131,28 @@ export default function Pinball({ close }: AppProps) {
   }
 
   useEffect(() => { fit(600, 438) }, [fit])
+  useEffect(() => {
+    const resize = () => {
+      if (!root.current) return
+      if (window.innerWidth < 720) setTouch(true)
+      const fullscreen = document.fullscreenElement === root.current
+      const ratio = fullscreen && window.innerWidth >= 720 ? Math.min(window.innerWidth / 600, (window.innerHeight - 28) / 416) : 1
+      root.current.style.setProperty('--pinball-scale', String(ratio >= 1 ? Math.floor(ratio) : ratio))
+    }
+    window.addEventListener('resize', resize)
+    document.addEventListener('fullscreenchange', resize)
+    resize()
+    return () => { window.removeEventListener('resize', resize); document.removeEventListener('fullscreenchange', resize) }
+  }, [])
   useEffect(() => { redraw() }, [revision, canvas])
   useEffect(() => {
     if (active && !hidden) canvas.ref.current?.focus({ preventScroll: true })
     if (!active || hidden) { setPaused(true); clearInputs() }
   }, [active, hidden])
+  useEffect(() => { if (menuOpen || dialog || scoreQueue.length) clearInputs() }, [menuOpen, dialog, scoreQueue.length])
   useEffect(() => {
+    if (hidden || !active || suspended) stopPinballAudio()
     setPinballMusic(options.music && !muted && !hidden && active && !suspended, !!game.mission)
-    return () => stopPinballAudio()
   }, [options.music, muted, hidden, active, suspended, !!game.mission])
   useEffect(() => {
     let cancelled = false
@@ -157,25 +173,30 @@ export default function Pinball({ close }: AppProps) {
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      if (!active || hidden || dialog || scoreQueue.length || /^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement)?.tagName)) return
+      if (!active || hidden || menuOpen || dialog || scoreQueue.length || /^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement)?.tagName)) return
       unlockAudio()
       if (demo) { setDemo(false); newGame(); return }
+      if (paused && !/^F\d+$/.test(event.key)) { event.preventDefault(); setPaused(false); return }
       if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
         cheat.current = (cheat.current + event.key.toLowerCase()).slice(-11)
-        if (cheat.current === 'hidden test') { gameRef.current.testMode = true; refresh((n) => n + 1) }
+        if (cheat.current === 'hidden test') { enableTestMode(gameRef.current); refresh((n) => n + 1) }
       }
       const action = controlForKey(options.controls, event.key)
       if (!action) return
       event.preventDefault()
-      if (paused) { setPaused(false); return }
       if (event.repeat) return
-      if (action === 'left' || action === 'right') { inputs.current[action] = true; sound('flipper') }
+      if (action === 'left' || action === 'right') {
+        inputs.current[action] = true
+        rotateReentry(gameRef.current, action === 'left' ? -1 : 1)
+        sound('flipper')
+        refresh((n) => n + 1)
+      }
       else if (action === 'plunger') pressPlunger()
       else nudge(action === 'nudgeLeft' ? 'left' : action === 'nudgeRight' ? 'right' : 'up')
     }
     const up = (event: KeyboardEvent) => {
       const action = controlForKey(options.controls, event.key)
-      if (action === 'left' || action === 'right') inputs.current[action] = false
+      if (action === 'left' || action === 'right') { inputs.current[action] = false; refresh((n) => n + 1) }
       else if (action === 'plunger') releasePlunger()
     }
     const blur = () => { clearInputs(); setPaused(true) }
@@ -183,7 +204,7 @@ export default function Pinball({ close }: AppProps) {
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur) }
-  }, [active, hidden, dialog, scoreQueue.length, options.controls, paused, demo, suspended])
+  }, [active, hidden, menuOpen, dialog, scoreQueue.length, options.controls, paused, demo, suspended])
 
   useAnimationFrame((dt, now) => {
     const g = gameRef.current
@@ -212,16 +233,20 @@ export default function Pinball({ close }: AppProps) {
       } else if (event && event !== 'launch') {
         hit(g, event as TableEvent, index)
         sound(event === 'bumper' || event === 'satellite' ? 'bumper' : event === 'rebound' ? 'slingshot' : event === 'drop' ? 'drop'
-          : event === 'wormhole' ? 'wormhole' : event === 'ramp' ? 'ramp' : event === 'spinner' ? 'spinner' : 'rollover', g.bumperLevel)
+          : event === 'wormhole' || event === 'hyperspace' || event === 'ramp' || event === 'spinner' ? event
+          : event === 'blackhole' ? 'black-hole' : event === 'spot' || event === 'engine' || event.endsWith('Hazard') ? 'target' : 'rollover', g.bumperLevel)
       }
     }
     if (g.messageSerial !== lastMessage.current) {
       lastMessage.current = g.messageSerial
-      if (/promotion|mission-complete|mission|extra|replay|fuel-low|tilt/.test(g.messageId)) sound(g.messageId)
+      const cue = g.messageId === 'accepted' ? 'mission' : ['completed', 'recoveryCompleted', 'cabaldCompleted'].includes(g.messageId) ? 'mission-complete'
+        : g.messageId === 'extraBall' ? 'extra' : g.messageId === 'lowFuel' ? 'fuel-low' : g.messageId
+      if (['promotion', 'mission-complete', 'mission', 'extra', 'replay', 'fuel-low', 'tilt'].includes(cue)) sound(cue)
       refresh((n) => n + 1)
     } else if (now - lastPanel.current >= 100) { lastPanel.current = now; refresh((n) => n + 1) }
     redraw()
-  }, { paused: suspended, maxDt: 0.05 })
+  }, { paused: suspended || (game.phase === 'ready' && !inputs.current.plunger && !inputs.current.left && !inputs.current.right && !demo
+    && physics.leftAngle === FLIPPERS[0].rest && physics.rightAngle === FLIPPERS[1].rest), maxDt: 0.05 })
 
   const pointerPosition = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -233,10 +258,11 @@ export default function Pinball({ close }: AppProps) {
     if (side === 'plunger') releasePlunger()
     else if (side) inputs.current[side] = [...pointers.current.values()].includes(side)
     if (inputs.current.drag === event.pointerId) inputs.current.drag = -1
+    refresh((n) => n + 1)
   }
 
-  return <div className="pinball-app" ref={root}>
-    <GameMenuBar disabled={!!dialog || !!scoreQueue.length} menus={[
+  return <div className="pinball-app" ref={root} onPointerDownCapture={() => unlockAudio()} onKeyDownCapture={() => unlockAudio()}>
+    <GameMenuBar onOpenChange={setMenuOpen} disabled={!!dialog || !!scoreQueue.length} menus={[
       { label: S.game, items: [
         { label: S.newGame, hotkey: 'F2', onClick: () => newGame() },
         { label: S.launch, hotkey: 'Space', accel: false, onClick: launchCommand },
@@ -246,8 +272,11 @@ export default function Pinball({ close }: AppProps) {
       ] },
       { label: S.options, items: [
         { label: S.fullScreen, hotkey: 'F4', onClick: fullScreen },
-        ...[1, 2, 3, 4].map((count) => ({ label: `${S.players} ${count}`, radio: true, checked: options.players === count,
-          onClick: () => { updateOptions({ players: count }); gameRef.current = createGame(count); resetBall(physicsRef.current); refresh((n) => n + 1) } })),
+        { label: S.players, items: [1, 2, 3, 4].map((count) => ({ label: S.playerItem[count - 1], radio: true, checked: options.players === count,
+          onClick: () => {
+            updateOptions({ players: count }); gameRef.current = createGame(count); resetBall(physicsRef.current)
+            clearInputs(); setPaused(false); setDemo(false); refresh((n) => n + 1)
+          } })) },
         { label: S.controls, hotkey: 'F8', onClick: () => { setDraftControls({ ...options.controls }); setDialog('controls') } }, '-',
         { label: S.sound, checked: !muted, onClick: () => setMuted(!muted) },
         { label: S.music, checked: options.music, onClick: () => updateOptions({ music: !options.music }) },
@@ -278,7 +307,12 @@ export default function Pinball({ close }: AppProps) {
               const side = position.x > 300 && position.y > 345 && game.phase === 'ready' ? 'plunger' : position.x < 187.5 ? 'left' : 'right'
               pointers.current.set(event.pointerId, side)
               if (side === 'plunger') { inputs.current.swipeY = event.clientY; pressPlunger() }
-              else { inputs.current[side] = true; sound('flipper') }
+              else {
+                inputs.current[side] = true
+                rotateReentry(gameRef.current, side === 'left' ? -1 : 1)
+                sound('flipper')
+                refresh((n) => n + 1)
+              }
             }
           }}
           onPointerMove={(event) => {
@@ -302,20 +336,21 @@ export default function Pinball({ close }: AppProps) {
       <button aria-label={S.controlLabels.nudgeUp} onClick={() => nudge('up')}>↑</button>
       <button aria-label={S.controlLabels.nudgeRight} onClick={() => nudge('right')}>→</button>
       <button onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); pressPlunger() }}
-        onPointerUp={releasePlunger} onPointerCancel={releasePlunger}>{S.plunger}</button>
+        onPointerUp={releasePlunger} onPointerCancel={releasePlunger}>{S.touchPlunger}</button>
     </div>}
-    <span className="pinball-live" aria-live="polite">{game.message} {missionName(game)} {missionGoal(game)}</span>
-    {dialog === 'help' && <GameDialog title={`${S.title} Help`} onClose={() => setDialog(null)} width={470}>
+    <span className="pinball-live" aria-live="polite">{game.message} {missionName(game)} {missionGoal(game)} {PANEL_COPY.score}: {game.player.score.toLocaleString('en-US')}</span>
+    {dialog === 'help' && <GameDialog title={S.helpTitle} onClose={() => setDialog(null)} width={470}>
       <div className="pinball-help-tabs" role="tablist">{S.helpTabs.map((label, index) => <button key={label} role="tab" aria-selected={index === helpTab}
         onClick={() => setHelpTab(index)}>{label}</button>)}</div><div className="pinball-help-copy" role="tabpanel">{S.helpTexts[helpTab]}</div>
     </GameDialog>}
     {dialog === 'about' && <AboutDialog game={S.title} icon={icon} version="5.1 (Build 2600.remy_sp2.4490)" flavour={S.aboutFlavour}
-      lines={S.aboutLines} onClose={() => setDialog(null)} />}
-    {dialog === 'scores' && <BestScoresDialog title={S.highScores} rows={options.scores.map((score, index) => ({
-      label: `${index + 1}. ${RANKS[score.rank]}`, name: score.name, score: score.score,
-    }))} format={(score) => score.toLocaleString('en-US')} onReset={() => updateOptions({ scores: [] })} onClose={() => setDialog(null)} />}
+      lines={[...S.aboutLines]} onClose={() => setDialog(null)} />}
+    {dialog === 'scores' && <BestScoresDialog title={S.highScoresTitle} heading={S.highScoresHeading} rows={Array.from({ length: 5 }, (_, index) => {
+      const score = options.scores[index]
+      return { label: `${index + 1}. ${score ? RANKS[score.rank] : ''}`, name: score?.name, score: score?.score ?? null }
+    })} format={(score) => score.toLocaleString('en-US')} onReset={() => updateOptions({ scores: [] })} onClose={() => setDialog(null)} />}
     {dialog === 'remy' && <ChooseRemyDialog onClose={() => setDialog(null)} />}
-    {dialog === 'controls' && <GameDialog title={S.controls} onClose={() => { setDialog(null); setMappingAction(null) }} buttons={[
+    {dialog === 'controls' && <GameDialog title={S.controlsTitle} onClose={() => { setDialog(null); setMappingAction(null) }} buttons={[
       { label: S.ok, default: true, onClick: () => { updateOptions({ controls: draftControls }); setDialog(null); setMappingAction(null) } },
       { label: S.cancel, cancel: true, onClick: () => { setDialog(null); setMappingAction(null) } },
     ]}><div className="pinball-controls" onKeyDown={(event) => {
@@ -330,9 +365,9 @@ export default function Pinball({ close }: AppProps) {
         <button onClick={() => { setMappingAction(action); setMappingError(false) }}>{mappingAction === action ? S.keyPrompt
           : draftControls[action] === ' ' ? S.spaceLabel : draftControls[action]}</button></div>)}
       {mappingError && <p role="alert">{S.duplicateKey}</p>}
-      <button onClick={() => { setDraftControls({ ...DEFAULT_CONTROLS }); setMappingAction(null) }}>{S.reset}</button>
+      <button onClick={() => { setDraftControls({ ...DEFAULT_CONTROLS }); setMappingAction(null) }}>{S.defaults.replace('&', '')}</button>
     </div></GameDialog>}
-    {scoreQueue.length > 0 && <NameEntryDialog title={S.highScores} level={RANKS[scoreQueue[0].rank]}
+    {scoreQueue.length > 0 && <NameEntryDialog title={S.nameEntryTitle} level={RANKS[scoreQueue[0].rank]}
       message={`${S.gameOver} ${scoreQueue[0].score.toLocaleString('en-US')}`} onSubmit={(name) => {
         const score = scoreQueue[0]
         updateOptions({ scores: recordHighScore(options.scores, name, score.score, score.rank, game.testMode) })

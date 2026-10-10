@@ -57,7 +57,7 @@ export function GameDialog({ title, onClose, buttons, children, width, className
     const d = dialogRef.current
     if (!d) return
     const target =
-      d.querySelector<HTMLElement>('[data-autofocus]') ??
+      d.querySelector<HTMLElement>('[data-autofocus]:not(:disabled)') ??
       d.querySelector<HTMLElement>('.dialog-buttons .btn.default:not(:disabled)') ??
       d.querySelector<HTMLElement>(FOCUSABLE)
     target?.focus()

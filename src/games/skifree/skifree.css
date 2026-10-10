@@ -1,0 +1,235 @@
+.skifree {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #000000;
+  font: 11px var(--font);
+}
+
+.skifree > .gk-menubar {
+  flex: 0 0 auto;
+  z-index: 3;
+}
+
+.skifree-surface {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #ffffff;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.skifree-surface:focus-visible::after {
+  position: absolute;
+  inset: 2px;
+  z-index: 2;
+  border: 1px dotted #000000;
+  pointer-events: none;
+  content: '';
+}
+
+.skifree-canvas {
+  display: block;
+  flex: 0 0 auto;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.skifree-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 32px);
+  padding: 14px 18px;
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border: 1px solid #000000;
+  background: #ffffff;
+  box-shadow: 2px 2px 0 #808080;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.skifree-panel h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.skifree-panel p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.skifree-panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.skifree-panel .btn {
+  min-width: 80px;
+  min-height: 28px;
+}
+
+.skifree-panel .skifree-frame-hint {
+  margin: 12px 0 0;
+  color: #808080;
+}
+
+.skifree-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.skifree-controls .btn {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid #000000;
+  border-radius: 0;
+  background: #c0c0c0;
+  color: #000000;
+  box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080;
+  font: 11px var(--font);
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.skifree-controls .btn:active,
+.skifree-controls .btn[aria-pressed='true'] {
+  background: #c0c0c0;
+  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #ffffff;
+}
+
+.skifree-controls .btn:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -5px;
+}
+
+.skifree-controls .btn:disabled {
+  color: #808080;
+}
+
+.skifree-pause-control {
+  top: 8px;
+  left: 8px;
+}
+
+.skifree-jump-control {
+  bottom: max(8px, env(safe-area-inset-bottom));
+  left: 8px;
+}
+
+.skifree-fast-control {
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  font-weight: bold !important;
+}
+
+.skifree-course-chooser {
+  display: grid;
+  gap: 2px;
+  margin: 12px 0;
+  padding: 6px 10px 10px;
+}
+
+.skifree-course-chooser label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  cursor: default;
+}
+
+.skifree-course-chooser input {
+  margin: 0;
+}
+
+.skifree-help-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 0;
+}
+
+.skifree-help-tabs .btn {
+  min-height: 28px;
+  border-radius: 0;
+}
+
+.skifree-help-tabs .skifree-selected-tab {
+  background: #ffffff;
+  font-weight: bold;
+}
+
+.skifree-help-panel {
+  min-height: 150px;
+  padding: 12px;
+  border: 1px solid #808080;
+  background: #ffffff;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.skifree-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skifree-touch .skifree-panel .btn {
+  min-height: 44px;
+}
+
+@media (max-width: 719px) {
+  .skifree-panel {
+    padding: 12px;
+    max-width: calc(100% - 20px);
+    max-height: calc(100% - 120px);
+  }
+
+  .skifree-course-chooser label,
+  .skifree-help-tabs .btn {
+    min-height: 44px;
+  }
+
+  .skifree-help-panel {
+    min-height: 100px;
+  }
+}
+
+@media (pointer: coarse) {
+  .skifree-course-chooser label,
+  .skifree-help-tabs .btn {
+    min-height: 44px;
+  }
+}

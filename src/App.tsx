@@ -12,7 +12,7 @@ import { IconDefs } from './os/icons'
 import { MobileContext, useShell } from './os/shell'
 import { TeamPrompt, useSecurityBalloons } from './os/system'
 
-type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean }
+type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean; title?: string }
 
 const SESSION_KEY = 'remyxp.session'
 
@@ -152,6 +152,7 @@ export default function App() {
         onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
         onToggleMax={() => def.resizable !== false && update(w.id, (x) => ({ ...x, max: !x.max }))}
         onGeom={(geom) => update(w.id, (x) => ({ ...x, geom }))}
+        onTitle={(title) => update(w.id, (x) => x.title === title ? x : { ...x, title })}
       >
         <Component param={params[w.id]} navigate={navigate} close={() => close(w.id)} />
       </Window>
@@ -165,7 +166,7 @@ export default function App() {
       <IconDefs />
       <div className={`xp theme-${theme}${powerDialog ? ' fading' : ''}`}>
         {mobile ? (
-          <Pocket active={active} open={wins.map((w) => w.id)} onLaunch={navigate} onClose={close} onToday={minimizeAll} onLogOff={logOff}>
+          <Pocket active={active} title={wins.find((w) => w.id === active)?.title} open={wins.map((w) => w.id)} onLaunch={navigate} onClose={close} onToday={minimizeAll} onLogOff={logOff}>
             {wins.filter((w) => w.id === active || persistent(w)).map((w) => renderWindow(w, w.id !== active))}
           </Pocket>
         ) : (
@@ -176,7 +177,7 @@ export default function App() {
             {wins.filter((w) => !w.min || persistent(w)).map((w) => renderWindow(w, w.min))}
             {menu.element}
             <Taskbar
-              wins={wins.map((w) => ({ id: w.id, min: w.min }))}
+              wins={wins.map((w) => ({ id: w.id, min: w.min, title: w.title }))}
               active={active}
               onTask={toggleFromTaskbar}
               onLaunch={navigate}

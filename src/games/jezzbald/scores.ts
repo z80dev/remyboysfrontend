@@ -1,5 +1,5 @@
-export type Score = { score: number; name: string }
-export type Settings = { fast: boolean; reveal: boolean; scores: Score[] }
+export type Score = { score: number, name: string }
+export type Settings = { fast: boolean, reveal: boolean, scores: Score[] }
 export const defaults: Settings = { fast: false, reveal: true, scores: [] }
 
 export function isSettings(value: unknown): value is Settings {

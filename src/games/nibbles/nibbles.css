@@ -1,0 +1,66 @@
+.nibbles-client .qbasic-letterbox canvas {
+  width: 640px;
+  height: 400px;
+  flex: none;
+}
+
+.nibbles-controls {
+  align-items: center;
+  color: #ffffff;
+}
+
+.nibbles-controls form {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.nibbles-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font: 11px var(--font);
+}
+
+.nibbles-controls input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 240px;
+  height: 44px;
+  padding: 4px 8px;
+  border: 1px solid #aaaaaa;
+  color: #ffffff;
+  background: #000000;
+  font: 16px var(--font);
+}
+
+.nibbles-swipe-label {
+  line-height: 16px;
+  text-align: center;
+}
+
+.nibbles-help-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.nibbles-help-tabs button {
+  min-width: 56px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #808080;
+  background: #c0c0c0;
+  font: 11px var(--font);
+}
+
+.nibbles-help-tabs button[aria-selected='true'] {
+  background: #ffffff;
+  border-color: #000000;
+}
+
+.nibbles-help-tabs + p {
+  min-height: 100px;
+  line-height: 1.5;
+}

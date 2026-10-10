@@ -1,0 +1,12 @@
+.freecell-game { width: 100%; max-width: 632px; height: 448px; display: flex; flex-direction: column; background: #008000; font: 11px var(--font); overflow: hidden; }
+.freecell-surface { width: 100%; flex: 1; min-height: 0; outline: none; background: #008000; touch-action: none; }
+.freecell-surface:focus-visible { box-shadow: inset 0 0 0 1px #ffff80; }
+.freecell-surface canvas { display: block; touch-action: none; }
+.freecell-status { display: flex; gap: 2px; height: 22px; flex: 0 0 22px; padding: 2px; background: #ece9d8; color: #000; box-sizing: border-box; }
+.freecell-status span { border: 1px solid; border-color: #aca899 #fff #fff #aca899; padding: 1px 5px; white-space: nowrap; }
+.freecell-status span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.freecell-option { display: flex; gap: 5px; align-items: center; min-height: 32px; }
+.freecell-stats fieldset { margin: 5px 0; padding: 3px 10px; }
+.freecell-stats p { margin: 5px 0; }
+.freecell-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 719px) { .freecell-game { height: 100%; max-width: none; } .freecell-status { height: 24px; flex-basis: 24px; } }

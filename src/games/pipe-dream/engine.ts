@@ -62,7 +62,7 @@ export function pipeExit(piece: Piece, entry: Direction): Direction | null {
   return ports[0] === entry ? ports[1] ?? null : ports[0] ?? null
 }
 function copy(game: PipeGame): PipeGame {
-  return { ...game, board: [...game.board], filled: [...game.filled], placed: [...game.placed], queue: [...game.queue], events: [] }
+  return { ...game, events: [] }
 }
 function random(game: PipeGame): number {
   game.random = (game.random + 0x6d2b79f5) >>> 0
@@ -91,19 +91,16 @@ export function createGame(seed: number, level = 1, score = 0, bonus = false): P
     game.board[game.gap] = 'empty'
     game.placed[game.gap] = false
   } else {
-    for (let i = 0; i < Math.min(24, params.obstacles); i++) addFixed('block')
-    if (level >= 5) { addFixed('reservoir-h'); addFixed('reservoir-v') }
-    if (level >= 7) { addFixed('valve-e'); addFixed('valve-n') }
-    if (level >= 9) addFixed('drain')
     if (level >= 13) {
       const row = Math.floor(random(game) * ROWS)
       const col = Math.floor(random(game) * COLS)
       game.portals = [{ a: row * COLS + COLS - 1, direction: 1, b: row * COLS }, { a: col, direction: 0, b: (ROWS - 1) * COLS + col }]
-      for (const portal of game.portals) {
-        if (portal.a !== game.source) game.board[portal.a] = 'empty'
-        if (portal.b !== game.source) game.board[portal.b] = 'empty'
-      }
+      for (const portal of game.portals) { reserve.add(portal.a); reserve.add(portal.b) }
     }
+    if (level >= 5) { addFixed('reservoir-h'); addFixed('reservoir-v') }
+    if (level >= 7) { addFixed('valve-e'); addFixed('valve-n') }
+    if (level >= 9) addFixed('drain')
+    for (let i = 0; i < Math.min(CELLS, params.obstacles); i++) addFixed('block')
   }
   for (let i = 0; i < 5; i++) game.queue.push(nextPiece(game))
   return game
@@ -149,6 +146,8 @@ export function advanceTo(game: PipeGame, time: number): PipeGame {
   const next = copy(game)
   while ((next.phase === 'countdown' || next.phase === 'flow') && (time >= next.deadline || (next.replacement && time >= next.replacement.until))) {
     if (next.replacement && next.replacement.until <= Math.min(time, next.deadline)) {
+      if (next.board === game.board) next.board = [...game.board]
+      if (next.placed === game.placed) next.placed = [...game.placed]
       next.board[next.replacement.index] = next.replacement.piece
       next.placed[next.replacement.index] = true
       next.clock = next.replacement.until
@@ -157,6 +156,7 @@ export function advanceTo(game: PipeGame, time: number): PipeGame {
     }
     const at = next.deadline
     next.clock = at
+    if (next.filled === game.filled) next.filled = [...game.filled]
     if (next.phase === 'countdown') {
       next.phase = 'flow'
       next.filled[next.source] = 3
@@ -191,9 +191,12 @@ export function placePiece(game: PipeGame, index: number, time: number): PipeGam
   if (current.board[index] !== 'empty' && !current.placed[index]) return current
   const next = copy(current)
   next.clock = time
+  next.queue = [...current.queue]
   const piece = next.queue.pop()!
   next.queue.unshift(nextPiece(next))
   if (next.board[index] === 'empty') {
+    next.board = [...current.board]
+    next.placed = [...current.placed]
     next.board[index] = piece
     next.placed[index] = true
     next.events.push('place')
@@ -211,6 +214,8 @@ export function slidePiece(game: PipeGame, index: number, time: number): PipeGam
   if (index === game.source || game.filled[index] || (game.phase === 'flow' && game.head === index)) return game
   const next = copy(game)
   next.clock = time
+  next.board = [...game.board]
+  next.placed = [...game.placed]
   next.board[gap] = next.board[index]
   next.placed[gap] = true
   next.board[index] = 'empty'
@@ -260,7 +265,7 @@ export function validPreferences(value: unknown): value is Preferences {
   if (!value || typeof value !== 'object') return false
   const data = value as Preferences
   return typeof data.grid === 'boolean' && Array.isArray(data.scores) && data.scores.length <= 10 && data.scores.every(row =>
-    typeof row.name === 'string' && row.name.length <= 32 && Number.isFinite(row.score) && Number.isInteger(row.level) && row.level >= 1
+    row !== null && typeof row === 'object' && typeof row.name === 'string' && row.name.length <= 32 && Number.isFinite(row.score) && Number.isInteger(row.level) && row.level >= 1
   ) && Array.isArray(data.passwords) && data.passwords.every(word => typeof word === 'string' && levelForPassword(word) !== null)
 }
 export function addHighScore(scores: HighScore[], name: string, score: number, level: number): HighScore[] {

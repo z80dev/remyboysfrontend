@@ -1,0 +1,70 @@
+.pipe-dream {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #c0c0c0;
+  color: #000;
+  font: 11px var(--font);
+  display: flex;
+  flex-direction: column;
+}
+.pipe-dream * { box-sizing: border-box; }
+.pipe-dream .pd-surface { outline: none; flex: 1; min-height: 0; padding-top: 4px; }
+.pipe-dream .pd-surface:focus-visible .pd-board { outline: 2px dotted #000; outline-offset: 2px; }
+.pipe-dream .pd-header {
+  height: 40px;
+  margin: 0 8px 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1px 6px;
+}
+.pipe-dream .pd-header label { display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap; }
+.pipe-dream .pd-level strong { font: bold 17px monospace; }
+.pipe-dream .pd-countdown { height: 18px; flex: 1; min-width: 25px; overflow: hidden; background: #302d2a; padding: 2px; }
+.pipe-dream .pd-countdown > div { height: 100%; width: 100%; background: #209d20; transform-origin: left; }
+.pipe-dream button { font: 11px var(--font); cursor: pointer; }
+.pipe-dream button:disabled { cursor: default; }
+.pipe-dream .pd-fast { min-width: 44px; height: 34px; font-size: 19px; font-weight: bold; }
+.pipe-dream .pd-playfield { display: flex; gap: 8px; margin: 0 8px; align-items: flex-start; }
+.pipe-dream .pd-dispenser { width: 72px; height: 340px; padding: 14px 10px; flex: 0 0 72px; display: flex; flex-direction: column; gap: 9px; background: #5b636b; }
+.pipe-dream .pd-preview { width: 48px; height: 48px; position: relative; flex: 0 0 48px; }
+.pipe-dream .pd-preview canvas { display: block; width: 48px; height: 48px; }
+.pipe-dream .pd-next { outline: 2px solid #ffff00; outline-offset: 2px; }
+.pipe-dream .pd-next span { position: absolute; bottom: -16px; left: 0; width: 100%; text-align: center; color: #ffff00; }
+.pipe-dream .pd-board { width: 484px; height: 340px; flex: 0 0 484px; padding: 2px; position: relative; }
+.pipe-dream .pd-board > canvas { display: block; width: 480px; height: 336px; touch-action: none; }
+.pipe-dream .pd-overlay { position: absolute; inset: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 12px; background: #1e2b3de6; color: #fff2b0; text-align: center; }
+.pipe-dream .pd-overlay p { margin: 0; font-weight: bold; font-size: 15px; }
+.pipe-dream .pd-overlay button { min-width: 110px; min-height: 44px; padding: 6px 14px; }
+.pipe-dream .pd-overlay .pd-password { font-size: 18px; letter-spacing: 1px; }
+.pipe-dream .pd-pocket-controls { display: none; }
+.pipe-dream .statusbar { height: 16px; margin-top: 0; }
+.pipe-dream .pd-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pd-help-tabs { display: flex; gap: 4px; }
+.pd-help-tabs button { min-height: 28px; flex: 1; font: 11px var(--font); }
+.pd-help-tabs button[aria-selected='true'] { font-weight: bold; box-shadow: inset 0 -2px #17437d; }
+.pd-password-entry { display: flex; flex-direction: column; gap: 8px; }
+.pd-password-entry input { width: 100%; font: bold 20px monospace; letter-spacing: 8px; }
+.pd-password-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pd-password-list button { min-height: 32px; padding: 4px 10px; font: 14px monospace; }
+.pipe-dream.pd-touch .pd-pocket-controls { display: flex; justify-content: flex-end; gap: 8px; margin: 8px; }
+.pipe-dream.pd-touch .pd-surface { overflow-y: auto; }
+.pipe-dream .pd-pocket-controls button { min-width: 64px; min-height: 44px; font-size: 15px; }
+@media (max-width: 719px) {
+  .pipe-dream .pd-surface { overflow-y: auto; padding: 8px 0 0; }
+  .pipe-dream .pd-header { height: auto; min-height: 72px; flex-wrap: wrap; gap: 8px; margin: 0 4px 10px; }
+  .pipe-dream .pd-header .pd-countdown { flex-basis: 100%; order: 10; height: 14px; }
+  .pipe-dream .pd-header .pd-fast { margin-left: auto; height: 44px; }
+  .pipe-dream .pd-playfield { flex-direction: column; margin: 0; gap: 8px; align-items: center; overflow-x: auto; }
+  .pipe-dream .pd-dispenser { flex-direction: row-reverse; width: 298px; height: 68px; flex-basis: auto; padding: 7px 10px; gap: 8px; }
+  .pipe-dream .pd-preview { flex: 0 0 48px; }
+  .pipe-dream .pd-next span { bottom: -14px; font-size: 10px; }
+  .pipe-dream .pd-board { width: min(100%, 484px); min-width: 324px; height: auto; flex-basis: auto; margin-inline: auto; align-self: flex-start; }
+  .pipe-dream .pd-board > canvas { width: 100%; height: auto; }
+  .pipe-dream .pd-pocket-controls { display: flex; justify-content: flex-end; gap: 8px; margin: 10px 4px; }
+  .pipe-dream .statusbar { height: auto; min-height: 24px; margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipe-dream .pd-overlay { background: #1e2b3df5; }
+}

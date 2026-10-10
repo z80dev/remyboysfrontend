@@ -17,7 +17,7 @@
 .pinball-help-copy { white-space: pre-line; line-height: 1.55; color: #000; }
 .pinball-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .pinball-app:fullscreen { display: flex; justify-content: center; background: #000; }
-.pinball-app:fullscreen .pinball-stage { transform-origin: center; }
+.pinball-app:fullscreen .pinball-stage { transform-origin: center; transform: scale(var(--pinball-scale, 1)); }
 @media (max-width: 719px) {
   .pinball-stage { width: 100%; height: auto; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: center; margin: 0; }
   .pinball-table-wrap { width: min(100%, calc((100dvh - 174px) * 375 / 416)); height: auto; aspect-ratio: 375 / 416; min-height: 0; flex: 0 1 auto; }

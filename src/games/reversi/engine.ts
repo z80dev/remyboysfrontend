@@ -100,6 +100,7 @@ export function chooseMove(input: Board, side: Side, skill: Skill, options: Sear
       score: max, depth: 1, exact: false, nodes: rootMoves.length }
   }
   const exact = skill === 'master' && empty <= 12
+  rootMoves.sort((a, b) => WEIGHTS[b] - WEIGHTS[a])
   const moves = Array.from({ length: 130 }, () => new Uint8Array(64))
   const flips = Array.from({ length: 130 }, () => new Uint8Array(64))
   let nodes = 0
@@ -160,7 +161,7 @@ export function chooseMove(input: Board, side: Side, skill: Skill, options: Sear
   let result: SearchResult = { move: rootMoves[0] ?? null, score: 0, depth: 0, exact, nodes: 0 }
   const minimum = exact ? empty : skill === 'novice' ? 2 : skill === 'expert' ? 4 : 6
   const maximum = skill === 'master' && !exact && now ? empty : minimum
-  for (let depth = minimum; depth <= maximum; depth++) {
+  for (let depth = skill === 'master' && !exact && now ? 1 : minimum; depth <= maximum; depth++) {
     let best = -Infinity
     let bestMove: number | null = null
     timed = !exact && depth > minimum
@@ -184,7 +185,7 @@ export function chooseMove(input: Board, side: Side, skill: Skill, options: Sear
       if (error !== timeout) throw error
       break
     }
-    if (result.exact || !now || now() >= deadline) break
+    if (result.exact || !now || (depth >= minimum && now() >= deadline)) break
   }
   result.nodes = nodes
   return result

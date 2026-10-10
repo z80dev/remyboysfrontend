@@ -1,8 +1,21 @@
 import type { HeadRect, RemyHeads } from '../kit/remy'
 import { CELL, COLS, HEIGHT, ROWS, WIDTH, type Game, type Orientation } from './engine'
 
-export type Art = { portrait: HTMLImageElement | null; bg: string; heads: RemyHeads | null; rects: HeadRect[]; idx: number; epithet: string }
-export type Painter = { field: HTMLCanvasElement; reveal: HTMLCanvasElement; revision: number; dirty: boolean; art: Art }
+export type Art = {
+  portrait: HTMLImageElement | null
+  bg: string
+  heads: RemyHeads | null
+  rects: HeadRect[]
+  idx: number
+  epithet: string
+}
+export type Painter = {
+  field: HTMLCanvasElement
+  reveal: HTMLCanvasElement
+  revision: number
+  dirty: boolean
+  art: Art
+}
 export function createPainter(): Painter {
   const field = document.createElement('canvas')
   const reveal = document.createElement('canvas')
@@ -16,7 +29,7 @@ function cache(p: Painter, g: Game, pictures: boolean): void {
   const ctx = p.field.getContext('2d')
   const reveal = p.reveal.getContext('2d')
   if (!ctx || !reveal) return
-  reveal.fillStyle = pictures ? p.art.bg : '#808080'
+  reveal.fillStyle = pictures && p.art.portrait ? p.art.bg : '#808080'
   reveal.fillRect(0, 0, WIDTH, HEIGHT)
   if (pictures && p.art.portrait) reveal.drawImage(p.art.portrait, (WIDTH - HEIGHT) / 2, 0, HEIGHT, HEIGHT)
   ctx.fillStyle = '#000020'
@@ -98,9 +111,14 @@ export function draw(ctx: CanvasRenderingContext2D, p: Painter, g: Game, cursorX
     ctx.strokeStyle = '#000'
     ctx.lineWidth = 4
     ctx.beginPath()
-    ctx.moveTo(-6, 0); ctx.lineTo(6, 0)
-    ctx.moveTo(-3, -3); ctx.lineTo(-6, 0); ctx.lineTo(-3, 3)
-    ctx.moveTo(3, -3); ctx.lineTo(6, 0); ctx.lineTo(3, 3)
+    ctx.moveTo(-6, 0)
+    ctx.lineTo(6, 0)
+    ctx.moveTo(-3, -3)
+    ctx.lineTo(-6, 0)
+    ctx.lineTo(-3, 3)
+    ctx.moveTo(3, -3)
+    ctx.lineTo(6, 0)
+    ctx.lineTo(3, 3)
     ctx.stroke()
     ctx.strokeStyle = '#fff'
     ctx.lineWidth = 2

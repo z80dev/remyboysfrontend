@@ -85,6 +85,8 @@ export interface AnimationFrameOptions {
   paused?: boolean
   /** Longest `dt` handed to the callback in seconds, default 0.1, so a slow frame never tunnels through the world. */
   maxDt?: number
+  /** Pause on deactivation too (default true); turn-based animations may set false to freeze only while hidden. */
+  activeOnly?: boolean
 }
 
 /**
@@ -96,7 +98,7 @@ export interface AnimationFrameOptions {
  */
 export function useAnimationFrame(callback: (dt: number, now: number) => void, opts: AnimationFrameOptions = {}): void {
   const { active, hidden } = useWindowState()
-  const run = active && !hidden && !opts.paused
+  const run = (opts.activeOnly === false || active) && !hidden && !opts.paused
   const cb = useRef(callback)
   cb.current = callback
   const maxDt = useRef(opts.maxDt ?? 0.1)

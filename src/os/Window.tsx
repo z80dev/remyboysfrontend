@@ -1,4 +1,4 @@
-import { type ReactNode, type PointerEvent as ReactPointerEvent, createContext, useCallback, useRef } from 'react'
+import { type ReactNode, type PointerEvent as ReactPointerEvent, createContext, useCallback, useRef, useState } from 'react'
 import { GameWindowContext } from '../games/kit/window'
 import { Icon } from './icons'
 
@@ -32,6 +32,7 @@ type Props = {
   onMinimize: () => void
   onToggleMax: () => void
   onGeom: (g: WinGeom) => void
+  onTitle?: (title: string | undefined) => void
   children: ReactNode
 }
 
@@ -60,6 +61,12 @@ export function Window(p: Props) {
   const body = useRef<HTMLDivElement>(null)
   const latest = useRef(p)
   latest.current = p
+  const [titleOverride, setTitleOverride] = useState<string>()
+  const title = titleOverride ?? p.title
+  const setTitle = useCallback((title: string | undefined) => {
+    setTitleOverride(title)
+    latest.current.onTitle?.(title)
+  }, [])
   const fit = useCallback(function fit(clientW: number, clientH: number) {
     const p = latest.current
     if (p.mobile || p.maximized || p.skinned) return
@@ -80,12 +87,12 @@ export function Window(p: Props) {
     const y = Math.max(0, Math.min(p.geom.y, vh - h))
     if (w !== p.geom.w || h !== p.geom.h || x !== p.geom.x || y !== p.geom.y) p.onGeom({ x, y, w, h })
   }, [])
-  const content = <GameWindowContext.Provider value={{ active: p.active, hidden: !!p.hidden, fit }}>{p.children}</GameWindowContext.Provider>
+  const content = <GameWindowContext.Provider value={{ active: p.active, hidden: !!p.hidden, fit, setTitle }}>{p.children}</GameWindowContext.Provider>
   const free = !p.mobile && !p.maximized
 
   if (p.mobile)
     return (
-      <section className={`window pocket-window${p.skinned ? ' skinned' : ''}`} aria-label={p.title} hidden={p.hidden}>
+      <section className={`window pocket-window${p.skinned ? ' skinned' : ''}`} aria-label={title} hidden={p.hidden}>
         <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: () => {} }}>
           <div className="window-body">{content}</div>
         </ChromeContext.Provider>
@@ -118,7 +125,7 @@ export function Window(p: Props) {
         className={`window skinned${p.active ? ' active' : ''}`}
         style={{ left: p.geom.x, top: p.geom.y, zIndex: p.z }}
         onPointerDownCapture={p.onFocus}
-        aria-label={p.title}
+        aria-label={title}
         hidden={p.hidden}
       >
         <ChromeContext.Provider value={{ active: p.active, minimize: p.onMinimize, drag: onDrag }}>{content}</ChromeContext.Provider>
@@ -133,12 +140,12 @@ export function Window(p: Props) {
       className={`window${p.active ? ' active' : ''}${p.maximized ? ' maximized' : ''}${p.dialog ? ' dialog' : ''}`}
       style={style}
       onPointerDownCapture={p.onFocus}
-      aria-label={p.title}
+      aria-label={title}
       hidden={p.hidden}
     >
       <header className="titlebar" onPointerDown={onDrag} onDoubleClick={() => !p.dialog && p.resizable !== false && p.onToggleMax()}>
         <Icon name={p.icon} size={16} className="title-icon" />
-        <span className="title-text">{p.title}</span>
+        <span className="title-text">{title}</span>
         <div className="title-controls">
           {!p.dialog && (
             <>

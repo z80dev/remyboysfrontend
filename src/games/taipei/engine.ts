@@ -34,20 +34,27 @@ function makeLayout(id: LayoutId): readonly Position[] {
     rectangle(p, 4, 2, 6, 4, 0)
     rectangle(p, 5, 3, 4, 2, 1)
   } else if (id === 'castle') {
-    rectangle(p, 0, 0, 12, 8, 0)
-    for (const x of [0, 9]) for (const y of [0, 5]) {
-      rectangle(p, x, y, 3, 3, 1)
-      rectangle(p, x + 1, y, 1, 3, 2)
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 12; x++) {
+      if (y !== 7 || x !== 5 && x !== 6) p.push({ x, y, z: 0 })
+    }
+    rectangle(p, 5, -1, 2, 1, 0)
+    for (const x of [0, 9]) for (const y of [0, 6]) {
+      rectangle(p, x, y, 3, 2, 1)
+      for (let z = 2; z < 5; z++) rectangle(p, x + 0.5, y + 0.5, 2, 1, z)
     }
   } else if (id === 'rug-tower') {
-    rectangle(p, 0, 0, 10, 8, 0)
-    rectangle(p, 1, 1, 8, 6, 1)
-    rectangle(p, 3, 2, 4, 4, 2)
+    rectangle(p, 0, 0, 12, 6, 0)
+    rectangle(p, 3, 0, 6, 6, 1)
+    rectangle(p, 4, 1, 4, 4, 2)
+    rectangle(p, 4, 1.5, 4, 3, 3)
+    rectangle(p, 5, 1.5, 2, 3, 4)
+    rectangle(p, 5, 2.5, 2, 1, 5)
   } else if (id === 'pyramid') {
-    rectangle(p, 0, 0, 8, 10, 0)
-    rectangle(p, 1, 1.5, 6, 7, 1)
-    rectangle(p, 2, 3, 4, 4, 2)
-    rectangle(p, 3, 3.5, 2, 3, 3)
+    rectangle(p, 0, 0, 10, 8, 0)
+    rectangle(p, 1, 1.5, 8, 5, 1)
+    rectangle(p, 3, 2, 4, 4, 2)
+    rectangle(p, 4, 2.5, 2, 3, 3)
+    rectangle(p, 4, 3.5, 2, 1, 4)
   } else if (id === 'spiral') {
     const path: Position[] = []
     rectangle(path, 0, 0, 12, 1, 0)

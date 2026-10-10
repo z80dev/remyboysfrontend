@@ -1,4 +1,5 @@
 import { mulberry32 } from '../kit/remy'
+import { CARD_COURT_NAMES, CARD_RANK_NAMES, FACE_DOWN_LABEL } from './strings'
 
 export const CARD_W = 71
 export const CARD_H = 96
@@ -30,18 +31,11 @@ export function shuffle(cards: readonly Card[], seed: number): Card[] {
 
 export const isRed = (card: Pick<Card, 'suit'>): boolean => card.suit === 'hearts' || card.suit === 'diamonds'
 
-const RANK_NAMES = ['', 'Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King']
-const COURTS: Record<Suit, readonly string[]> = {
-  hearts: ['Rival', 'Nurse', 'Prof. Gwei'],
-  diamonds: ['Clerk', 'Curator', 'Maxi'],
-  clubs: ['the Remy Boys club', 'the Remy Boys club', 'the Remy Boys club'],
-  spades: ['Short and Squeeze', 'the Rug Lord', 'Admin Escrow'],
-}
 
 export function cardLabel(card: Card): string {
-  if (!card.faceUp) return 'Face-down card'
+  if (!card.faceUp) return FACE_DOWN_LABEL
   const suit = card.suit[0].toUpperCase() + card.suit.slice(1)
-  return `${RANK_NAMES[card.rank]} of ${suit}${card.rank >= 11 ? ` (${COURTS[card.suit][card.rank - 11]})` : ''}`
+  return `${CARD_RANK_NAMES[card.rank]} of ${suit}${card.rank >= 11 ? ` (${CARD_COURT_NAMES[card.suit][card.rank - 11]})` : ''}`
 }
 
 export type CardHit = { pile: number; depth: number; x: number; y: number; card?: Card }
@@ -59,13 +53,18 @@ export function pileCardPositions(layout: CardPileLayout): CardHit[] {
 export function hitTestPiles(layouts: readonly CardPileLayout[], x: number, y: number): CardHit | null {
   for (let p = layouts.length - 1; p >= 0; p--) {
     const layout = layouts[p]
-    const positions = pileCardPositions(layout)
-    if (positions.length === 0 && x >= layout.x && x < layout.x + CARD_W && y >= layout.y && y < layout.y + CARD_H) {
-      return { pile: layout.pile, depth: -1, x: layout.x, y: layout.y }
+    if (x < layout.x || x >= layout.x + CARD_W) continue
+    const count = layout.cards.length
+    if (count === 0) {
+      if (y >= layout.y && y < layout.y + CARD_H) return { pile: layout.pile, depth: -1, x: layout.x, y: layout.y }
+      continue
     }
-    for (let i = positions.length - 1; i >= 0; i--) {
-      const hit = positions[i]
-      if (x >= hit.x && x < hit.x + CARD_W && y >= hit.y && y < hit.y + CARD_H) return hit
+    let top = layout.y
+    if (typeof layout.offset === 'number') top += layout.offset * (count - 1)
+    else for (let i = 0; i < count - 1; i++) top += layout.offset(layout.cards[i], i)
+    for (let i = count - 1; i >= 0; i--) {
+      if (y >= top && y < top + CARD_H) return { pile: layout.pile, depth: i, x: layout.x, y: top, card: layout.cards[i] }
+      if (i > 0) top -= typeof layout.offset === 'number' ? layout.offset : layout.offset(layout.cards[i - 1], i - 1)
     }
   }
   return null

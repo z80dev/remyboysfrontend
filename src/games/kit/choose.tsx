@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { remySrc } from '../../lib/media'
 import './choose.css'
 import { GameDialog } from './dialogs'
 import { useGamesPlayer } from './player'
 import { REMY_COUNT, loadCabald } from './remy'
+import { useWindowState } from './window'
 
 /** Props of {@link ChooseRemyDialog}. */
 export interface ChooseRemyDialogProps {
@@ -33,12 +34,17 @@ function parseIndex(text: string): number | undefined {
  */
 export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
   const { player, setRemy } = useGamesPlayer()
+  const { active, hidden } = useWindowState()
   const [roster, setRoster] = useState<Roster>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [text, setText] = useState(String(player.remy))
   const [anchor, setAnchor] = useState(player.remy)
   const [length, setLength] = useState(STRIP_STEP)
   const [submitted, setSubmitted] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (roster.status === 'ready' && active && !hidden) { inputRef.current?.focus(); inputRef.current?.select() }
+  }, [roster.status, active, hidden])
 
   useEffect(() => {
     let live = true
@@ -115,6 +121,7 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
             <label className="gk-choose-label">
               Remy number (0–{REMY_COUNT - 1}):
               <input
+                ref={inputRef}
                 className="input"
                 data-autofocus
                 inputMode="numeric"

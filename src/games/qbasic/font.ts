@@ -29,7 +29,7 @@ const drawings: Record<string, string> = {
   '→': '00080c7e0c080000', '♥': '00667e7e3c180000', '☺': '3c428181a599423c',
 }
 
-export const FONT: Readonly<Record<string, Uint8Array>> = Object.fromEntries(
+const bitmaps: Record<string, Uint8Array> = Object.fromEntries(
   Object.entries(drawings).map(([char, hex]) => {
     const rows = new Uint8Array(16)
     for (let y = 0; y < 8; y++) rows[y * 2] = rows[y * 2 + 1] = Number.parseInt(hex.slice(y * 2, y * 2 + 2), 16)
@@ -40,24 +40,28 @@ export const FONT: Readonly<Record<string, Uint8Array>> = Object.fromEntries(
 // Junctions run through adjacent cell edges, like text-mode line graphics.
 const lines: Record<string, number> = {
   '─': 3, '│': 12, '┌': 10, '┐': 9, '└': 6, '┘': 5, '├': 14, '┤': 13, '┬': 11, '┴': 7, '┼': 15,
-  '═': 19, '║': 28, '╔': 26, '╗': 25, '╚': 22, '╝': 21, '╠': 30, '╣': 29, '╦': 27, '╩': 23, '╬': 31,
+  '═': 19, '║': 44, '╔': 58, '╗': 57, '╚': 54, '╝': 53, '╠': 62, '╣': 61, '╦': 59, '╩': 55, '╬': 63,
+  '╒': 26, '╕': 25, '╘': 22, '╛': 21, '╓': 42, '╖': 41, '╙': 38, '╜': 37,
+  '╞': 30, '╡': 29, '╟': 46, '╢': 45, '╤': 27, '╧': 23, '╥': 43, '╨': 39, '╪': 31, '╫': 47,
 }
 for (const [char, mask] of Object.entries(lines)) {
   const rows = new Uint8Array(16)
-  const double = (mask & 16) !== 0
-  const vertical = double ? 0x24 : 0x18
-  const center = double ? [6, 9] : [7, 8]
+  const vertical = (mask & 32) ? 0x24 : 0x18
+  const upper = (mask & 16) ? 6 : 7
+  const lower = (mask & 16) ? 9 : 8
   for (let y = 0; y < 16; y++) {
-    if ((y <= center[1] && (mask & 4)) || (y >= center[0] && (mask & 8))) rows[y] |= vertical
-    if (center.includes(y)) rows[y] |= ((mask & 1) ? 0xf0 : 0) | ((mask & 2) ? 0x0f : 0)
+    if ((y <= lower && (mask & 4)) || (y >= upper && (mask & 8))) rows[y] |= vertical
+    if (y === upper || y === lower) rows[y] |= ((mask & 1) ? 0xf0 : 0) | ((mask & 2) ? 0x0f : 0)
   }
-  ;(FONT as Record<string, Uint8Array>)[char] = rows
+  bitmaps[char] = rows
 }
 for (const char of ['█', '▀', '▄']) {
   const rows = new Uint8Array(16)
   for (let y = 0; y < 16; y++) rows[y] = char === '█' || (char === '▀' ? y < 8 : y >= 8) ? 255 : 0
-  ;(FONT as Record<string, Uint8Array>)[char] = rows
+  bitmaps[char] = rows
 }
+
+export const FONT: Readonly<Record<string, Uint8Array>> = bitmaps
 
 export function glyph(char: string): Uint8Array {
   return FONT[char] ?? FONT['?']

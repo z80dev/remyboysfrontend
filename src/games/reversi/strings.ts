@@ -12,6 +12,8 @@ export const strings = {
   game: '&Game', newGame: '&New', hint: '&Hint', pass: '&Pass', sound: '&Sound', legal: 'Show &Legal Moves', exit: 'E&xit',
   skill: '&Skill', skills: { beginner: '&Beginner', novice: '&Novice', expert: '&Expert', master: '&Master' },
   help: '&Help', contents: '&Contents', about: '&About Reversi…', helpTitle: 'Reversi Help', ok: 'OK',
+  options: '&Options', chooseRemy: 'Choose Your &Remy…',
+  winJingle: 'Some Flips Are Haircuts', lossJingle: 'Plausible Deniability', tieJingle: 'An Even Part',
   tabs: ['Rules', 'Scoring', 'Keyboard', 'Tips'],
   helpSections: [
     'Place a disc so that it traps a line of the computer’s discs between it and another of yours. Every trapped disc flips to your side. Lines may run horizontally, vertically, or diagonally. You move first. If you cannot move, you must pass. The game ends when neither side can move.',

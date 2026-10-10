@@ -1,8 +1,14 @@
 import { getGamesAudio, isGamesMuted, noise, sweep, tone } from '../kit'
 import type { GameEvent } from './types'
 
+export type SkiAudio = {
+  event(name: GameEvent): void
+  update(speed: number, running: boolean): void
+  dispose(): void
+}
+
 /** A quiet continuous ski hiss. Event sounds are short and use the shared games graph. */
-export function createSkiAudio() {
+export function createSkiAudio(): SkiAudio {
   let hiss: AudioBufferSourceNode | null = null
   let filter: BiquadFilterNode | null = null
   let gain: GainNode | null = null

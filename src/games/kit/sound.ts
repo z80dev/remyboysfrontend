@@ -101,7 +101,7 @@ function syncMusic(fadeMs = 400): void {
     return
   }
   if (!audio || !wanted || current?.song === wanted) return
-  const { ctx, out } = audio
+  const { ctx } = audio
   const fade = Math.max(0, fadeMs) / 1000
   const now = ctx.currentTime
   const bus = ctx.createGain()
@@ -367,6 +367,8 @@ export function tone(freq: number, dur: number, opts: ToneOptions = {}): void {
     osc.disconnect()
     g.disconnect()
     depth?.disconnect()
+    lfo?.disconnect()
+    mod?.disconnect()
     modDepth?.disconnect()
   }
 }

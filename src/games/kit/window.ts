@@ -1,13 +1,17 @@
-import { createContext, useContext, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useSyncExternalStore } from 'react'
 
 /** Window visibility supplied by the desktop and Pocket shells. */
 export type GameWindowState = { active: boolean; hidden: boolean }
 
 /** Shell bridge; standalone games are active and fitting is harmless by default. */
-export const GameWindowContext = createContext<GameWindowState & { fit: (clientW: number, clientH: number) => void }>({
+export const GameWindowContext = createContext<GameWindowState & {
+  fit: (clientW: number, clientH: number) => void
+  setTitle: (title: string | undefined) => void
+}>({
   active: true,
   hidden: false,
   fit: () => {},
+  setTitle: () => {},
 })
 
 /** Resize the surrounding Luna window to a measured client size; no-op on Pocket or maximized windows. */
@@ -26,4 +30,13 @@ export function useWindowState(): GameWindowState {
   const { active, hidden } = useContext(GameWindowContext)
   const tabHidden = useSyncExternalStore(subscribeVisibility, browserHidden, () => false)
   return { active, hidden: hidden || tabHidden }
+}
+
+/** Set this window's caption/taskbar/Pocket title; the app's normal title is restored when the hook unmounts. */
+export function useWindowTitle(title: string): void {
+  const { setTitle } = useContext(GameWindowContext)
+  useEffect(() => {
+    setTitle(title)
+    return () => setTitle(undefined)
+  }, [title, setTitle])
 }

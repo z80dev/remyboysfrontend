@@ -1,0 +1,14 @@
+.solitaire { display:flex; flex-direction:column; width:100%; height:100%; min-width:0; overflow:hidden; font:11px var(--font); background:#008000 }
+.solitaire-felt { flex:1; min-height:0; min-width:0; position:relative; overflow:hidden; touch-action:none; outline:none; background:#008000 }
+.solitaire-felt canvas { display:block; position:absolute; inset:0; width:100%; height:100%; pointer-events:none }
+.solitaire-cascade { z-index:1 }
+.solitaire-overlay { z-index:2 }
+.solitaire-status { height:20px; min-height:20px; box-sizing:border-box; display:flex; justify-content:space-between; align-items:center; padding:2px 5px; gap:8px; background:#ece9d8; color:#000; border-top:1px solid #fff; white-space:pre }
+.solitaire-status>span:last-child { border-left:1px solid #aca899; padding-left:8px }
+.solitaire-status .negative { color:#c00000 }
+.solitaire-live { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap }
+.solitaire-options { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px }
+.solitaire-options fieldset { margin:0; padding:8px; border:1px solid #aca899 }
+.solitaire-options label { display:flex; align-items:center; gap:5px; min-height:24px }
+.solitaire-options fieldset label { white-space:nowrap }
+@media(max-width:719px) { .solitaire-options label { min-height:32px } .solitaire-status { font-size:10px; gap:2px; padding-inline:3px } }

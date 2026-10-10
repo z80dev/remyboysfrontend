@@ -4,7 +4,7 @@ export const strings = {
   flavour: '144 tiles. Four are definitely not the Cabald.',
   version: '5.1 (Build 2600.remy_sp2.4490)',
   about: ['Remade for the Remy Boys community, 2026.', 'After Taipei (1990) by Dave Norris (Microsoft Entertainment Pack 1).', 'This product is licensed to: Remy Boy', 'Remys available to Remy OS: 4,490'],
-  menu: { game: '&Game', options: '&Options', help: '&Help', new: '&New', select: '&Select Game…', restart: 'Start &Over', backup: '&Backup', hint: '&Hint', best: 'Best &Times…', exit: 'E&xit', layout: '&Layout…', solvable: '&Solvable Deals', timer: 'Show &Timer', free: 'Highlight &Free Tiles', sound: '&Sound', tiles: 'Tile &Set…', contents: '&Contents', about: '&About Taipei…' },
+  menu: { game: '&Game', options: '&Options', help: '&Help', new: '&New', select: '&Select Game…', restart: 'Start &Over', backup: '&Backup', hint: '&Hint', best: 'Best &Times…', exit: 'E&xit', layout: '&Layout', solvable: '&Solvable Deals', timer: 'Show &Timer', free: 'Highlight &Free Tiles', sound: '&Sound', tiles: 'Tile &Set', contents: '&Contents', about: '&About Taipei…' },
   layouts: { standard: 'Standard', bridge: 'Bridge', castle: 'Castle', 'rug-tower': 'Rug Tower', pyramid: 'Pyramid', spiral: 'Spiral', flag: 'The Flag' },
   sets: { remy: 'Remy', classic: 'Classic' },
   noMoves: 'There are no more moves.',
@@ -23,7 +23,7 @@ export const strings = {
   help: {
     Rules: 'Remove two free matching tiles. A tile is free when no tile covers it and either its left or right side is open. Identical faces match. Any Flower matches any Flower; any Season matches any Season. Remove all 144 tiles to finish. The Seasons are interchangeable. Just like their alibis.',
     Scoring: 'Taipei has no score. The timer measures visible playing time. It continues when another window is active, and stops when Taipei is minimized. Best times are recorded separately for each layout. Solvable deals guarantee a solution at the start, not after every possible match.',
-    Keyboard: 'F2 starts a new game. F3 selects a numbered game. Arrows move to the nearest free tile in that direction; Space selects it. H cycles through available pairs. Ctrl+Z backs up one match. F1 opens Help. Hold the right mouse button to peek. On a touch screen, hold for a moment to peek. Double-tap or use the zoom button for 2×; drag to pan.',
+    Keyboard: 'F2 starts a new game. F3 selects a numbered game. Arrows move to the nearest free tile in that direction; Space selects it. H cycles through available pairs. Ctrl+Z backs up one match. F1 opens Help. Hold P or the right mouse button to peek. On a touch screen, hold for a moment to peek. Double-tap, press + or −, or use the zoom button for 2×; drag to pan.',
     Tips: 'Free the edges first. The Remys in the middle are patient. Backup restores removed pairs in reverse order. Start Over repeats the same numbered deal. Solvable Deals is on by default; turn it off for classic random deals. Hint identifies a legal pair, not necessarily a winning move.'
   },
   ok: 'OK', cancel: 'Cancel', newGame: 'New Game', backup: 'Backup', startOver: 'Start Over',

@@ -132,7 +132,7 @@ function Tray() {
 }
 
 type Props = {
-  wins: { id: string; min: boolean }[]
+  wins: { id: string; min: boolean; title?: string }[]
   active?: string
   onTask: (id: string) => void
   onLaunch: (id: string) => void
@@ -175,9 +175,9 @@ export function Taskbar({ wins, active, onTask, onLaunch, onLogOff, onTurnOff }:
           if (!a) return null
           const on = w.id === active && !w.min
           return (
-            <button type="button" key={w.id} className={`task${on ? ' active' : ''}`} onClick={() => onTask(w.id)} title={a.title} aria-pressed={on}>
+            <button type="button" key={w.id} className={`task${on ? ' active' : ''}`} onClick={() => onTask(w.id)} title={w.title ?? a.title} aria-pressed={on}>
               <Icon name={a.icon} size={16} />
-              <span>{a.title}</span>
+              <span>{w.title ?? a.title}</span>
             </button>
           )
         })}
