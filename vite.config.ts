@@ -39,8 +39,9 @@ export default defineConfig(async () => ({
   },
   build: {
     rollupOptions: {
-      // Remy OS shell + the standalone Remy Quest game (embedded by the OS, also playable full screen at /quest/).
-      input: { main: 'index.html', quest: 'quest/index.html' },
+      // Remy OS shell, the standalone Remy Quest game (embedded by the OS, also playable full screen at /quest/) and
+      // Night of the Cabald (/halloween/, also the X player card that plays inside a post).
+      input: { main: 'index.html', quest: 'quest/index.html', halloween: 'halloween/index.html' },
     },
   },
 }))

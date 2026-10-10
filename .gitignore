@@ -27,3 +27,6 @@ dist-ssr
 
 .cache/
 __pycache__/
+
+# filmkit renders
+output/

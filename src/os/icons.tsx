@@ -322,6 +322,17 @@ const icons: Record<string, ReactNode> = {
       <path d="M4.6 10.6c5.6-1.9 17.2-1.9 22.8 0" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth=".9" strokeLinecap="round" />
     </>
   ),
+  /* Jack-o'-lantern: Night of the Cabald. */
+  pumpkin: (
+    <>
+      <Shadow />
+      <path d="M15.4 9.4c0-3 1-5 3.4-6l1 1.4c-2 1-2.4 2.6-2.4 4.6z" fill="#4d6b1f" />
+      <ellipse cx="10" cy="18" rx="7.4" ry="9.6" fill="#d9590b" />
+      <ellipse cx="22" cy="18" rx="7.4" ry="9.6" fill="#d9590b" />
+      <ellipse cx="16" cy="18" rx="8" ry="10.6" fill="#f47a16" stroke="#9a3a06" strokeWidth=".6" />
+      <path d="m9.4 16 3.4-4.2 2.8 4.2zm7 0 2.8-4.2 3.4 4.2zM8 20.4c3.2 4.6 12.8 4.6 16 0l-2 1-1.6 2-2-1.4-1.6 2-1.6-2-1.6 2-2-1.6-1.6 1.4z" fill="#ffe36b" />
+    </>
+  ),
   /* Leather wallet with a card peeking out. */
   wallet: (
     <>

@@ -5,6 +5,7 @@ import { Remix } from '../apps/Remix'
 import { Approvals } from '../apps/Approvals'
 import { DisplayProperties } from '../apps/DisplayProperties'
 import { Gallery } from '../apps/Gallery'
+import { Haunt } from '../apps/Haunt'
 import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
 import { Quest } from '../apps/Quest'
@@ -78,6 +79,15 @@ export const APPS: AppDef[] = [
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
   { id: 'remix', title: 'Remy Remix Studio', short: 'Remix Studio', desc: 'Reimagine original Remy art', icon: 'remix', size: [980, 720], Component: Remix },
   { id: 'quest', title: 'Remy Quest', short: 'Remy Quest', desc: 'A Remy adventure on Base', icon: 'quest', size: [900, 660], Component: Quest },
+  {
+    id: 'halloween',
+    title: 'Night of the Cabald',
+    short: 'Night of the Cabald',
+    desc: 'Halloween shooter: survive the Cabald',
+    icon: 'pumpkin',
+    size: [860, 640],
+    Component: Haunt,
+  },
   {
     id: 'launch',
     title: 'Launch Control',
