@@ -12,12 +12,14 @@ export interface BevelOptions {
   width?: number
   /** First fill the whole rectangle with {@link WIN9X}`.face`. Default `false`. */
   face?: boolean
+  /** Diagonal pixel joins at corners (WinMine), rather than square overlapping edge strips. Default `false`. */
+  miter?: boolean
 }
 
 /**
  * Draws a Win9x bevel inside the rectangle `x, y, w, h` (edges are drawn inside the rectangle, nothing outside it).
- * Raised: light on the top/left edges, shadow on the bottom/right. Inset reverses them. The shadow edge wins the
- * top-right and bottom-left corner pixels, exactly like the `visual.css` classes. Use integer coordinates.
+ * Raised: light on the top/left edges, shadow on the bottom/right. Inset reverses them. By default the shadow edge
+ * wins square corner overlaps like `visual.css`; `miter` draws stepped diagonal corner joins. Use integer coordinates.
  * @param ctx 2D context; `fillStyle` is restored afterwards.
  * @param x left edge.
  * @param y top edge.
@@ -34,11 +36,22 @@ export function drawBevel(ctx: CanvasRenderingContext2D, x: number, y: number, w
     ctx.fillStyle = WIN9X.face
     ctx.fillRect(x, y, w, h)
   }
-  ctx.fillStyle = tl
-  ctx.fillRect(x, y, w, t)
-  ctx.fillRect(x, y, t, h)
-  ctx.fillStyle = br
-  ctx.fillRect(x, y + h - t, w, t)
-  ctx.fillRect(x + w - t, y, t, h)
+  if (opts.miter) {
+    for (let i = 0; i < t; i++) {
+      ctx.fillStyle = tl
+      ctx.fillRect(x + i, y + i, w - 2 * i - 1, 1)
+      ctx.fillRect(x + i, y + i, 1, h - 2 * i - 1)
+      ctx.fillStyle = br
+      ctx.fillRect(x + i, y + h - i - 1, w - 2 * i, 1)
+      ctx.fillRect(x + w - i - 1, y + i, 1, h - 2 * i)
+    }
+  } else {
+    ctx.fillStyle = tl
+    ctx.fillRect(x, y, w, t)
+    ctx.fillRect(x, y, t, h)
+    ctx.fillStyle = br
+    ctx.fillRect(x, y + h - t, w, t)
+    ctx.fillRect(x + w - t, y, t, h)
+  }
   ctx.fillStyle = saved
 }

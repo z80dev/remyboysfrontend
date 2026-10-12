@@ -39,7 +39,10 @@ export function cardLabel(card: Card): string {
 }
 
 export type CardHit = { pile: number; depth: number; x: number; y: number; card?: Card }
-export type CardPileLayout = { pile: number; x: number; y: number; cards: readonly Card[]; offset: number | ((card: Card, depth: number) => number) }
+export type CardPileLayout = {
+  pile: number; x: number; y: number; cards: readonly Card[]; offset: number | ((card: Card, depth: number) => number)
+  cardHeight?: number
+}
 
 export function pileCardPositions(layout: CardPileLayout): CardHit[] {
   let y = layout.y
@@ -53,17 +56,18 @@ export function pileCardPositions(layout: CardPileLayout): CardHit[] {
 export function hitTestPiles(layouts: readonly CardPileLayout[], x: number, y: number): CardHit | null {
   for (let p = layouts.length - 1; p >= 0; p--) {
     const layout = layouts[p]
+    const cardHeight = layout.cardHeight ?? CARD_H
     if (x < layout.x || x >= layout.x + CARD_W) continue
     const count = layout.cards.length
     if (count === 0) {
-      if (y >= layout.y && y < layout.y + CARD_H) return { pile: layout.pile, depth: -1, x: layout.x, y: layout.y }
+      if (y >= layout.y && y < layout.y + cardHeight) return { pile: layout.pile, depth: -1, x: layout.x, y: layout.y }
       continue
     }
     let top = layout.y
     if (typeof layout.offset === 'number') top += layout.offset * (count - 1)
     else for (let i = 0; i < count - 1; i++) top += layout.offset(layout.cards[i], i)
     for (let i = count - 1; i >= 0; i--) {
-      if (y >= top && y < top + CARD_H) return { pile: layout.pile, depth: i, x: layout.x, y: top, card: layout.cards[i] }
+      if (y >= top && y < top + cardHeight) return { pile: layout.pile, depth: i, x: layout.x, y: top, card: layout.cards[i] }
       if (i > 0) top -= typeof layout.offset === 'number' ? layout.offset : layout.offset(layout.cards[i - 1], i - 1)
     }
   }

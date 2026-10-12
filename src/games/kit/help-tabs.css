@@ -1,0 +1,68 @@
+.gk-help-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.gk-help-strip {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding-left: 2px;
+}
+
+.gk-help-tab {
+  position: relative;
+  flex: none;
+  min-height: 25px;
+  margin-top: 2px;
+  padding: 4px 9px;
+  border: 1px solid;
+  border-color: #fff #808080 #808080 #fff;
+  border-radius: 3px 3px 0 0;
+  background: var(--face);
+  color: #000;
+  font: inherit;
+}
+
+.gk-help-tab.selected {
+  z-index: 1;
+  min-height: 27px;
+  margin-top: 0;
+  margin-bottom: -1px;
+  padding-bottom: 5px;
+  border-bottom-color: var(--face);
+}
+
+.gk-help-tab:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+.gk-help-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid;
+  border-color: #fff #808080 #808080 #fff;
+  box-shadow: 1px 1px #000;
+  overflow: auto;
+}
+
+.gk-help-panel p {
+  margin: 0 0 10px;
+}
+
+.gk-help-panel > :last-child {
+  margin-bottom: 0;
+}
+
+@media (pointer: coarse) {
+  .gk-help-tab {
+    min-height: 32px;
+  }
+  .gk-help-tab.selected {
+    min-height: 34px;
+  }
+}

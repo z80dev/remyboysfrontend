@@ -3,6 +3,7 @@ import { unlockAudio } from '../kit'
 import { easeOut, isDoubleClick, moveDuration, type Card, type CardHit } from './model'
 
 export type CardDrag = { source: CardHit; x: number; y: number; originX: number; originY: number }
+export type CardPointerFeedback = { x: number; y: number; progress: number }
 export type CardPointerOptions = {
   hitTest: (x: number, y: number) => CardHit | null
   onTap: (hit: CardHit | null, x: number, y: number) => void
@@ -23,7 +24,7 @@ export function useCardPointer(options: CardPointerOptions) {
   const timer = useRef<number | undefined>(undefined)
   const frame = useRef<number | null>(null)
   const [drag, setDrag] = useState<CardDrag | null>(null)
-  const [longPress, setLongPress] = useState<{ x: number; y: number; progress: number } | null>(null)
+  const [longPress, setLongPress] = useState<CardPointerFeedback | null>(null)
 
   function stopHold() {
     window.clearTimeout(timer.current)
@@ -51,12 +52,13 @@ export function useCardPointer(options: CardPointerOptions) {
 
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
     if (callbacks.current.disabled || e.button !== 0) return
+    if (e.target instanceof Element && e.target.closest('button, input, select, textarea, a, label, [role="button"]')) return
     unlockAudio()
     e.currentTarget.focus({ preventScroll: true })
     const { x, y } = point(e)
     const hit = callbacks.current.hitTest(x, y)
     press.current = { pointer: e.pointerId, hit, x, y, moved: false, consumed: false, time: performance.now() }
-    e.currentTarget.setPointerCapture(e.pointerId)
+    if (hit?.card) e.currentTarget.setPointerCapture(e.pointerId)
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
       const pulse = () => {
         const held = press.current
@@ -163,7 +165,7 @@ export function useStockAnimation(enabled: boolean, hidden: boolean, dragging: b
   return time
 }
 
-export type CardTweenMove = { card: Card; fromX: number; fromY: number; toX: number; toY: number; delay?: number }
+export type CardTweenMove = { card: Card; fromX: number; fromY: number; toX: number; toY: number; delay?: number; onStart?: () => void }
 export type CardTween = { card: Card; x: number; y: number }
 
 /** Transient overlay positions; commit the engine move first and omit these cards from the static layer. */
@@ -204,11 +206,17 @@ export function useCardTweens(hidden: boolean) {
     }
     const began = performance.now()
     const durations = moves.map((move) => moveDuration(Math.hypot(move.toX - move.fromX, move.toY - move.fromY)))
+    const started = new Uint8Array(moves.length)
     const tick = (now: number) => {
       const positions: CardTween[] = []
       for (let i = 0; i < moves.length; i++) {
         const move = moves[i]
-        const progress = Math.max(0, (now - began - (move.delay ?? 0)) / durations[i])
+        const elapsed = now - began - (move.delay ?? 0)
+        if (elapsed >= 0 && !started[i]) {
+          started[i] = 1
+          move.onStart?.()
+        }
+        const progress = Math.max(0, elapsed / durations[i])
         if (progress >= 1) continue
         const eased = easeOut(progress)
         positions.push({ card: move.card, x: move.fromX + (move.toX - move.fromX) * eased, y: move.fromY + (move.toY - move.fromY) * eased })

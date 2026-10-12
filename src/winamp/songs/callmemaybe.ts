@@ -1,25 +1,28 @@
 import { DRUM, type Note, type Song } from "../../quest/music/song";
 
 /**
- * "Call Me Maybe (16-Bit Remake)" — D major, 120 BPM, an imagined sugar-rush crush anthem after Carly Rae
- * Jepsen's #2. A disco-string stab riff (staccato strings) is the whole plot; palm-muted square chugs, snaps,
- * handclaps and a bubbly bell hook. The pre-chorus holds its breath (stabs stop, EP only), the chorus is the
- * text message you rewrite five times, and the tag is a stop-time "hey!" count-in that never actually slows
- * down. Verse D A Bm G; chorus G D A Bm / G D A A.
- * Intro (4 bars) → loop of 40 bars (≈80 s): verse (8) → pre (4) → chorus (8) → verse′ (8) → chorus (8)
- * → stop-time tag and build (4).
+ * "Pocket Dial Crush" — G major, 120 BPM, an original bubblegum dance-pop crush song in the style of
+ * Carly Rae Jepsen's #2 (original melodies; only the genre, groove and arrangement are borrowed). Strummed guitar
+ * and a four-on-the-floor kick carry the verse; the pre-chorus drops to half-time with long strings and a climbing
+ * lead; the chorus is bright staccato string stabs, octave-bouncing synth bass, claps and a bell sparkle under a
+ * short, punchy hook. Ends on a stop-time tag that snaps straight back to the verse.
+ * Verse G C Em D; pre Em D C D; chorus C D G Em C D G G.
+ * Intro (4 bars) → loop of 40 bars (≈80 s): verse (8) → pre (4) → chorus (8) → verse′ (8) → chorus (8) → tag (4).
  */
-const D = 38;
-const A = 45;
-const Bm = 47;
-const G = 43;
+type Chord = [bass: number, triad: number[]];
+const G: Chord = [43, [55, 59, 62]];
+const C: Chord = [36, [55, 60, 64]];
+const D: Chord = [38, [54, 57, 62]];
+const Em: Chord = [40, [55, 59, 64]];
+const verse = [G, C, Em, D, G, C, Em, D];
+const pre = [Em, D, C, D];
+const chorus = [C, D, G, Em, C, D, G, G];
 
 const lead: Note[] = [];
 const sparkle: Note[] = [];
-const chug: Note[] = [];
-const riff: Note[] = [];
+const guitar: Note[] = [];
 const stabs: Note[] = [];
-const keys: Note[] = [];
+const strings: Note[] = [];
 const bass: Note[] = [];
 const drums: Note[] = [];
 
@@ -29,269 +32,270 @@ function phrase(target: Note[], bar: number, notes: Note[], strength = 1, transp
   }
 }
 
-// The string-stab disco riff: off-beat pushes, the song's opening handshake.
-const RIFF: Note[] = [
-  [0, 69, 1, 0.72],
-  [0, 74, 1, 0.72],
-  [2, 71, 1, 0.66],
-  [2, 74, 1, 0.66],
-  [4, 73, 1.5, 0.78],
-  [4, 78, 1.5, 0.78],
-  [7, 74, 1, 0.62],
-  [7, 78, 1, 0.62],
-  [8, 71, 1, 0.7],
-  [8, 76, 1, 0.7],
-  [10, 73, 1, 0.66],
-  [10, 76, 1, 0.66],
-  [12, 74, 2.5, 0.8],
-  [12, 78, 2.5, 0.8],
+// Strummed acoustic: down, down-up, up-down-up; strings fanned a hair apart.
+const STRUM: [step: number, vel: number, down: boolean][] = [
+  [0, 0.56, true],
+  [4, 0.46, true],
+  [6, 0.34, false],
+  [10, 0.36, false],
+  [12, 0.46, true],
+  [14, 0.32, false],
 ];
-function stringRiff(bar: number, strength: number) {
-  phrase(riff, bar, RIFF, strength);
+function strum(bar: number, chord: Chord, strength: number) {
+  const voicing = [chord[0] + 12, ...chord[1]];
+  for (const [s, vel, down] of STRUM) {
+    const order = down ? voicing : [...voicing].reverse();
+    order.forEach((pitch, k) => guitar.push([bar * 16 + s + k * 0.08, pitch, 2, vel * strength]));
+  }
 }
 
-function chugs(bar: number, root: number, strength: number) {
-  for (let s = 0; s < 16; s += 2) chug.push([bar * 16 + s, root + 12, 1.6, (s % 4 ? 0.44 : 0.6) * strength]);
-}
-
-function powerStab(bar: number, root: number, steps: number[], strength: number) {
+// Staccato string stabs: pushed off-beats, the chorus's whole personality.
+const STAB_STEPS = [0, 3, 6, 10, 12];
+function stringStabs(bar: number, chord: Chord, strength: number, steps = STAB_STEPS) {
   for (const s of steps) {
-    for (const pitch of [root + 12, root + 19, root + 24]) stabs.push([bar * 16 + s, pitch, 1.8, 0.72 * strength]);
+    for (const pitch of chord[1]) stabs.push([bar * 16 + s, pitch + 12, 1, (s === 0 ? 0.76 : 0.64) * strength]);
   }
 }
 
-function popBass(bar: number, root: number, strength: number) {
-  for (const [s, interval] of [
-    [0, 0],
-    [3, 0],
-    [6, 7],
-    [8, 0],
-    [11, 0],
-    [14, 12],
-  ] as const) {
-    bass.push([bar * 16 + s, root + interval, 2.4, (s === 0 || s === 8 ? 0.8 : 0.6) * strength]);
-  }
+// Synth bass bouncing between octaves on 8ths.
+function octaveBass(bar: number, root: number, strength: number) {
+  for (let s = 0; s < 16; s += 2)
+    bass.push([bar * 16 + s, root + (s % 4 ? 12 : 0), 1.6, (s % 4 ? 0.5 : 0.72) * strength]);
 }
 
-// Bouncy pop kit: kick 1-and, snaps on 2/4, 8th hats, claps in the chorus.
-function popKit(bar: number, opts: { clap?: boolean; crash?: boolean; fill?: boolean } = {}) {
+function dancePop(bar: number, opts: { open?: boolean; crash?: boolean; fill?: boolean } = {}) {
   const at = bar * 16;
-  drums.push([at, DRUM.kick, 1, 0.84], [at + 6, DRUM.kick, 1, 0.6], [at + 10, DRUM.kick, 1, 0.74]);
-  for (const s of [4, 12]) drums.push([at + s, DRUM.rim, 1, 0.5]);
-  for (let s = 0; s < 16; s += 2) drums.push([at + s, DRUM.hatClosed, 0.6, 0.24]);
-  if (opts.clap) for (const s of [4, 12]) drums.push([at + s, DRUM.clap, 1, 0.5]);
-  if (opts.crash) drums.push([at, DRUM.crash, 4, 0.45]);
-  if (opts.fill)
-    drums.push([at + 13, DRUM.tomHigh, 0.5, 0.44], [at + 14, DRUM.snare, 0.5, 0.48], [at + 15, DRUM.tomLow, 0.5, 0.5]);
+  for (const s of [0, 4, 8, 12]) drums.push([at + s, DRUM.kick, 1, 0.86]);
+  for (const s of [4, 12]) drums.push([at + s, DRUM.clap, 1, 0.6], [at + s, DRUM.snare, 1, 0.36]);
+  for (let s = 0; s < 16; s++) drums.push([at + s, DRUM.hatClosed, 0.4, s % 4 === 2 ? 0.26 : 0.12]);
+  if (opts.open) for (const s of [2, 6, 10, 14]) drums.push([at + s, DRUM.hatOpen, 1.2, 0.22]);
+  if (opts.crash) drums.push([at, DRUM.crash, 6, 0.48]);
+  if (opts.fill) for (const s of [12, 13, 14, 15]) drums.push([at + s, DRUM.snare, 0.5, 0.46 + (s - 12) * 0.08]);
 }
 
-const verseMelody: Note[][] = [
+const VERSE: Note[][] = [
   [
-    [0, 69, 2, 0.76],
-    [2, 71, 2, 0.72],
-    [4, 74, 3, 0.8],
-    [8, 73, 2, 0.7],
-    [10, 71, 2, 0.7],
-    [12, 69, 3, 0.74],
+    [2, 71, 1, 0.74],
+    [3, 71, 1, 0.68],
+    [4, 71, 2, 0.74],
+    [6, 72, 2, 0.72],
+    [8, 74, 3, 0.8],
+    [12, 71, 2, 0.7],
   ],
+  [
+    [2, 72, 1, 0.72],
+    [3, 72, 1, 0.68],
+    [4, 72, 2, 0.74],
+    [6, 71, 2, 0.7],
+    [8, 67, 4, 0.74],
+    [12, 69, 2, 0.7],
+  ],
+  [
+    [2, 71, 1, 0.74],
+    [3, 71, 1, 0.68],
+    [4, 71, 2, 0.74],
+    [6, 74, 2, 0.76],
+    [8, 76, 3, 0.82],
+    [12, 74, 2, 0.74],
+    [14, 71, 2, 0.7],
+  ],
+  [
+    [0, 69, 4, 0.74],
+    [6, 66, 2, 0.68],
+    [8, 69, 6, 0.72],
+  ],
+];
+
+const PRE: Note[][] = [
   [
     [0, 71, 2, 0.74],
-    [2, 73, 2, 0.72],
-    [4, 76, 3, 0.8],
-    [8, 74, 2, 0.72],
-    [10, 73, 2, 0.7],
-    [12, 71, 3, 0.72],
+    [2, 71, 2, 0.7],
+    [4, 72, 2, 0.74],
+    [6, 74, 4, 0.8],
+    [12, 71, 4, 0.72],
   ],
   [
-    [0, 74, 1, 0.72],
-    [1, 76, 1, 0.74],
-    [2, 78, 4, 0.84],
-    [6, 76, 2, 0.72],
-    [8, 74, 2, 0.7],
-    [10, 71, 2, 0.68],
-    [12, 73, 3, 0.72],
+    [0, 74, 2, 0.76],
+    [2, 74, 2, 0.72],
+    [4, 76, 2, 0.78],
+    [6, 78, 4, 0.84],
+    [12, 74, 4, 0.74],
   ],
   [
-    [0, 71, 4, 0.74],
-    [4, 69, 2, 0.7],
-    [6, 67, 2, 0.68],
-    [8, 66, 6, 0.72],
-    [14, 69, 2, 0.68],
-  ],
-];
-const chorusMelody: Note[][] = [
-  [
-    [0, 78, 2, 0.88],
-    [2, 78, 2, 0.8],
-    [4, 81, 4, 0.92],
-    [8, 78, 2, 0.82],
-    [10, 76, 2, 0.78],
-    [12, 74, 3, 0.82],
+    [0, 76, 2, 0.78],
+    [2, 76, 2, 0.74],
+    [4, 79, 2, 0.82],
+    [6, 76, 4, 0.8],
+    [12, 72, 4, 0.74],
   ],
   [
-    [0, 76, 2, 0.84],
-    [2, 74, 2, 0.78],
-    [4, 73, 4, 0.86],
-    [8, 76, 2, 0.8],
-    [10, 78, 2, 0.82],
-    [12, 81, 3, 0.88],
-  ],
-  [
-    [0, 78, 2, 0.86],
-    [2, 81, 2, 0.86],
-    [4, 83, 4, 0.92],
-    [8, 81, 2, 0.84],
-    [10, 78, 2, 0.8],
-    [12, 81, 3, 0.88],
-  ],
-  [
-    [0, 78, 4, 0.86],
-    [4, 76, 2, 0.8],
-    [6, 74, 2, 0.78],
-    [8, 71, 6, 0.84],
-    [14, 74, 2, 0.78],
-  ],
-];
-// The bell hook: bubbly pentatonic answer, glockenspiel energy.
-const BELL: Note[][] = [
-  [
-    [0, 90, 2, 0.4],
-    [2, 93, 2, 0.42],
-    [4, 95, 3, 0.46],
-    [8, 93, 2, 0.4],
-    [10, 90, 2, 0.38],
-    [12, 86, 3, 0.4],
-  ],
-  [
-    [0, 95, 2, 0.44],
-    [2, 98, 2, 0.46],
-    [4, 100, 3, 0.5],
-    [8, 98, 2, 0.42],
-    [10, 95, 2, 0.4],
-    [12, 93, 3, 0.42],
+    [0, 74, 4, 0.8],
+    [4, 78, 4, 0.86],
+    [8, 81, 7, 0.92],
   ],
 ];
 
-function gang(bar: number, step: number, pitch: number) {
-  stabs.push([bar * 16 + step, pitch, 1, 0.5], [bar * 16 + step, pitch + 7, 1, 0.42]);
-  drums.push([bar * 16 + step, DRUM.clap, 1, 0.4]);
+const HOOK_A: Note[] = [
+  [0, 79, 2, 0.9],
+  [2, 79, 1, 0.82],
+  [3, 76, 3, 0.86],
+  [6, 79, 2, 0.88],
+  [8, 81, 4, 0.94],
+  [12, 79, 2, 0.84],
+  [14, 76, 2, 0.8],
+];
+const HOOK_B: Note[] = [
+  [0, 78, 2, 0.88],
+  [2, 78, 1, 0.8],
+  [3, 74, 3, 0.84],
+  [6, 78, 2, 0.86],
+  [8, 81, 6, 0.94],
+  [14, 78, 2, 0.8],
+];
+const CHORUS: Note[][] = [
+  HOOK_A,
+  HOOK_B,
+  [
+    [0, 79, 3, 0.9],
+    [3, 78, 1, 0.8],
+    [4, 74, 4, 0.84],
+    [8, 71, 2, 0.8],
+    [10, 74, 2, 0.82],
+    [12, 79, 4, 0.9],
+  ],
+  [
+    [0, 76, 6, 0.88],
+    [6, 74, 2, 0.8],
+    [8, 71, 8, 0.84],
+  ],
+  HOOK_A,
+  HOOK_B,
+  [
+    [0, 79, 2, 0.88],
+    [2, 81, 2, 0.9],
+    [4, 83, 4, 0.96],
+    [8, 81, 2, 0.88],
+    [10, 79, 2, 0.84],
+    [12, 78, 4, 0.86],
+  ],
+  [
+    [0, 79, 10, 0.92],
+    [12, 74, 2, 0.8],
+    [14, 78, 2, 0.84],
+  ],
+];
+
+// Bell sparkle answering the hook in its gaps (G major pentatonic).
+function bellAnswer(bar: number, chord: Chord, strength: number) {
+  const [a, b, c] = chord[1].map((p) => p + 24);
+  sparkle.push(
+    [bar * 16 + 12, a, 1, 0.42 * strength],
+    [bar * 16 + 13, b, 1, 0.44 * strength],
+    [bar * 16 + 14, c, 1, 0.46 * strength],
+    [bar * 16 + 15, a + 12, 1, 0.48 * strength],
+  );
 }
 
-// Intro: the string riff and claps introduce themselves.
-for (let i = 0; i < 4; i++) {
-  stringRiff(i, i === 3 ? 0.8 : 1);
-  popKit(i, { clap: i >= 2, crash: i === 0 });
-  if (i >= 2) popBass(i, [D, A, Bm, G][i], 0.8);
-}
+// Intro: guitar alone, then the string stabs tease the chorus.
+[G, C, Em, D].forEach((chord, i) => {
+  strum(i, chord, 0.9);
+  if (i >= 2) stringStabs(i, chord, 0.7);
+  if (i >= 1) for (const s of [0, 4, 8, 12]) drums.push([i * 16 + s, DRUM.kick, 1, 0.5 + i * 0.08]);
+  if (i === 3) for (const s of [12, 13, 14, 15]) drums.push([i * 16 + s, DRUM.clap, 0.5, 0.36 + (s - 12) * 0.08]);
+});
 
 const LOOP = 4;
 let bar = LOOP;
 
 function verseBars(second: boolean) {
-  [D, A, Bm, G, D, A, Bm, G].forEach((root, i) => {
-    popKit(bar, { fill: i === 7 });
-    chugs(bar, root, 1);
-    popBass(bar, root, 1);
-    if (!second) stringRiff(bar, 0.5);
-    else stringRiff(bar, 0.8);
-    phrase(lead, bar, verseMelody[i % 4], second ? 0.9 : 1);
-    if (second) phrase(sparkle, bar, BELL[i % 2], 0.7);
-    if (i % 2 === 1) gang(bar, 14, 67);
+  verse.forEach((chord, i) => {
+    dancePop(bar, { fill: i === 7 && second });
+    strum(bar, chord, 1);
+    bass.push([bar * 16, chord[0], 6, 0.66], [bar * 16 + 8, chord[0], 6, 0.6]);
+    phrase(lead, bar, VERSE[i % 4], second ? 0.95 : 1);
+    if (second) stringStabs(bar, chord, 0.45, [6, 14]);
     bar++;
   });
 }
 
 function preBars() {
-  [G, A, Bm, Bm].forEach((root, i) => {
-    popKit(bar, { clap: false });
-    chugs(bar, root, 0.7);
-    if (i >= 2) popBass(bar, root, 0.8);
-    keys.push([bar * 16, root + 12, 15.5, 0.4], [bar * 16, root + 16, 15.5, 0.36], [bar * 16, root + 19, 15.5, 0.34]);
-    const climb: Note[][] = [
-      [
-        [0, 74, 4, 0.68],
-        [6, 76, 2, 0.66],
-        [8, 78, 6, 0.72],
-      ],
-      [
-        [0, 76, 4, 0.7],
-        [6, 78, 2, 0.68],
-        [8, 81, 6, 0.76],
-      ],
-      [
-        [0, 78, 2, 0.72],
-        [2, 79, 2, 0.72],
-        [4, 81, 4, 0.78],
-        [8, 83, 4, 0.8],
-        [12, 85, 3, 0.82],
-      ],
-      [
-        [0, 83, 4, 0.8],
-        [4, 81, 2, 0.74],
-        [6, 78, 2, 0.72],
-        [8, 81, 6, 0.82],
-      ],
-    ];
-    phrase(lead, bar, climb[i]);
-    if (i === 3) for (const s of [12, 14]) drums.push([bar * 16 + s, DRUM.snare, 0.5, 0.4 + (s - 12) * 0.06]);
+  pre.forEach((chord, i) => {
+    const at = bar * 16;
+    drums.push([at, DRUM.kick, 1, 0.8], [at + 8, DRUM.kick, 1, 0.7], [at + 8, DRUM.clap, 1, 0.5]);
+    for (let s = 0; s < 16; s += 2) drums.push([at + s, DRUM.hatClosed, 0.4, 0.14]);
+    strum(bar, chord, 0.75);
+    strings.push(...chord[1].map((pitch): Note => [at, pitch + 12, 15.5, 0.3 + i * 0.05]));
+    bass.push([at, chord[0], 15, 0.64]);
+    phrase(lead, bar, PRE[i]);
+    if (i === 3) for (let s = 8; s < 16; s++) drums.push([at + s, DRUM.snare, 0.5, 0.3 + (s - 8) * 0.07]);
     bar++;
   });
 }
 
-function chorusBars(big: boolean) {
-  [G, D, A, Bm, G, D, A, A].forEach((root, i) => {
-    popKit(bar, { clap: true, crash: i === 0 || i === 4, fill: i === 7 });
-    chugs(bar, root, 1);
-    popBass(bar, root, 1);
-    stringRiff(bar, 1);
-    powerStab(bar, root, [0, 8], 0.9);
-    phrase(lead, bar, chorusMelody[i % 4]);
-    phrase(sparkle, bar, BELL[i % 2], big ? 1 : 0.8);
-    if (i % 2 === 1) gang(bar, 12, 67);
+function chorusBars() {
+  chorus.forEach((chord, i) => {
+    dancePop(bar, { open: true, crash: i === 0 || i === 4, fill: i === 7 });
+    stringStabs(bar, chord, 1);
+    octaveBass(bar, chord[0], 1);
+    strum(bar, chord, 0.6);
+    phrase(lead, bar, CHORUS[i]);
+    if (i % 2 === 1) bellAnswer(bar, chord, 1);
     bar++;
   });
 }
 
 verseBars(false);
 preBars();
-chorusBars(false);
+chorusBars();
 verseBars(true);
-chorusBars(false);
+chorusBars();
 
-// Stop-time tag: hits on 1 and "hey!" — the count-in that runs straight back to the top.
-for (let i = 0; i < 4; i++) {
+// Stop-time tag: everything hits on 1 and the "and" of 2, then the guitar and kick run back to the verse.
+[C, D, G, D].forEach((chord, i) => {
   const at = bar * 16;
-  const root = [G, A, Bm, D][i];
-  drums.push([at, DRUM.kick, 1, 0.85], [at + 4, DRUM.snare, 1, 0.55]);
-  powerStab(bar, root, [0], 0.8);
-  gang(bar, 4, 67);
-  if (i >= 2) {
-    popKit(bar, { clap: true });
-    chugs(bar, root, 0.8);
+  stringStabs(bar, chord, 1, [0, 6]);
+  bass.push([at, chord[0], 1.6, 0.8], [at + 6, chord[0], 1.6, 0.74]);
+  drums.push(
+    [at, DRUM.kick, 1, 0.9],
+    [at, DRUM.crash, 3, 0.4],
+    [at + 6, DRUM.kick, 1, 0.8],
+    [at + 6, DRUM.clap, 1, 0.6],
+  );
+  if (i === 3) {
+    strum(bar, chord, 0.9);
+    for (const s of [8, 12]) drums.push([at + s, DRUM.kick, 1, 0.7]);
+    for (const s of [12, 13, 14, 15]) drums.push([at + s, DRUM.clap, 0.5, 0.4 + (s - 12) * 0.08]);
   }
-  if (i === 3) stringRiff(bar, 0.9);
-  if (i === 3) for (const s of [12, 13, 14, 15]) drums.push([at + s, DRUM.snare, 0.5, 0.42 + (s - 12) * 0.1]);
+  phrase(
+    lead,
+    bar,
+    i < 3
+      ? [
+          [0, chord[1][2] + 12, 1, 0.84],
+          [6, chord[1][1] + 12, 1, 0.8],
+        ]
+      : [[0, 79, 4, 0.84]],
+  );
   bar++;
-}
+});
 
 export default {
-  title: "Call Me Maybe (16-Bit Remake)",
+  title: "Pocket Dial Crush",
   bpm: 120,
   stepsPerBeat: 4,
   beatsPerBar: 4,
   length: bar * 16,
   loopStart: LOOP * 16,
-  room: 0.5,
+  room: 0.42,
   echoBeats: 0.5,
-  echoFeedback: 0.2,
+  echoFeedback: 0.18,
   parts: [
-    { inst: "square", notes: lead, vol: 0.6, pan: 0.05, reverb: 0.18, echo: 0.15 },
-    { inst: "bell", notes: sparkle, vol: 0.3, pan: 0.35, reverb: 0.35, echo: 0.25 },
-    { inst: "square50", notes: chug, vol: 0.28, pan: -0.3, reverb: 0.12 },
-    { inst: "strings_stacc", notes: riff, vol: 0.3, pan: 0.15, reverb: 0.22, echo: 0.12 },
-    { inst: "brass", notes: stabs, vol: 0.24, pan: -0.15, reverb: 0.2 },
-    { inst: "epiano", notes: keys, vol: 0.4, pan: 0.2, reverb: 0.25 },
-    { inst: "bass", notes: bass, vol: 0.56, pan: 0, reverb: 0.03 },
-    { inst: "drums", notes: drums, vol: 0.68, pan: 0, reverb: 0.1 },
+    { inst: "square", notes: lead, vol: 0.6, pan: 0.04, reverb: 0.16, echo: 0.12 },
+    { inst: "bell", notes: sparkle, vol: 0.28, pan: 0.38, reverb: 0.32, echo: 0.24 },
+    { inst: "guitar", notes: guitar, vol: 0.4, pan: -0.32, reverb: 0.14 },
+    { inst: "strings_stacc", notes: stabs, vol: 0.36, pan: 0.2, reverb: 0.2 },
+    { inst: "strings", notes: strings, vol: 0.22, pan: 0.25, reverb: 0.38 },
+    { inst: "bass", notes: bass, vol: 0.54, pan: 0, reverb: 0.03 },
+    { inst: "drums", notes: drums, vol: 0.68, pan: 0, reverb: 0.08 },
   ],
 } satisfies Song;

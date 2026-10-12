@@ -1,4 +1,5 @@
-import { LAYOUT_IDS, type LayoutId } from './engine'
+import { LAYOUT_IDS } from './engine'
+import type { LayoutId } from './engine'
 import type { TileSet } from './render'
 
 export type BestTime = { seconds: number; name: string }

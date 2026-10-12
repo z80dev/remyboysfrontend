@@ -1,6 +1,6 @@
-import { memo, useState } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { MATRIX_GLYPHS, matrixLines, matrixWidth } from './matrix'
-import { PANEL_COPY } from './strings'
+import { PANEL_COPY, ruleMessage } from './strings'
 
 export type PanelProps = {
   score: number
@@ -36,10 +36,13 @@ const panelStyle = `
 .base-cadet-stats strong{display:block;font-size:16px;color:#f0f5f7;text-shadow:1px 2px #060e19}
 .base-cadet-lcd{padding:7px 5px;border:2px solid #070c12;border-right-color:#718191;border-bottom-color:#718191;background-color:#031006;background-image:radial-gradient(#0b2a12 .5px,transparent .7px);background-size:3px 3px;box-shadow:inset 0 0 8px #000;overflow:hidden}
 .base-cadet-lcd svg{display:block;width:100%;height:100%;color:#39ff6a;filter:drop-shadow(0 0 1px #289647)}
+.base-cadet-completion{height:100%;display:flex;align-items:center;overflow:hidden}.base-cadet-completion-track{height:14px;flex-shrink:0;animation:base-cadet-completion 12s linear 1 both}.base-cadet-completion[data-paused=true] .base-cadet-completion-track{animation-play-state:paused}
+@keyframes base-cadet-completion{from{transform:translateX(191px)}to{transform:translateX(-100%)}}
+@media(prefers-reduced-motion:reduce){.base-cadet-completion-track{animation:none;width:100%!important;transform:none}}
 .base-cadet-resources{display:flex;align-items:center;gap:8px;padding:2px 5px;background:linear-gradient(#142338,#263d54);border-top:1px solid #63778a}
 .base-cadet-gas{flex:1;min-width:0}.base-cadet-gas-meter{display:flex;gap:3px;height:8px;margin-top:4px}.base-cadet-gas-meter i{flex:1;border:1px solid #51677a;background:#0a1520}.base-cadet-gas-meter i[data-lit=true]{background:#8ee0c2;border-color:#b4f4d7;box-shadow:0 0 2px #5ba791}.base-cadet-bonus{text-align:center;white-space:nowrap}.base-cadet-bonus strong{margin-left:4px;color:#e0dcb3;font-size:16px}
 .base-cadet-pocket{display:none}
-@media(max-width:719px){.base-cadet-panel{order:-1;flex:0 0 40px;width:100%;height:40px;padding:2px 5px;border-width:2px}.base-cadet-backglass{display:none}.base-cadet-pocket{height:100%;display:grid;grid-template-rows:16px 15px;gap:1px}.base-cadet-pocket-stats{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:10px;overflow:hidden}.base-cadet-pocket-stats span:last-child{overflow:hidden;text-overflow:ellipsis}.base-cadet-pocket-stats b{color:#c2ffcb;margin-left:3px}.base-cadet-pocket-ticker{background:#020c06;border-top:1px solid #07110b;border-bottom:1px solid #50695c;overflow:hidden}.base-cadet-pocket-ticker svg{display:block;height:12px;width:100%;color:#72f696}}
+@media (max-width: 720px), (pointer: coarse) and (max-height: 480px){.base-cadet-panel{order:-1;flex:0 0 40px;width:100%;height:40px;padding:2px 5px;border-width:2px}.base-cadet-backglass{display:none}.base-cadet-pocket{height:100%;display:grid;grid-template-rows:16px 15px;gap:1px}.base-cadet-pocket-stats{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:10px;overflow:hidden}.base-cadet-pocket-stats span:last-child{overflow:hidden;text-overflow:ellipsis}.base-cadet-pocket-stats b{color:#c2ffcb;margin-left:3px}.base-cadet-pocket-ticker{background:#020c06;border-top:1px solid #07110b;border-bottom:1px solid #50695c;overflow:hidden}.base-cadet-pocket-ticker svg{display:block;height:12px;width:100%;color:#72f696}}
 .base-cadet-ticker-track{display:flex;width:max-content;gap:32px;animation:base-cadet-ticker 24s linear infinite}.base-cadet-ticker-track>div{flex-shrink:0}.base-cadet-pocket-ticker[data-paused=true] .base-cadet-ticker-track{animation-play-state:paused}
 @keyframes base-cadet-ticker{to{transform:translateX(calc(-50% - 16px))}}
 @media(prefers-reduced-motion:reduce){.base-cadet-ticker-track{animation:none}.base-cadet-pocket-ticker{overflow-x:auto}.base-cadet-ticker-track>div+div{display:none}}
@@ -50,6 +53,15 @@ const MatrixText = memo(function MatrixText({ text, height = 7 }: { text: string
   return <svg viewBox={`0 0 ${matrixWidth(upper)} ${height}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
     {Array.from(upper, (character, index) => <path key={index} d={(MATRIX_GLYPHS[character] ?? MATRIX_GLYPHS['?']).path} fill="currentColor" transform={`translate(${index * 6} 0)`} />)}
   </svg>
+})
+
+const CompletionScroll = memo(function CompletionScroll({ text, paused, enabled, children }: { text: string; paused: boolean; enabled: boolean; children: ReactNode }) {
+  const [finished, setFinished] = useState(false)
+  return !enabled || finished ? children : <div className="base-cadet-completion" data-paused={paused}>
+    <div className="base-cadet-completion-track" style={{ width: matrixWidth(text) * 2 }} onAnimationEnd={() => setFinished(true)}>
+      <MatrixText text={text} />
+    </div>
+  </div>
 })
 
 const insignia = Array.from({ length: 9 }, (_, index) => {
@@ -67,6 +79,7 @@ export const Panel = memo(function Panel({ score, player, ball, rank, rankIndex,
   const lines = [...matrixLines(displayMessage), ...matrixLines(goal)]
   const lcdHeight = Math.max(7, lines.length * 10 - 3)
   const ticker = [displayMessage, goal].filter(Boolean).join(' / ')
+  const completionScroll = message.includes(ruleMessage('cabaldCompleted'))
   return <aside className="base-cadet-panel" aria-hidden="true">
     <style>{panelStyle}</style>
     <div className="base-cadet-backglass">
@@ -87,9 +100,11 @@ export const Panel = memo(function Panel({ score, player, ball, rank, rankIndex,
         <div><span className="base-cadet-label">{PANEL_COPY.ball}</span><strong>{ball}</strong></div>
       </div>
       <div className="base-cadet-lcd">
-        <svg viewBox={`0 0 191 ${lcdHeight}`} preserveAspectRatio="xMinYMid meet" aria-hidden="true">
-          {lines.map((line, row) => Array.from(line, (character, column) => <path key={`${row}-${column}`} d={(MATRIX_GLYPHS[character] ?? MATRIX_GLYPHS['?']).path} fill="currentColor" transform={`translate(${column * 6} ${row * 10})`} />))}
-        </svg>
+        <CompletionScroll key={message} text={displayMessage} paused={paused} enabled={completionScroll}>
+          <svg viewBox={`0 0 191 ${lcdHeight}`} preserveAspectRatio="xMinYMid meet" aria-hidden="true">
+            {lines.map((line, row) => Array.from(line, (character, column) => <path key={`${row}-${column}`} d={(MATRIX_GLYPHS[character] ?? MATRIX_GLYPHS['?']).path} fill="currentColor" transform={`translate(${column * 6} ${row * 10})`} />))}
+          </svg>
+        </CompletionScroll>
       </div>
       <div className="base-cadet-resources">
         <div className="base-cadet-gas"><span className="base-cadet-label">{PANEL_COPY.fuel}</span><div className="base-cadet-gas-meter">{gasSegments.map(index => <i key={index} data-lit={fuel > index * 100 / 6} />)}</div></div>
@@ -101,10 +116,12 @@ export const Panel = memo(function Panel({ score, player, ball, rank, rankIndex,
         <span>{PANEL_COPY.score}<b>{scoreText}</b></span><span>{PANEL_COPY.ball}<b>{ball}</b></span><span>{PANEL_COPY.rank}<b>{rank}</b></span>
       </div>
       <div className="base-cadet-pocket-ticker" data-paused={paused}>
-        <div className="base-cadet-ticker-track" key={ticker}>
+        {completionScroll ? <CompletionScroll key={message} text={ticker} paused={paused} enabled>
+          <MatrixText text={ticker} />
+        </CompletionScroll> : <div className="base-cadet-ticker-track" key={ticker}>
           <div style={{ width: Math.max(280, matrixWidth(ticker) * 1.5) }}><MatrixText text={ticker} /></div>
           <div style={{ width: Math.max(280, matrixWidth(ticker) * 1.5) }}><MatrixText text={ticker} /></div>
-        </div>
+        </div>}
       </div>
     </div>
   </aside>

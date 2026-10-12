@@ -6,13 +6,13 @@ import { HalloweenMint } from './os/Halloween'
 import { Pocket } from './os/Pocket'
 import { Session, type SessionStage, TurnOffDialog } from './os/Session'
 import { Taskbar } from './os/Taskbar'
-import { TASKBAR_H, type WinGeom, Window } from './os/Window'
-import { appById, isTeam } from './os/apps'
+import { TASKBAR_H, type WinGeom, Window, focusActiveWindow } from './os/Window'
+import { type AppDef, type AppProps, appById, isTeam } from './os/apps'
 import { IconDefs } from './os/icons'
 import { MobileContext, useShell } from './os/shell'
 import { TeamPrompt, useSecurityBalloons } from './os/system'
 
-type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean; title?: string }
+type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean; title?: string; closeGuard?: () => void }
 
 const SESSION_KEY = 'remyxp.session'
 
@@ -22,7 +22,8 @@ function parseHash(): { id?: string; param?: string } {
 }
 
 function useMobile() {
-  const q = '(max-width: 720px)'
+  // Phones in landscape (short, touch-first) get the Pocket shell too: the desktop shell has no room there.
+  const q = '(max-width: 720px), (pointer: coarse) and (max-height: 480px)'
   const [mobile, setMobile] = useState(() => window.matchMedia(q).matches)
   useEffect(() => {
     const m = window.matchMedia(q)
@@ -45,6 +46,14 @@ function initialGeom(id: string, count: number): WinGeom {
   return { w: W, h: H, x: Math.round(x), y: Math.round(y) }
 }
 
+/** Keep the bypass close callback stable for the lifetime of the open application. */
+function WindowApplication({ Component, param, navigate, close: onClose }: AppProps & { Component: AppDef['Component'] }) {
+  const latestClose = useRef(onClose)
+  latestClose.current = onClose
+  const close = useCallback(() => latestClose.current(), [])
+  return <Component param={param} navigate={navigate} close={close} />
+}
+
 export default function App() {
   const mobile = useMobile()
   const theme = useShell((s) => s.prefs.theme)
@@ -54,6 +63,8 @@ export default function App() {
   const [powerDialog, setPowerDialog] = useState(false)
   const [wins, setWins] = useState<Win[]>([])
   const [params, setParams] = useState<Record<string, string | undefined>>({})
+  const [windowHost, setWindowHost] = useState<HTMLElement | null>(null)
+  const pocketHost = useCallback((node: HTMLSpanElement | null) => setWindowHost(node?.parentElement ?? null), [])
   const zRef = useRef(10)
 
   useSecurityBalloons(session === null)
@@ -107,6 +118,11 @@ export default function App() {
     setWins((ws) => ws.filter((w) => w.id !== id))
     if (wins.every((w) => w.id === id || w.min)) history.replaceState(null, '', '#/')
   }
+  const requestClose = (id: string) => {
+    const guard = wins.find((w) => w.id === id)?.closeGuard
+    if (guard) guard()
+    else close(id)
+  }
   const toggleFromTaskbar = (id: string) => {
     const w = wins.find((x) => x.id === id)
     if (w && id === active && !w.min) update(id, (x) => ({ ...x, min: true }))
@@ -121,26 +137,29 @@ export default function App() {
   const endSession = useCallback(() => {
     sessionStorage.setItem(SESSION_KEY, '1')
     setSession(null)
+    // The log-on/boot overlay held focus; give it back to the window the visitor is about to type into.
+    requestAnimationFrame(() => focusActiveWindow())
   }, [])
   const logOff = () => {
     if (address) disconnect()
     setSession('login')
   }
 
-  // Apps flagged `persistent` (Winamp) stay mounted while minimized so they keep playing; unmount means closed.
-  const persistent = (w: Win) => !!appById(w.id)?.persistent
-  const renderWindow = (w: Win, hidden = false) => {
+  // Every open app owns one mounted instance; only its visible shell frame follows the breakpoint.
+  const renderWindow = (w: Win) => {
     const def = appById(w.id)
     if (!def) return null
     const { Component } = def
+    const hidden = mobile ? w.id !== active : w.min
     return (
       <Window
         key={w.id}
+        host={!hidden || def.persistent ? windowHost : null}
         title={def.title}
         icon={def.icon}
         geom={w.geom}
         z={w.z}
-        active={w.id === active}
+        active={session === null && !powerDialog && w.id === active}
         maximized={w.max}
         mobile={mobile}
         dialog={def.dialog}
@@ -148,13 +167,14 @@ export default function App() {
         skinned={def.skinned}
         hidden={hidden}
         onFocus={() => focus(w.id)}
-        onClose={() => close(w.id)}
+        onClose={() => requestClose(w.id)}
         onMinimize={() => update(w.id, (x) => ({ ...x, min: true }))}
         onToggleMax={() => def.resizable !== false && update(w.id, (x) => ({ ...x, max: !x.max }))}
         onGeom={(geom) => update(w.id, (x) => ({ ...x, geom }))}
-        onTitle={(title) => update(w.id, (x) => x.title === title ? x : { ...x, title })}
+        onTitle={(title) => update(w.id, (x) => (x.title === title ? x : { ...x, title }))}
+        onCloseGuard={(closeGuard) => update(w.id, (x) => (x.closeGuard === closeGuard ? x : { ...x, closeGuard }))}
       >
-        <Component param={params[w.id]} navigate={navigate} close={() => close(w.id)} />
+        <WindowApplication Component={Component} param={params[w.id]} navigate={navigate} close={() => close(w.id)} />
       </Window>
     )
   }
@@ -166,15 +186,22 @@ export default function App() {
       <IconDefs />
       <div className={`xp theme-${theme}${powerDialog ? ' fading' : ''}`}>
         {mobile ? (
-          <Pocket active={active} title={wins.find((w) => w.id === active)?.title} open={wins.map((w) => w.id)} onLaunch={navigate} onClose={close} onToday={minimizeAll} onLogOff={logOff}>
-            {wins.filter((w) => w.id === active || persistent(w)).map((w) => renderWindow(w, w.id !== active))}
+          <Pocket
+            active={active}
+            title={wins.find((w) => w.id === active)?.title}
+            open={wins.map((w) => w.id)}
+            onLaunch={navigate}
+            onClose={requestClose}
+            onToday={minimizeAll}
+            onLogOff={logOff}
+          >
+            <span hidden ref={pocketHost} />
           </Pocket>
         ) : (
-          <div className="desktop" onContextMenu={menu.onContextMenu}>
+          <div className="desktop" ref={setWindowHost} onContextMenu={menu.onContextMenu}>
             <Wallpaper />
             <DesktopIcons open={navigate} />
             <HalloweenMint />
-            {wins.filter((w) => !w.min || persistent(w)).map((w) => renderWindow(w, w.min))}
             {menu.element}
             <Taskbar
               wins={wins.map((w) => ({ id: w.id, min: w.min, title: w.title }))}
@@ -186,6 +213,7 @@ export default function App() {
             />
           </div>
         )}
+        {wins.map(renderWindow)}
       </div>
       {powerDialog && (
         <TurnOffDialog

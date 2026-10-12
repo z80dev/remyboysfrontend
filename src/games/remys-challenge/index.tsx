@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { AppProps } from '../../os/apps'
 import { AboutDialog, BestScoresDialog, ChooseRemyDialog, GameDialog, GameMenuBar, LedCounter, NameEntryDialog, loadGame, saveGame, useCrispCanvas, useGamesMuted, useGamesPlayer, useWindowFit, useWindowState, unlockAudio, toggleGamesMuted, tone, sweep, noise, playMusic, stopMusic, playJingle, stopSounds } from '../kit'
-import { createState, step, passwordLevel, levelScore, Tile, type Direction } from './engine'
+import { createState, step, passwordLevel, levelScore, Tile, TICK_MS, type Direction } from './engine'
 import { LEVELS } from './levels'
 import { createTileSheet, drawViewport, drawInventory, loadChallengeArt, type ChallengeArt } from './render'
 import { songForLevel, winJingle, deathJingle } from './music/jingles'
@@ -32,8 +32,12 @@ type Dialog = 'goto' | 'best' | 'help' | 'about' | 'choose' | 'death' | 'complet
 const directions: Record<string, Direction> = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }
 const items = [Tile.BlueKey, Tile.RedKey, Tile.GreenKey, Tile.YellowKey, Tile.Flippers, Tile.FireBoots, Tile.Skates, Tile.SuctionBoots]
 const names = [ITEM_NAMES.blueKey, ITEM_NAMES.redKey, ITEM_NAMES.greenKey, ITEM_NAMES.yellowKey, ITEM_NAMES.flippers, ITEM_NAMES.fireBoots, ITEM_NAMES.skates, ITEM_NAMES.suction]
+const hintMeasures = [
+  ...LEVELS.map(level => <div key={level.number} className="challenge-hint challenge-hint-measure" aria-hidden="true">{level.hint}</div>),
+  <div key="thief" className="challenge-hint challenge-hint-measure" aria-hidden="true">{PANEL.thief}</div>
+]
 
-export default function RemysChallenge({ param, close }: AppProps) {
+export default function RemysChallenge({ param, navigate, close }: AppProps) {
   const [saved, setSaved] = useState(() => loadGame<Save>('remys-challenge', defaults(), validSave))
   const savedRef = useRef(saved)
   const [initial] = useState(() => {
@@ -59,9 +63,9 @@ export default function RemysChallenge({ param, close }: AppProps) {
   const pending = useRef<Direction | undefined>(undefined)
   const swipe = useRef<{ x: number, y: number } | null>(null)
   const surface = useRef<HTMLDivElement>(null)
-  const inventory = useRef<HTMLCanvasElement>(null)
+  const inventory = useCrispCanvas(128, 64, { smoothing: false, onResize: () => refresh(n => n + 1) }).ref
   const lastSounds = useRef<Partial<Record<string, number>>>({})
-  const canvas = useCrispCanvas(288, 288, { smoothing: false })
+  const canvas = useCrispCanvas(288, 288, { smoothing: false, onResize: () => refresh(n => n + 1) })
   const fit = useWindowFit()
   const { active, hidden } = useWindowState()
   const { muted } = useGamesMuted()
@@ -76,6 +80,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
   const cancelInput = () => {
     held.current = undefined
     pending.current = undefined
+    live.current.queuedInput = undefined
     swipe.current = null
   }
   const focus = () => surface.current?.focus()
@@ -95,6 +100,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
     setPhase('card')
     refresh(n => n + 1)
     focus()
+    navigate(`#/remys-challenge/${number}`)
   }
   const start = () => {
     unlockAudio()
@@ -119,15 +125,15 @@ export default function RemysChallenge({ param, close }: AppProps) {
   }
   const completeContinue = () => {
     const n = live.current.level.number
-    if (n === 40) {
-      setDialog('name')
-      return
-    }
-    if (n === 10 || n === 20 || n === 30) {
+    if (n === 10 || n === 20 || n === 30 || n === 40) {
       setDialog('story')
       return
     }
     nextLevel()
+  }
+  const storyContinue = () => {
+    if (live.current.level.number === 40) setDialog('name')
+    else nextLevel()
   }
   const goTo = () => {
     const number = goNumber.trim() ? Number(goNumber) : undefined
@@ -148,6 +154,28 @@ export default function RemysChallenge({ param, close }: AppProps) {
     if (!savedRef.current.unlocked.includes(n)) persist({ ...savedRef.current, unlocked: [...savedRef.current.unlocked, n] })
     loadLevel(n)
   }
+  const inputWindow = useRef({ active, hidden })
+  useLayoutEffect(() => { inputWindow.current = { active, hidden } }, [active, hidden])
+  useLayoutEffect(() => {
+    // Register before the kit's passive accelerator listeners can consume a key.
+    const onKeyboardInput = () => {
+      if (inputWindow.current.active && !inputWindow.current.hidden) setTouch(false)
+    }
+    window.addEventListener('keydown', onKeyboardInput, true)
+    return () => window.removeEventListener('keydown', onKeyboardInput, true)
+  }, [])
+  useEffect(() => {
+    if (!param) return
+    const number = /^\d+$/.test(param) ? Number(param) : NaN
+    if (!savedRef.current.unlocked.includes(number)) {
+      // Let the shell finish synchronizing its current route before replacing it.
+      const expectedHash = new URL(`#/remys-challenge/${param}`, window.location.href).hash
+      const timer = window.setTimeout(() => {
+        if (window.location.hash === expectedHash) navigate(`#/remys-challenge/${live.current.level.number}`)
+      }, 0)
+      return () => window.clearTimeout(timer)
+    } else if (live.current.level.number !== number) loadLevel(number)
+  }, [param])
   useEffect(() => { fit(544, 416) }, [fit])
   useEffect(() => { if (active && !hidden && !dialog) focus() }, [active, hidden, dialog])
   useEffect(() => {
@@ -176,7 +204,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
   }, [])
   useEffect(() => {
     const ctx = canvas.ref.current?.getContext('2d')
-    if (ctx) drawViewport(ctx, live.current, live.current.tick, art, sheet)
+    if (ctx) drawViewport(ctx, live.current, Math.floor(live.current.tick * TICK_MS / 200), art, sheet)
     const inv = inventory.current?.getContext('2d')
     if (inv) {
       inv.clearRect(0, 0, 128, 64)
@@ -292,7 +320,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
         const i = s.level.number - 1
         const attempts = Math.max(1, old.attempts[i])
         const score = levelScore(s.level.number, s.timeLeft, attempts)
-        const elapsed = Math.floor(s.tick / 5)
+        const elapsed = Math.floor(s.tick * TICK_MS / 1000)
         const record = old.times[i] === null || elapsed < old.times[i]!
         const next = { ...old, times: [...old.times], scores: [...old.scores], unlocked: [...old.unlocked] }
         if (record) next.times[i] = elapsed
@@ -305,7 +333,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
         void playJingle(winJingle, 'remys-challenge')
       }
       refresh(n => n + 1)
-    }, 200)
+    }, TICK_MS)
     return () => window.clearInterval(timer)
   }, [phase, active, hidden, dialog, menuOpen, muted])
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -362,7 +390,7 @@ export default function RemysChallenge({ param, close }: AppProps) {
   const hint = state.tiles[state.player.pos] === Tile.Hint ? state.level.hint : state.tiles[state.player.pos] === Tile.Thief ? PANEL.thief : ''
   return <div className={`challenge${touch ? ' challenge-touch' : ''}`} onPointerDownCapture={event => {
     unlockAudio()
-    if (event.pointerType === 'touch') setTouch(true)
+    setTouch(event.pointerType === 'touch')
     if (phase === 'celebrate' && !dialog) {
       event.preventDefault()
       event.stopPropagation()
@@ -385,7 +413,6 @@ export default function RemysChallenge({ param, close }: AppProps) {
     }} onBlur={cancelInput} onContextMenu={event => event.preventDefault()}>
       <div className={`challenge-board${saved.colorOff ? ' challenge-mono' : ''}`} onPointerDown={event => {
         focus()
-        if (event.pointerType === 'touch') setTouch(true)
         if (phase === 'celebrate') {
           advance()
           return
@@ -426,7 +453,11 @@ export default function RemysChallenge({ param, close }: AppProps) {
         <div className="challenge-meter"><strong>{PANEL.time}</strong><LedCounter value={state.level.time ? state.timeLeft : PANEL.untimed} digits={3} scale={2} /></div>
         <div className="challenge-meter"><strong>{PANEL.chipsLeft}</strong><LedCounter value={state.chipsLeft} digits={3} scale={2} /></div>
         <div className={`challenge-inventory${saved.colorOff ? ' challenge-mono' : ''}`} role="img" aria-label={`${PANEL.inventory}: ${names.filter((_, i) => i < 4 ? state.keys[i] > 0 : state.boots[i - 4]).join(', ')}`}><canvas ref={inventory} width={128} height={64} /></div>
-        {hint && <div className="challenge-hint">{hint}</div>}
+        <div className="challenge-hint-slot">
+          {/* Invisible copies size the slot for every hint at the current width. */}
+          {hintMeasures}
+          {hint && <div className="challenge-hint">{hint}</div>}
+        </div>
       </aside>
       <div className="challenge-pad">{([0, 3, 2, 1] as Direction[]).map(d => <button key={d} className={`challenge-dir-${d}`} aria-label={[TOUCH.up, TOUCH.right, TOUCH.down, TOUCH.left][d]} onPointerDown={event => {
         event.preventDefault()
@@ -445,8 +476,8 @@ export default function RemysChallenge({ param, close }: AppProps) {
     <div className="challenge-live" aria-live="polite">{announcement}</div>
     {dialog === 'death' && <GameDialog title={DEATH_TITLE} onClose={startAfterRestart} buttons={[{ label: MENU.restart.replace('&', ''), default: true, onClick: startAfterRestart }]}><p>{DEATH[state.death!]}</p></GameDialog>}
     {dialog === 'complete' && <GameDialog title={COMPLETE.title} onClose={completeContinue} buttons={[{ label: COMPLETE.ok, default: true, onClick: completeContinue }]}><dl className="challenge-results">{[[COMPLETE.timeBonus, result.timeBonus], [COMPLETE.levelBonus, result.levelBonus], [COMPLETE.levelScore, result.score], [COMPLETE.total, saved.scores.reduce((a, b) => a + b, 0)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{result.record && <p>{COMPLETE.record}</p>}<p>{COMPLETE.attempts(result.attempts)}</p></GameDialog>}
-    {dialog === 'story' && <GameDialog title={STORY[state.level.number as 10 | 20 | 30].title} onClose={nextLevel} buttons={[{ label: COMPLETE.ok, default: true, onClick: nextLevel }]}><p>{STORY[state.level.number as 10 | 20 | 30].text}</p></GameDialog>}
-    {dialog === 'name' && <NameEntryDialog title={CERTIFICATE.title} message={CERTIFICATE.body} defaultName={player.name} onSubmit={name => {
+    {dialog === 'story' && <GameDialog title={STORY[state.level.number as 10 | 20 | 30 | 40].title} onClose={storyContinue} buttons={[{ label: COMPLETE.ok, default: true, onClick: storyContinue }]}><p>{STORY[state.level.number as 10 | 20 | 30 | 40].text}</p></GameDialog>}
+    {dialog === 'name' && <NameEntryDialog title={CERTIFICATE.title} message={CERTIFICATE.signBook} defaultName={player.name} onSubmit={name => {
       setName(name)
       setDialog('certificate')
     }} onCancel={() => setDialog('certificate')} />}
@@ -454,8 +485,8 @@ export default function RemysChallenge({ param, close }: AppProps) {
     {dialog === 'goto' && <GameDialog title={GOTO.title} onClose={dismiss} buttons={[{ label: GOTO.ok, default: true, onClick: goTo }, { label: GOTO.cancel, cancel: true, onClick: dismiss }]}><form className="challenge-goto" onSubmit={event => {
       event.preventDefault()
       goTo()
-    }}><label>{GOTO.level.replace('&', '')}<input type="number" min={1} max={40} value={goNumber} onChange={event => setGoNumber(event.target.value)} /></label><label>{GOTO.password.replace('&', '')}<input value={goPassword} maxLength={4} onChange={event => setGoPassword(event.target.value.toUpperCase())} /></label>{goError && <p role="alert">{goError}</p>}</form></GameDialog>}
-    {dialog === 'best' && <BestScoresDialog title={BEST.title} rows={[...LEVELS.flatMap(level => [{ label: `${BEST.level} ${level.number} — ${BEST.time}`, score: saved.times[level.number - 1] }, { label: `${BEST.level} ${level.number} — ${BEST.score}`, score: saved.scores[level.number - 1] || null }]), { label: BEST.total, score: saved.scores.reduce((a, b) => a + b, 0) }]} format={(score, row) => row.label.endsWith(BEST.time) ? `${score}s` : score.toLocaleString()} onReset={() => persist({ ...savedRef.current, times: Array(40).fill(null), scores: Array(40).fill(0) })} onClose={dismiss} />}
+    }}><label>{GOTO.level.replace('&', '')}<input data-autofocus type="number" min={1} max={40} value={goNumber} onChange={event => setGoNumber(event.target.value)} /></label><label>{GOTO.password.replace('&', '')}<input value={goPassword} maxLength={4} onChange={event => setGoPassword(event.target.value.toUpperCase())} /></label>{goError && <p role="alert">{goError}</p>}</form></GameDialog>}
+    {dialog === 'best' && <BestScoresDialog title={BEST.title} headings={BEST.headings} rows={[...LEVELS.map(level => ({ label: String(level.number), score: saved.scores[level.number - 1] || null, name: BEST.elapsed(saved.times[level.number - 1]) })), { label: BEST.total, score: saved.scores.reduce((a, b) => a + b, 0), name: BEST.elapsed(null) }]} format={String} onReset={() => persist({ ...savedRef.current, times: Array(40).fill(null), scores: Array(40).fill(0) })} onClose={dismiss} />}
     {dialog === 'choose' && <ChooseRemyDialog onClose={dismiss} />}
     {dialog === 'about' && <AboutDialog game={TITLE} icon={icon} {...ABOUT} onClose={dismiss} />}
     {dialog === 'help' && <GameDialog title={HELP.title} width={460} onClose={dismiss} buttons={[{ label: COMPLETE.ok, default: true, onClick: dismiss }]}><div className="challenge-help-tabs" role="tablist">{HELP.tabs.map(tab => <button key={tab} role="tab" aria-selected={tab === helpTab} onClick={() => setHelpTab(tab)}>{tab}</button>)}</div><div role="tabpanel">{HELP.sections[helpTab].map(text => <p key={text}>{text}</p>)}</div></GameDialog>}

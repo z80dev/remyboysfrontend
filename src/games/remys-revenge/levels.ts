@@ -51,13 +51,14 @@ type Field = 'square' | 'round' | 'diamond' | 'cross' | 'quads' | 'rings' | 'str
 type Fixed = 'scatter' | 'pillars' | 'frame' | 'spokes' | 'bars' | 'posts' | 'corners'
 
 /**
- * One level. `r` is the field's Chebyshev radius around the centre (≤ 9 keeps the two-cell outer lane free for cats).
- * `fixed` entries are `[pattern, n]`; `holes` punches seeded single-cell pockets into the field; hazard counts are
- * placed from `seed`. `waves` is the number of blue marks after the first wave.
+ * One level. `r` is the field's Chebyshev radius around the centre (default 9, which keeps the two-cell outer lane free
+ * for cats). `fixed` entries are `[pattern, n]`; `holes` punches seeded single-cell pockets into the field; hazard
+ * counts are placed from `seed`. `waves` is the number of blue marks after the first wave; `clock` is the sweep in
+ * seconds.
  */
 type Recipe = {
   field: Field
-  r: number
+  r?: number
   fixed?: readonly (readonly [Fixed, number])[]
   holes?: number
   rugs?: number
@@ -65,7 +66,7 @@ type Recipe = {
   yarn?: number
   cats: number
   waves: number
-  duration: number
+  clock: number
   seed: number
   tweaks?: readonly string[]
 }
@@ -73,67 +74,150 @@ type Recipe = {
 const C = 11
 
 /**
- * The 50 levels. Rules the table keeps (and tests check): no hazards before 13; rugs from 13, traps from 17, yarn
- * from 21; at most one hazard kind per level before 35, two or more from 35; first-wave cats 1 → 3.
+ * The 50 levels. Progression the table keeps: no hazards before 13; rugs from 13, traps from 17, yarn from 21; at most
+ * one hazard kind per level before 35, two or more from 35; first-wave cats 1 → 3; immovables roughly 2 → 50.
  */
 const RECIPES: readonly Recipe[] = [
   // 1–12: the field. Big movable blocks, a few immovables, cats in the outer lane.
-  /* 1 Welcome Mat */ { field: 'square', r: 8, cats: 1, waves: 2, duration: 120, seed: 101, tweaks: ['fixed 4,4', 'fixed 18,18'] },
-  /* 2 Big Cheese Board */ { field: 'square', r: 9, cats: 1, waves: 2, duration: 120, seed: 202, tweaks: ['fixed 4,18', 'fixed 18,4', 'empty 11,2..11,3'] },
-  /* 3 Round Table */ { field: 'round', r: 9, fixed: [['scatter', 1]], cats: 1, waves: 2, duration: 130, seed: 303, tweaks: ['fixed 11,4', 'fixed 11,18'] },
-  /* 4 Two Tails */ { field: 'square', r: 8, fixed: [['scatter', 2]], cats: 2, waves: 2, duration: 130, seed: 404, tweaks: ['empty 3,11', 'empty 19,11'] },
-  /* 5 Stop Sign */ { field: 'octagon', r: 9, fixed: [['scatter', 2]], cats: 2, waves: 3, duration: 150, seed: 505, tweaks: ['fixed 8,11', 'fixed 14,11'] },
-  /* 6 Kite */ { field: 'diamond', r: 9, fixed: [['scatter', 2]], cats: 2, waves: 3, duration: 150, seed: 606, tweaks: ['fixed 11,5', 'empty 11,2..11,3'] },
-  /* 7 Picture Frame */ { field: 'square', r: 9, fixed: [['frame', 3]], cats: 2, waves: 3, duration: 150, seed: 707, tweaks: ['fixed 5,5', 'fixed 17,17'] },
-  /* 8 Plus One */ { field: 'cross', r: 9, fixed: [['scatter', 2]], cats: 2, waves: 3, duration: 150, seed: 808, tweaks: ['fixed 11,7', 'fixed 11,15'] },
-  /* 9 Studs */ { field: 'round', r: 9, fixed: [['pillars', 4]], cats: 2, waves: 3, duration: 160, seed: 909, tweaks: ['empty 13,13', 'empty 9,9'] },
-  /* 10 Twin Fields */ { field: 'twin', r: 8, fixed: [['corners', 2]], cats: 2, waves: 3, duration: 160, seed: 1010, tweaks: ['fixed 11,5', 'fixed 11,17'] },
-  /* 11 Starburst */ { field: 'square', r: 9, fixed: [['spokes', 7]], holes: 6, cats: 2, waves: 3, duration: 160, seed: 1111, tweaks: ['fixed 11,3', 'fixed 3,11'] },
-  /* 12 Four Pastures */ { field: 'quads', r: 9, fixed: [['scatter', 3]], cats: 2, waves: 3, duration: 160, seed: 1212, tweaks: ['block 11,10', 'block 11,12'] },
+  // 1 Welcome Mat
+  { field: 'square', r: 8, cats: 1, waves: 2, clock: 120, seed: 101, tweaks: ['fixed 4,4', 'fixed 18,18'] },
+  // 2 Big Cheese Board
+  { field: 'square', cats: 1, waves: 2, clock: 120, seed: 202, tweaks: ['fixed 4,18', 'fixed 18,4', 'empty 11,2..11,3'] },
+  // 3 Round Table
+  { field: 'round', fixed: [['scatter', 1]], cats: 1, waves: 2, clock: 130, seed: 303, tweaks: ['fixed 11,4', 'fixed 11,18'] },
+  // 4 Two Tails
+  { field: 'square', r: 8, fixed: [['scatter', 2]], cats: 2, waves: 2, clock: 130, seed: 404, tweaks: ['empty 3,11', 'empty 19,11'] },
+  // 5 Stop Sign
+  { field: 'octagon', fixed: [['scatter', 2]], cats: 2, waves: 3, clock: 150, seed: 505, tweaks: ['fixed 8,11', 'fixed 14,11'] },
+  // 6 Kite
+  { field: 'diamond', fixed: [['scatter', 2]], cats: 2, waves: 3, clock: 150, seed: 606, tweaks: ['fixed 11,5', 'empty 11,2..11,3'] },
+  // 7 Picture Frame
+  { field: 'square', fixed: [['frame', 3]], cats: 2, waves: 3, clock: 150, seed: 707, tweaks: ['fixed 5,5', 'fixed 17,17'] },
+  // 8 Plus One
+  { field: 'cross', fixed: [['scatter', 2]], cats: 2, waves: 3, clock: 150, seed: 808, tweaks: ['fixed 11,7', 'fixed 11,15'] },
+  // 9 Studs
+  { field: 'round', fixed: [['pillars', 4]], cats: 2, waves: 3, clock: 160, seed: 909, tweaks: ['empty 13,13', 'empty 9,9'] },
+  // 10 Twin Fields
+  { field: 'twin', r: 8, fixed: [['corners', 2]], cats: 2, waves: 3, clock: 160, seed: 1010, tweaks: ['fixed 11,5', 'fixed 11,17'] },
+  // 11 Starburst
+  { field: 'square', fixed: [['spokes', 7]], holes: 6, cats: 2, waves: 3, clock: 160, seed: 1111, tweaks: ['fixed 11,3', 'fixed 3,11'] },
+  // 12 Four Pastures
+  { field: 'quads', fixed: [['scatter', 3]], cats: 2, waves: 3, clock: 160, seed: 1212, tweaks: ['block 11,5', 'block 11,17'] },
 
   // 13–20: rugs, then traps. More immovables.
-  /* 13 First Rug */ { field: 'square', r: 9, fixed: [['scatter', 3]], rugs: 2, cats: 2, waves: 3, duration: 160, seed: 1313, tweaks: ['rug 11,5'] },
-  /* 14 Rug Gallery */ { field: 'octagon', r: 9, fixed: [['frame', 5]], rugs: 3, cats: 2, waves: 3, duration: 170, seed: 1414, tweaks: ['empty 11,5', 'rug 5,11'] },
-  /* 15 Carpet Kite */ { field: 'diamond', r: 9, fixed: [['pillars', 5]], rugs: 3, cats: 2, waves: 4, duration: 180, seed: 1515, tweaks: ['rug 17,11', 'fixed 11,16'] },
-  /* 16 Onion */ { field: 'rings', r: 9, fixed: [['pillars', 4]], rugs: 4, cats: 2, waves: 4, duration: 180, seed: 1616, tweaks: ['empty 11,4', 'empty 11,18'] },
-  /* 17 Snap */ { field: 'square', r: 9, fixed: [['bars', 5]], traps: 2, cats: 2, waves: 4, duration: 180, seed: 1717, tweaks: ['trap 11,3'] },
-  /* 18 Cheese Wheel */ { field: 'round', r: 9, fixed: [['scatter', 4]], traps: 3, cats: 2, waves: 4, duration: 180, seed: 1818, tweaks: ['fixed 7,7', 'fixed 15,15'] },
-  /* 19 Crossroads */ { field: 'cross', r: 9, fixed: [['frame', 5]], traps: 3, cats: 2, waves: 4, duration: 180, seed: 1919, tweaks: ['trap 3,11', 'empty 11,6'] },
-  /* 20 Checkmate */ { field: 'checker', r: 9, fixed: [['corners', 3]], traps: 4, cats: 2, waves: 4, duration: 190, seed: 2020, tweaks: ['block 11,8', 'block 11,14'] },
+  // 13 First Rug
+  { field: 'square', fixed: [['scatter', 3]], rugs: 2, cats: 2, waves: 3, clock: 160, seed: 1313, tweaks: ['rug 11,5'] },
+  // 14 Rug Gallery
+  { field: 'octagon', fixed: [['frame', 5]], rugs: 3, cats: 2, waves: 3, clock: 170, seed: 1414, tweaks: ['empty 11,5', 'rug 5,11'] },
+  // 15 Carpet Kite
+  { field: 'diamond', fixed: [['pillars', 5]], rugs: 3, cats: 2, waves: 4, clock: 180, seed: 1515, tweaks: ['rug 17,11', 'fixed 11,16'] },
+  // 16 Onion
+  { field: 'rings', fixed: [['pillars', 4]], rugs: 4, cats: 2, waves: 4, clock: 180, seed: 1616, tweaks: ['block 11,4', 'block 11,18'] },
+  // 17 Snap
+  { field: 'square', fixed: [['bars', 5]], traps: 2, cats: 2, waves: 4, clock: 180, seed: 1717, tweaks: ['trap 11,3'] },
+  // 18 Cheese Wheel
+  { field: 'round', fixed: [['scatter', 4]], traps: 3, cats: 2, waves: 4, clock: 180, seed: 1818, tweaks: ['fixed 7,7', 'fixed 15,15'] },
+  // 19 Crossroads
+  { field: 'cross', fixed: [['frame', 5]], traps: 3, cats: 2, waves: 4, clock: 180, seed: 1919, tweaks: ['trap 3,11', 'empty 11,6'] },
+  // 20 Checkmate
+  { field: 'checker', fixed: [['corners', 3]], traps: 4, cats: 2, waves: 4, clock: 190, seed: 2020, tweaks: ['block 11,8', 'block 11,14'] },
 
   // 21–34: Hopium yarn arrives; one hazard kind per level.
-  /* 21 Hopium */ { field: 'square', r: 9, fixed: [['scatter', 3]], yarn: 1, cats: 2, waves: 4, duration: 190, seed: 2121, tweaks: ['fixed 11,4'] },
-  /* 22 Ball Pit */ { field: 'octagon', r: 9, fixed: [['pillars', 4]], yarn: 1, cats: 2, waves: 4, duration: 190, seed: 2222, tweaks: ['empty 6,11', 'empty 16,11'] },
-  /* 23 Pinstripes */ { field: 'stripes', r: 9, fixed: [['scatter', 2]], yarn: 2, cats: 2, waves: 4, duration: 190, seed: 2323, tweaks: ['block 4,14', 'block 18,8'] },
-  /* 24 Rug Quarter */ { field: 'quads', r: 9, fixed: [['spokes', 8]], rugs: 4, cats: 2, waves: 4, duration: 200, seed: 2424, tweaks: ['rug 11,5', 'rug 11,17'] },
-  /* 25 Hopium Halo */ { field: 'round', r: 9, fixed: [['frame', 4]], yarn: 2, cats: 2, waves: 4, duration: 200, seed: 2525, tweaks: ['empty 11,7', 'fixed 4,11'] },
-  /* 26 Colonnade */ { field: 'columns', r: 9, fixed: [['scatter', 3]], yarn: 2, cats: 2, waves: 4, duration: 200, seed: 2626, tweaks: ['block 14,11', 'block 8,11'] },
-  /* 27 Trap Lattice */ { field: 'square', r: 9, fixed: [['pillars', 3]], traps: 4, cats: 2, waves: 4, duration: 200, seed: 2727, tweaks: ['trap 18,4'] },
-  /* 28 Hollow Promise */ { field: 'hollow', r: 9, fixed: [['bars', 6]], yarn: 2, cats: 2, waves: 4, duration: 200, seed: 2828, tweaks: ['fixed 11,3', 'fixed 11,19'] },
-  /* 29 Diamond Hands */ { field: 'diamond', r: 9, fixed: [['frame', 7]], yarn: 2, cats: 2, waves: 4, duration: 210, seed: 2929, tweaks: ['empty 11,4', 'block 11,1'] },
-  /* 30 Rug Twins */ { field: 'twin', r: 9, fixed: [['scatter', 4]], rugs: 5, cats: 2, waves: 5, duration: 220, seed: 3030, tweaks: ['fixed 11,6', 'fixed 11,16'] },
-  /* 31 Ripples */ { field: 'rings', r: 9, fixed: [['spokes', 8]], yarn: 2, cats: 3, waves: 5, duration: 220, seed: 3131, tweaks: ['empty 11,4', 'empty 4,11'] },
-  /* 32 Cross Studs */ { field: 'cross', r: 9, fixed: [['pillars', 4]], yarn: 2, cats: 3, waves: 5, duration: 220, seed: 3232, tweaks: ['fixed 6,11', 'fixed 16,11'] },
-  /* 33 Snap Board */ { field: 'checker', r: 9, fixed: [['frame', 7]], traps: 5, cats: 3, waves: 5, duration: 220, seed: 3333, tweaks: ['trap 11,4'] },
-  /* 34 Compass */ { field: 'octagon', r: 9, fixed: [['spokes', 6], ['frame', 4]], yarn: 3, cats: 3, waves: 5, duration: 230, seed: 3434, tweaks: ['empty 11,7', 'empty 11,15'] },
+  // 21 Hopium
+  { field: 'square', fixed: [['scatter', 3]], yarn: 1, cats: 2, waves: 4, clock: 190, seed: 2121, tweaks: ['fixed 11,4'] },
+  // 22 Ball Pit
+  { field: 'octagon', fixed: [['pillars', 4]], yarn: 1, cats: 2, waves: 4, clock: 190, seed: 2222, tweaks: ['empty 6,11', 'empty 16,11'] },
+  // 23 Pinstripes
+  { field: 'stripes', fixed: [['scatter', 2]], yarn: 2, cats: 2, waves: 4, clock: 190, seed: 2323, tweaks: ['block 4,14', 'block 18,8'] },
+  // 24 Rug Quarter
+  { field: 'quads', fixed: [['spokes', 8]], rugs: 4, cats: 2, waves: 4, clock: 200, seed: 2424, tweaks: ['rug 11,5', 'rug 11,17'] },
+  // 25 Hopium Halo
+  { field: 'round', fixed: [['frame', 4]], yarn: 2, cats: 2, waves: 4, clock: 200, seed: 2525, tweaks: ['empty 11,7', 'fixed 4,11'] },
+  // 26 Colonnade
+  { field: 'columns', fixed: [['scatter', 3]], yarn: 2, cats: 2, waves: 4, clock: 200, seed: 2626, tweaks: ['block 14,11', 'block 8,11'] },
+  // 27 Trap Lattice
+  { field: 'square', fixed: [['pillars', 3]], traps: 4, cats: 2, waves: 4, clock: 200, seed: 2727, tweaks: ['trap 18,4'] },
+  // 28 Hollow Promise
+  { field: 'hollow', fixed: [['bars', 6]], yarn: 2, cats: 2, waves: 4, clock: 200, seed: 2828, tweaks: ['fixed 11,3', 'fixed 11,19'] },
+  // 29 Diamond Hands
+  { field: 'diamond', fixed: [['frame', 7]], yarn: 2, cats: 2, waves: 4, clock: 210, seed: 2929, tweaks: ['empty 11,4', 'block 11,1'] },
+  // 30 Rug Twins
+  { field: 'twin', fixed: [['scatter', 4]], rugs: 5, cats: 2, waves: 5, clock: 220, seed: 3030, tweaks: ['fixed 11,6', 'fixed 11,16'] },
+  // 31 Ripples
+  { field: 'rings', fixed: [['spokes', 8]], yarn: 2, cats: 3, waves: 5, clock: 220, seed: 3131, tweaks: ['block 4,11', 'block 18,11'] },
+  // 32 Cross Studs
+  { field: 'cross', fixed: [['pillars', 4]], yarn: 2, cats: 3, waves: 5, clock: 220, seed: 3232, tweaks: ['fixed 6,11', 'fixed 16,11'] },
+  // 33 Snap Board
+  { field: 'checker', fixed: [['frame', 7]], traps: 5, cats: 3, waves: 5, clock: 220, seed: 3333, tweaks: ['trap 11,4'] },
+  // 34 Compass
+  { field: 'octagon', fixed: [['spokes', 6], ['frame', 4]], yarn: 3, cats: 3, waves: 5, clock: 230, seed: 3434, tweaks: ['empty 11,7', 'empty 11,15'] },
 
   // 35–50: hazards combined; the Cabald stops pretending.
-  /* 35 Due Diligence */ { field: 'square', r: 9, fixed: [['scatter', 4]], rugs: 3, traps: 2, cats: 3, waves: 5, duration: 230, seed: 3535, tweaks: ['fixed 11,3'] },
-  /* 36 Hopium Rug */ { field: 'round', r: 9, fixed: [['pillars', 4]], rugs: 3, yarn: 1, cats: 3, waves: 5, duration: 230, seed: 3636, tweaks: ['rug 11,4', 'empty 11,18'] },
-  /* 37 Quarterly Report */ { field: 'quads', r: 9, fixed: [['frame', 6]], traps: 3, yarn: 2, cats: 3, waves: 5, duration: 230, seed: 3737, tweaks: ['block 11,9', 'block 11,13'] },
-  /* 38 Bar Chart */ { field: 'stripes', r: 9, fixed: [['scatter', 3]], rugs: 3, traps: 3, cats: 3, waves: 5, duration: 240, seed: 3838, tweaks: ['fixed 4,11', 'fixed 18,11'] },
-  /* 39 Sparkle */ { field: 'diamond', r: 9, fixed: [['frame', 4]], traps: 3, yarn: 2, cats: 3, waves: 5, duration: 240, seed: 3939, tweaks: ['trap 11,16'] },
-  /* 40 Empty Vault */ { field: 'hollow', r: 9, fixed: [['frame', 5]], rugs: 4, yarn: 2, cats: 3, waves: 5, duration: 240, seed: 4040, tweaks: ['empty 11,6', 'rug 16,11'] },
-  /* 41 Pillars of Hopium */ { field: 'columns', r: 9, fixed: [['pillars', 5], ['scatter', 3]], rugs: 3, traps: 2, yarn: 1, cats: 3, waves: 5, duration: 240, seed: 4141, tweaks: ['fixed 11,4'] },
-  /* 42 Aerodynamics */ { field: 'square', r: 9, fixed: [['spokes', 7], ['scatter', 2]], rugs: 3, traps: 2, yarn: 1, cats: 3, waves: 5, duration: 250, seed: 4242, tweaks: ['empty 11,4'] },
-  /* 43 Plausible Deniability */ { field: 'octagon', r: 9, fixed: [['frame', 6], ['posts', 3]], rugs: 3, traps: 3, yarn: 1, cats: 3, waves: 5, duration: 250, seed: 4343, tweaks: ['trap 18,11'] },
-  /* 44 Crossfire */ { field: 'cross', r: 9, fixed: [['scatter', 5]], rugs: 3, traps: 3, yarn: 2, cats: 3, waves: 5, duration: 250, seed: 4444, tweaks: ['rug 11,4', 'trap 11,18'] },
-  /* 45 Tree Rings */ { field: 'rings', r: 9, fixed: [['corners', 3], ['spokes', 5]], rugs: 4, traps: 2, yarn: 2, cats: 3, waves: 5, duration: 260, seed: 4545, tweaks: ['fixed 11,6'] },
-  /* 46 Matching Capes */ { field: 'twin', r: 9, fixed: [['corners', 3], ['scatter', 3]], rugs: 3, traps: 3, yarn: 2, cats: 3, waves: 6, duration: 260, seed: 4646, tweaks: ['fixed 11,8', 'fixed 11,14'] },
-  /* 47 Checkered Past */ { field: 'checker', r: 9, fixed: [['pillars', 4]], rugs: 3, traps: 4, yarn: 2, cats: 3, waves: 6, duration: 260, seed: 4747, tweaks: ['rug 4,4', 'trap 18,18'] },
-  /* 48 Full Moon */ { field: 'round', r: 9, fixed: [['frame', 7], ['scatter', 3]], rugs: 4, traps: 3, yarn: 2, cats: 3, waves: 6, duration: 270, seed: 4848, tweaks: ['empty 11,5'] },
-  /* 49 Four Rugs Ago */ { field: 'quads', r: 9, fixed: [['frame', 5], ['bars', 8]], rugs: 4, traps: 4, yarn: 2, cats: 3, waves: 6, duration: 270, seed: 4949, tweaks: ['rug 6,11', 'trap 16,11'] },
-  /* 50 The Den That Isn't */ { field: 'square', r: 9, fixed: [['frame', 6], ['spokes', 5], ['scatter', 3]], rugs: 4, traps: 4, yarn: 3, cats: 3, waves: 6, duration: 280, seed: 5050, tweaks: ['block 6,11', 'block 16,11', 'fixed 3,3', 'fixed 19,19'] },
+  // 35 Due Diligence
+  { field: 'square', fixed: [['scatter', 4]], rugs: 3, traps: 2, cats: 3, waves: 5, clock: 230, seed: 3535, tweaks: ['fixed 11,3'] },
+  // 36 Hopium Rug
+  { field: 'round', fixed: [['pillars', 4]], rugs: 3, yarn: 1, cats: 3, waves: 5, clock: 230, seed: 3636, tweaks: ['rug 11,4', 'empty 11,18'] },
+  // 37 Quarterly Report
+  { field: 'quads', fixed: [['frame', 6]], traps: 3, yarn: 2, cats: 3, waves: 5, clock: 230, seed: 3737, tweaks: ['block 11,9', 'block 11,13'] },
+  // 38 Bar Chart
+  { field: 'stripes', fixed: [['scatter', 3]], rugs: 3, traps: 3, cats: 3, waves: 5, clock: 240, seed: 3838, tweaks: ['fixed 4,11', 'fixed 18,11'] },
+  // 39 Sparkle
+  { field: 'diamond', fixed: [['frame', 4]], traps: 3, yarn: 2, cats: 3, waves: 5, clock: 240, seed: 3939, tweaks: ['trap 11,16'] },
+  // 40 Empty Vault
+  { field: 'hollow', fixed: [['frame', 5]], rugs: 4, yarn: 2, cats: 3, waves: 5, clock: 240, seed: 4040, tweaks: ['empty 11,6', 'rug 16,11'] },
+  // 41 Pillars of Hopium
+  { field: 'columns', fixed: [['pillars', 5], ['scatter', 3]], rugs: 3, traps: 2, yarn: 1, cats: 3, waves: 5, clock: 240, seed: 4141, tweaks: ['fixed 11,4'] },
+  // 42 Aerodynamics
+  { field: 'square', fixed: [['spokes', 7], ['scatter', 2]], rugs: 3, traps: 2, yarn: 1, cats: 3, waves: 5, clock: 250, seed: 4242, tweaks: ['empty 11,4'] },
+  // 43 Plausible Deniability
+  { field: 'octagon', fixed: [['frame', 6], ['posts', 3]], rugs: 3, traps: 3, yarn: 1, cats: 3, waves: 5, clock: 250, seed: 4343, tweaks: ['trap 18,11'] },
+  // 44 Crossfire
+  { field: 'cross', fixed: [['scatter', 5]], rugs: 3, traps: 3, yarn: 2, cats: 3, waves: 5, clock: 250, seed: 4444, tweaks: ['rug 11,4', 'trap 11,18'] },
+  // 45 Tree Rings
+  { field: 'rings', fixed: [['corners', 3], ['spokes', 5]], rugs: 4, traps: 2, yarn: 2, cats: 3, waves: 5, clock: 260, seed: 4545, tweaks: ['fixed 11,6'] },
+  // 46 Matching Capes
+  {
+    field: 'twin',
+    fixed: [['corners', 3], ['scatter', 3]],
+    rugs: 3,
+    traps: 3,
+    yarn: 2,
+    cats: 3,
+    waves: 6,
+    clock: 260,
+    seed: 4646,
+    tweaks: ['fixed 11,8', 'fixed 11,14'],
+  },
+  // 47 Checkered Past
+  { field: 'checker', fixed: [['pillars', 4]], rugs: 3, traps: 4, yarn: 2, cats: 3, waves: 6, clock: 260, seed: 4747, tweaks: ['rug 4,4', 'trap 18,18'] },
+  // 48 Full Moon
+  { field: 'round', fixed: [['frame', 7], ['scatter', 3]], rugs: 4, traps: 3, yarn: 2, cats: 3, waves: 6, clock: 270, seed: 4848, tweaks: ['empty 11,5'] },
+  // 49 Four Rugs Ago
+  {
+    field: 'quads',
+    fixed: [['frame', 5], ['bars', 8]],
+    rugs: 4,
+    traps: 4,
+    yarn: 2,
+    cats: 3,
+    waves: 6,
+    clock: 270,
+    seed: 4949,
+    tweaks: ['rug 6,11', 'trap 16,11'],
+  },
+  // 50 The Den That Isn't
+  {
+    field: 'square',
+    fixed: [['frame', 6], ['spokes', 5]],
+    rugs: 4,
+    traps: 4,
+    yarn: 3,
+    cats: 3,
+    waves: 6,
+    clock: 280,
+    seed: 5052,
+    tweaks: ['empty 11,5', 'empty 11,17'],
+  },
 ]
 
 // ── Layout expansion ────────────────────────────────────────────────────────────────────────────────────────────
@@ -141,7 +225,6 @@ const RECIPES: readonly Recipe[] = [
 const idx = (x: number, y: number) => y * SIZE + x
 const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < SIZE && y < SIZE
 const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.abs(ax - bx), Math.abs(ay - by))
-const onEdge = (x: number, y: number) => x === 0 || y === 0 || x === SIZE - 1 || y === SIZE - 1
 
 function inField(f: Field, r: number, dx: number, dy: number): boolean {
   const ax = Math.abs(dx)
@@ -255,6 +338,7 @@ function hazardSpot(cells: Uint8Array, rand: () => number, mouse: Point, placed:
   return -1
 }
 
+/** First-wave cat slots on the edge lane, walked from a seeded offset: corners first, then midpoints, then thirds. */
 const EDGE_SLOTS: readonly Point[] = [
   { x: 0, y: 0 },
   { x: 22, y: 22 },
@@ -295,11 +379,12 @@ function applyTweak(t: string, cells: Uint8Array, layout: { mouse: Point; cats: 
 function expand(recipe: Recipe, number: number): LevelLayout {
   const rand = mulberry32(recipe.seed)
   const cells = new Uint8Array(SIZE * SIZE)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (inField(recipe.field, recipe.r, x - C, y - C)) cells[idx(x, y)] = Tile.Block
-  for (const [pattern, n] of recipe.fixed ?? []) placeFixed(cells, pattern, n, recipe.r, rand)
+  const r = recipe.r ?? 9
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (inField(recipe.field, r, x - C, y - C)) cells[idx(x, y)] = Tile.Block
+  for (const [pattern, n] of recipe.fixed ?? []) placeFixed(cells, pattern, n, r, rand)
   for (let i = 0; i < (recipe.holes ?? 0); i++) {
-    const x = C - recipe.r + Math.floor(rand() * (recipe.r * 2 + 1))
-    const y = C - recipe.r + Math.floor(rand() * (recipe.r * 2 + 1))
+    const x = C - r + Math.floor(rand() * (r * 2 + 1))
+    const y = C - r + Math.floor(rand() * (r * 2 + 1))
     if (cells[idx(x, y)] === Tile.Block && cheb(x, y, C, C) >= 2) cells[idx(x, y)] = Tile.Empty
   }
 
@@ -312,7 +397,7 @@ function expand(recipe: Recipe, number: number): LevelLayout {
   for (const [tile, count] of hazards) {
     for (let i = 0; i < count; i++) {
       const at = hazardSpot(cells, rand, mouse, placed)
-      if (at < 0) continue
+      if (at < 0) throw new Error(`level ${number}: no room for hazard ${i + 1}`)
       cells[at] = tile
       placed.push(at)
     }
@@ -333,6 +418,7 @@ function expand(recipe: Recipe, number: number): LevelLayout {
       yarn.push(p)
       break
     }
+    if (yarn.length <= i) throw new Error(`level ${number}: no room for yarn ${i + 1}`)
   }
 
   const layout = { mouse, cats, yarn }
@@ -342,8 +428,8 @@ function expand(recipe: Recipe, number: number): LevelLayout {
   for (const p of [...layout.cats, ...layout.yarn]) cells[idx(p.x, p.y)] = Tile.Empty
 
   const waveTimes: number[] = []
-  for (let k = 1; k <= recipe.waves; k++) waveTimes.push(Math.round((recipe.duration * k) / (recipe.waves + 1)))
-  return { number, cells, mouse: layout.mouse, cats: layout.cats, yarn: layout.yarn, duration: recipe.duration, waveTimes, tweaks }
+  for (let k = 1; k <= recipe.waves; k++) waveTimes.push(Math.round((recipe.clock * k) / (recipe.waves + 1)))
+  return { number, cells, mouse: layout.mouse, cats: layout.cats, yarn: layout.yarn, duration: recipe.clock, waveTimes, tweaks }
 }
 
 /** Expands level `level` (1-based; 51+ repeat the 50 layouts, invalid input → level 1). */
@@ -356,12 +442,12 @@ export function createLayout(level: number): LevelLayout {
 
 const DX = [0, 1, 1, 1, 0, -1, -1, -1]
 const DY = [-1, -1, 0, 1, 1, 1, 0, -1]
-/** Mouse actions per cat tick in the witness model (Medium speed with held keys is roughly three steps per tick). */
+/** Mouse actions per cat tick in the witness model: three moves per 650 ms Medium tick is a relaxed ~4.6 moves/s. */
 const MOUSE_STEPS_PER_TICK = 3
 /** Beam width and depth bound the search: at most BEAM × MAX_DEPTH × 9 simulated actions per layout. */
 const BEAM = 160
 const MAX_DEPTH = 360
-/** A witness must actually move blocks: a cat that walks into a dead end on its own does not count. */
+/** Witnesses must include at least this many pushes, so an opening solved by standing still does not count. */
 const MIN_PUSHES = 2
 
 type Node = {
@@ -512,14 +598,20 @@ function rank(n: Node): number {
   return trapped === n.cats.length ? Number.NEGATIVE_INFINITY : target - trapped * 1000
 }
 
-function search(layout: LevelLayout): Node | null {
-  const root: Node = { cells: layout.cells.slice(), z1: 0, z2: 0, mouse: idx(layout.mouse.x, layout.mouse.y), cats: [], phase: 0, tick: 0, pushes: 0, parent: null }
-  for (let i = 0; i < root.cells.length; i++) {
-    if (root.cells[i] !== Tile.Block) continue
-    root.z1 ^= Z1[i]
-    root.z2 ^= Z2[i]
+function rootNode(layout: LevelLayout): Node {
+  const cells = layout.cells.slice()
+  let z1 = 0
+  let z2 = 0
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i] !== Tile.Block) continue
+    z1 ^= Z1[i]
+    z2 ^= Z2[i]
   }
-  root.cats = layout.cats.map((p) => idx(p.x, p.y))
+  const cats = layout.cats.map((p) => idx(p.x, p.y))
+  return { cells, z1, z2, mouse: idx(layout.mouse.x, layout.mouse.y), cats, phase: 0, tick: 0, pushes: 0, parent: null }
+}
+
+function search(root: Node): Node | null {
   const seen = new Set<number>([nodeKey(root)])
   let layer = [root]
   for (let depth = 0; depth < MAX_DEPTH && layer.length; depth++) {
@@ -572,7 +664,7 @@ export function validateLayout(layout: LevelLayout): { solvable: boolean; reason
   if (!cats.length) return fail('no first-wave cats')
   const catCells = new Set<number>()
   for (const c of cats) {
-    if (!inBounds(c.x, c.y) || !onEdge(c.x, c.y)) return fail(`cat ${c.x},${c.y} must start on the edge lane`)
+    if (!inBounds(c.x, c.y) || (c.x % (SIZE - 1) !== 0 && c.y % (SIZE - 1) !== 0)) return fail(`cat ${c.x},${c.y} must start on the edge lane`)
     if (at(c) !== Tile.Empty) return fail(`cat ${c.x},${c.y} must start on an empty cell`)
     if (catCells.has(idx(c.x, c.y))) return fail(`two cats share ${c.x},${c.y}`)
     catCells.add(idx(c.x, c.y))
@@ -612,12 +704,10 @@ export function validateLayout(layout: LevelLayout): { solvable: boolean; reason
     if (!(t > last && t < layout.duration)) return fail('wave marks must ascend inside the clock')
     last = t
   }
-  const root = { cells, z1: 0, z2: 0, mouse: idx(mouse.x, mouse.y), cats: [], phase: MOUSE_STEPS_PER_TICK - 1, tick: 0, pushes: 0, parent: null }
-  let canMove = false
-  for (let d = 0; d < 8; d++) if (advance({ ...root, phase: 0 }, d)) canMove = true
-  if (!canMove) return fail('the mouse has no legal first move')
+  const root = rootNode(layout)
+  if (!DX.some((_, d) => advance(root, d))) return fail('the mouse has no legal first move')
 
-  const goal = search(layout)
+  const goal = search(root)
   if (!goal) return fail(`no first-wave trap found within ${MAX_DEPTH} actions (beam ${BEAM})`)
   const witness: Point[] = []
   for (let n: Node | null = goal; n; n = n.parent) witness.push({ x: n.mouse % SIZE, y: Math.floor(n.mouse / SIZE) })

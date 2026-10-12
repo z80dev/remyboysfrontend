@@ -15,6 +15,8 @@
 
 .ms-game > div:first-child { flex: none; }
 .ms-game .gk-menubar { font-size: 11px; }
+.ms-client { position: relative; display: flex; flex: none; flex-direction: column; align-self: center; min-height: 0; }
+.ms-client-border { position: absolute; inset: 0; border-style: solid; border-color: #fff #808080 #808080 #fff; pointer-events: none; }
 .ms-header { position: relative; flex: none; align-self: center; }
 .ms-header canvas, .ms-board { display: block; image-rendering: pixelated; }
 .ms-face {
@@ -27,7 +29,6 @@
   touch-action: none;
 }
 .ms-face:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
-.ms-game:focus-visible .ms-viewport { outline: 1px dotted #000; outline-offset: -5px; }
 .ms-viewport {
   position: relative;
   flex: none;
@@ -38,8 +39,13 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-.ms-board { max-width: none; touch-action: none; }
-.ms-pocket .ms-viewport { flex: 1 1 auto; width: 100%; min-height: 0; }
+.ms-board { max-width: none; margin: 0 auto; touch-action: none; }
+.ms-pocket .ms-viewport { min-height: 0; scrollbar-width: none; }
+.ms-pocket .ms-viewport::-webkit-scrollbar { display: none; }
+.ms-scroll-indicators { position: absolute; z-index: 3; overflow: hidden; pointer-events: none; }
+.ms-scroll-x, .ms-scroll-y { position: absolute; display: block; background: #000; opacity: 0.45; }
+.ms-scroll-x { bottom: 1px; height: 3px; }
+.ms-scroll-y { right: 1px; width: 3px; }
 .ms-egg { position: absolute; top: 0; left: 0; z-index: 5; width: 1px; height: 1px; pointer-events: none; }
 .ms-accessible {
   position: absolute;
@@ -60,12 +66,13 @@
   gap: 3px;
   height: 44px;
   background: #c0c0c0;
-  border-top: 1px solid #808080;
+  box-shadow: inset 0 1px #808080;
   box-sizing: border-box;
 }
-.ms-toolbar .btn { min-width: 44px; min-height: 43px; padding: 0 8px; font: 11px var(--font); }
+.ms-toolbar .btn { min-width: 44px; min-height: 44px; padding: 0 8px; font: 11px var(--font); }
 .ms-toolbar .ms-mode { display: flex; gap: 5px; align-items: center; justify-content: center; min-width: 85px; }
 .ms-toolbar .ms-mode[aria-pressed='true'] { box-shadow: inset 1px 1px #808080, inset -1px -1px #fff; }
+.ms-toolbar-compact .ms-mode { min-width: 0; max-width: 100%; padding: 0 12px; }
 .ms-hold-ring {
   position: absolute;
   z-index: 2;
@@ -83,9 +90,3 @@
 .ms-custom { display: grid; gap: 8px; margin: 12px 0; }
 .ms-custom label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ms-custom input { width: 80px; font: 11px var(--font); }
-.ms-help-tabs { display: flex; gap: 2px; margin-top: 8px; border-bottom: 1px solid #808080; }
-.ms-help-tabs button { padding: 5px 8px; border: 1px solid #808080; border-bottom: 0; background: #c0c0c0; font: 11px var(--font); color: #000; }
-.ms-help-tabs button[aria-selected='true'] { background: var(--face, #ece9d8); box-shadow: inset 1px 1px #fff; }
-.ms-help-tabs button:focus-visible { outline: 1px dotted #000; outline-offset: -3px; }
-.ms-help-panel { padding: 4px 8px; border: 1px solid #808080; border-top: 0; line-height: 1.45; }
-.ms-help-panel p { margin: 8px 0; }

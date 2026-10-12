@@ -25,13 +25,8 @@
 .remy-deck-index { display: flex; align-items: center; gap: 10px; font: 11px var(--font); }
 .remy-deck-index input { min-width: 0; width: 85px; }
 .remy-deck-error { min-height: 28px; color: #800000; font: 11px var(--font); }
-.remy-card-help-tabs { display: flex; gap: 3px; }
-.remy-card-help-tabs .btn { min-width: 0; flex: 1; }
-.remy-card-help-body { padding: 12px; min-height: 160px; background: #fff; border: 1px solid #808080; line-height: 1.5; }
-.remy-card-help-body p { margin: 0 0 10px; }
-.remy-card-help-body ul { padding-left: 18px; }
 .remy-card-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.remy-card-hold { position: absolute; pointer-events: none; border: 2px solid #fff; border-radius: 50%; width: 34px; height: 34px; }
+.remy-card-hold { position: absolute; z-index: 20; pointer-events: none; border: 2px solid #fff; box-shadow: 0 0 0 1px #000; border-radius: 50%; width: 44px; height: 44px; transform-origin: center; }
 .remy-card-status { display: flex; height: 20px; flex-shrink: 0; align-items: center; padding: 1px 2px; background: #ece9d8; font: 11px var(--font); }
 .remy-card-status > span { padding: 1px 6px; border-top: 1px solid #808080; border-left: 1px solid #808080; border-bottom: 1px solid #fff; border-right: 1px solid #fff; white-space: nowrap; }
 .remy-card-status > span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; }

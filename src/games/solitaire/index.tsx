@@ -1,50 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AppProps } from '../../os/apps'
-import { AboutDialog, GameDialog, GameMenuBar, loadGame, saveGame, useWindowFit, useWindowState, useGamesMuted,
+import { AboutDialog, GameDialog, GameMenuBar, loadGame, saveGame, useWindowFit, useWindowMinSize, useWindowState, useGamesMuted,
   setGamesMuted, unlockAudio, playJingle, stopSounds } from '../kit'
-import { BACKS, CardHelp, DeckDialog, cardLabel, cardSfx, drawFace, drawBack, drawEmpty, hitTestPiles, pileCardPositions,
-  subscribeCardArt, useCardPointer, useCardTweens, useDeckBack, useStockAnimation, type CardHit, type CardPileLayout } from '../cards'
-import { autoHome, canRecycle, cheatWin, deal, draw, flip, home, move, pile, tick, undo, DEFAULT_OPTIONS, type Options, type Source, type State } from './engine'
+import { BACKS, CardHelp, CardHoldFeedback, DeckDialog, cardLabel, cardSfx, drawFace, drawBack, drawEmpty, drawFocus, hitTestPiles,
+  subscribeCardArt, useCardPointer, useCardTweens, useDeckBack, useStockAnimation, type CardHit } from '../cards'
+import { autoHome, canRecycle, cheatWin, deal, draw, flip, home, move, pile, tick, undo, vegasBank, DEFAULT_OPTIONS, type Options, type Source, type State } from './engine'
 import { S } from './strings'
 import { icon } from './icon'
 import { winSong } from './music/win'
-import { CASCADE_SUITS, createCascade, stepCascade, type Cascade } from './cascade'
+import { createCascade, stepCascade, type Cascade } from './cascade'
+import { boardScale, dealOrder, layouts, positions } from './layout'
 import './solitaire.css'
 
-type Saved = { options: Options; bank: number }
+type Saved = { options: Options, bank: number }
 function guarded(v: unknown): v is Saved {
   const s = v as Saved | null
   return !!s && Number.isFinite(s.bank) && !!s.options && [1, 3].includes(s.options.draw) && ['standard', 'vegas', 'none'].includes(s.options.scoring)
     && ['timed', 'status', 'outline', 'keep'].every(k => typeof s.options[k as keyof Options] === 'boolean')
 }
-/** The tableau remains native card geometry; Pocket scales all seven columns together. */
-function layouts(s: State, width: number, height: number): CardPileLayout[] {
-  const left = Math.max(11, (width - 563) / 2)
-  const result: CardPileLayout[] = [
-    { pile: 0, x: left, y: 11, cards: s.stock.length ? [s.stock[s.stock.length - 1]] : [], offset: 0 },
-    { pile: 1, x: left + 82, y: 11, cards: s.waste.slice(-(s.options.draw === 3 ? 3 : 1)), offset: 0 }
-  ]
-  for (let i = 0; i < 4; i++) result.push({ pile: i + 2, x: left + (i + 3) * 82, y: 11, cards: s.homes[i].slice(-1), offset: 0 })
-  for (let i = 0; i < 7; i++) {
-    const cards = s.tableau[i]
-    const down = cards.filter(c => !c.faceUp).length
-    const up = cards.length - down
-    const offset = Math.max(6, Math.min(15, (height - 129 - 96 - down * 3) / Math.max(1, up - 1)))
-    result.push({ pile: i + 6, x: left + i * 82, y: 129, cards, offset: card => card.faceUp ? offset : 3 })
-  }
-  return result
-}
-function positions(s: State, width: number, height: number): CardHit[] {
-  return layouts(s, width, height).flatMap(l => {
-    const hits = pileCardPositions(l)
-    return hits.map((h, i) => ({ ...h, depth: l.pile === 1 ? s.waste.length - hits.length + i : l.pile < 6 ? pile(s, l.pile).length - 1 : h.depth,
-      x: l.pile === 1 ? h.x + i * 12 : h.x }))
-  })
-}
+function dealFlick() { cardSfx('deal') }
 export default function Solitaire({ close }: AppProps) {
   const initial = useRef(loadGame<Saved>('solitaire', { options: DEFAULT_OPTIONS, bank: 0 }, guarded))
+  const bank = useRef(initial.current.bank)
   const [state, setState] = useState(() => deal(Date.now(), initial.current.options, initial.current.bank))
-  const current = useRef(state); current.current = state
+  const current = useRef(state)
+  current.current = state
   const [dialog, setDialog] = useState<'deck' | 'options' | 'confirm' | 'help' | 'about' | 'again' | null>(null)
   const [draft, setDraft] = useState<Options>(state.options)
   const [draftSound, setDraftSound] = useState(true)
@@ -61,25 +41,33 @@ export default function Solitaire({ close }: AppProps) {
   const cascade = useRef<HTMLCanvasElement>(null)
   const physics = useRef<Cascade | null>(null)
   const modifiers = useRef(false)
-  const { active, hidden } = useWindowState()
-  const muted = useGamesMuted()
+  const { active, hidden, pocket } = useWindowState()
+  const { muted } = useGamesMuted()
   const { back, remy } = useDeckBack()
   const fit = useWindowFit()
   const tween = useCardTweens(hidden)
-  const scale = Math.min(1, size.width / 585)
+  const scale = boardScale(state, size.width, size.height, pocket)
   const width = size.width / scale
   const height = size.height / scale
-  const geometry = positions(state, width, height)
-  const geomRef = useRef(geometry); geomRef.current = geometry
-  const scaleRef = useRef(scale); scaleRef.current = scale
+  const geometry = positions(state, width, height, pocket)
+  const geomRef = useRef(geometry)
+  geomRef.current = geometry
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
   function commit(next: State, message: string, animate = true) {
     const old = current.current
-    if (next === old) { cardSfx('invalid'); announce(S.invalid); return }
+    if (next === old) {
+      cardSfx('invalid')
+      announce(S.invalid)
+      return
+    }
     current.current = next
-    setState(next); select(null); announce(message)
+    setState(next)
+    select(null)
+    announce(next.options.scoring === 'none' ? message : `${message} ${S.score} ${next.score}`)
     if (animate) {
-      const before = positions(old, width, height)
-      const after = positions(next, width, height)
+      const before = positions(old, width, height, pocket)
+      const after = positions(next, width, height, pocket)
       tween.start(after.flatMap(h => {
         const prev = before.find(p => p.card?.id === h.card?.id)
         return h.card && prev && (h.x !== prev.x || h.y !== prev.y) ? [{ card: h.card, fromX: prev.x, fromY: prev.y, toX: h.x, toY: h.y }] : []
@@ -88,22 +76,49 @@ export default function Solitaire({ close }: AppProps) {
     cardSfx(message === S.flipped ? 'flip' : message === S.drawn ? 'flick' : 'place')
   }
   function newDeal(options = current.current.options) {
-    const next = deal(Date.now(), options, current.current.options.keep ? current.current.score : initial.current.bank)
-    celebrate(false); setDialog(null); tween.cancel(); select(null); current.current = next; setState(next); announce(S.dealt); cardSfx('shuffle')
-    const hits = positions(next, width, height)
-    tween.start(hits.flatMap((h, i) => h.card ? [{ card: h.card, fromX: 11, fromY: 11, toX: h.x, toY: h.y, delay: i * 8 }] : []))
+    bank.current = vegasBank(current.current, bank.current)
+    const next = deal(Date.now(), options, bank.current)
+    celebrate(false)
+    setDialog(null)
+    tween.cancel()
+    select(null)
+    current.current = next
+    setState(next)
+    announce(S.dealt)
+    cardSfx('shuffle')
+    const hits = dealOrder(positions(next, width, height, pocket))
+    tween.start(hits.map((h, i) => ({ card: h.card!, fromX: 11, fromY: 11, toX: h.x, toY: h.y, delay: i * 25, onStart: dealFlick })))
   }
-  function finish() { celebrate(false); setDialog('again') }
+  function finish() {
+    celebrate(false)
+    setDialog('again')
+  }
   function tap(hit: CardHit | null) {
-    if (!hit) { select(null); return }
+    if (!hit) {
+      select(null)
+      return
+    }
     const s = current.current
-    if (hit.pile === 0) { commit(draw(s, modifiers.current), S.drawn); return }
+    if (hit.pile === 0) {
+      commit(draw(s, modifiers.current), S.drawn)
+      return
+    }
     if (selected) {
       const next = move(s, selected, hit.pile)
-      if (next !== s) { commit(next, S.moved); return }
+      if (next !== s) {
+        commit(next, S.moved)
+        return
+      }
     }
-    if (hit.card && !hit.card.faceUp) { commit(flip(s, hit), S.flipped, false); return }
-    if (hit.card?.faceUp && (hit.pile !== 1 || hit.depth === s.waste.length - 1)) { select(hit); cardSfx('flick'); announce(`${S.picked} ${cardLabel(hit.card)}`) }
+    if (hit.card && !hit.card.faceUp) {
+      commit(flip(s, hit), S.flipped, false)
+      return
+    }
+    if (hit.card?.faceUp && (hit.pile !== 1 || hit.depth === s.waste.length - 1)) {
+      select(hit)
+      cardSfx('flick')
+      announce(`${S.picked} ${cardLabel(hit.card)}`)
+    }
   }
   const pointer = useCardPointer({
     disabled: !active || hidden || !!dialog || celebrating,
@@ -114,17 +129,25 @@ export default function Solitaire({ close }: AppProps) {
       const hits = geomRef.current
       for (let i = hits.length - 1; i >= 0; i--) {
         const h = hits[i]
-        if (nx >= h.x && nx < h.x + 71 && ny >= h.y && ny < h.y + 96) return h
+        if (nx >= h.x && nx < h.x + 71 && ny >= h.y && ny < h.y + 96) {
+          if (h.pile === 0 || (h.pile === 1 && h.depth !== s.waste.length - 1)) return { ...h, card: undefined }
+          return h
+        }
       }
-      const empty = hitTestPiles(layouts(s, size.width / scaleRef.current, size.height / scaleRef.current), nx, ny)
+      const empty = hitTestPiles(layouts(s, size.width / scaleRef.current, size.height / scaleRef.current, pocket), nx, ny)
       return empty?.card ? null : empty
     },
     onTap: tap,
     onDoubleTap: h => commit(home(current.current, h), S.moved),
-    onDrop: (from, to) => { if (to) commit(move(current.current, from, to.pile), S.moved) },
+    onDrop: (from, to) => {
+      select(null)
+      if (to) commit(move(current.current, from, to.pile), S.moved)
+    },
     onContext: h => commit(h ? home(current.current, h) : autoHome(current.current), S.moved)
   })
+  useEffect(() => { if (pointer.drag) select(null) }, [pointer.drag])
   const stockTime = useStockAnimation(BACKS[back].animated && !!state.stock.length, hidden || celebrating, !!pointer.drag)
+  useWindowMinSize(585, 432)
   useEffect(() => { fit(585, 432) }, [])
   useEffect(() => subscribeCardArt(() => setArt(n => n + 1)), [])
   useEffect(() => {
@@ -138,64 +161,119 @@ export default function Solitaire({ close }: AppProps) {
   }, [])
   useEffect(() => { if (active && !dialog) surface.current?.focus({ preventScroll: true }) }, [active, dialog])
   useEffect(() => {
-    saveGame('solitaire', { options: state.options, bank: state.options.scoring === 'vegas' && state.options.keep ? state.score : 0 })
+    bank.current = vegasBank(state, bank.current)
+    saveGame('solitaire', { options: state.options, bank: bank.current })
   }, [state.options, state.score])
   useEffect(() => {
-    if (hidden || !state.started || state.won) return
-    const timer = window.setInterval(() => setState(s => { const n = tick(s); current.current = n; return n }), 1000)
+    if (hidden || !state.started || state.won || !state.options.timed || state.options.scoring !== 'standard') return
+    const timer = window.setInterval(() => setState(s => {
+      const n = tick(s)
+      current.current = n
+      return n
+    }), 1000)
     return () => clearInterval(timer)
-  }, [hidden, state.started, state.won])
+  }, [hidden, state.started, state.won, state.options.timed, state.options.scoring])
   useEffect(() => {
-    if (state.won) { celebrate(true); announce(S.won); void playJingle(winSong, 'solitaire') }
+    if (state.won) {
+      celebrate(true)
+      announce(S.won)
+      void playJingle(winSong, 'solitaire')
+    }
   }, [state.won])
-  useEffect(() => { if (hidden) stopSounds('solitaire'); return () => stopSounds('solitaire') }, [hidden])
+  useEffect(() => {
+    if (hidden) stopSounds('solitaire')
+    return () => stopSounds('solitaire')
+  }, [hidden])
   useEffect(() => {
     const c = canvas.current
     if (!c || celebrating) return
     const dpr = window.devicePixelRatio || 1
-    c.width = Math.round(size.width * dpr); c.height = Math.round(size.height * dpr)
+    c.width = Math.round(size.width * dpr)
+    c.height = Math.round(size.height * dpr)
     const ctx = c.getContext('2d')!
-    ctx.scale(dpr * scale, dpr * scale); ctx.imageSmoothingEnabled = false
-    ctx.fillStyle = '#008000'; ctx.fillRect(0, 0, width, height)
-    for (const l of layouts(state, width, height)) {
+    ctx.scale(dpr * scale, dpr * scale)
+    ctx.imageSmoothingEnabled = false
+    ctx.fillStyle = '#008000'
+    ctx.fillRect(0, 0, width, height)
+    for (const l of layouts(state, width, height, pocket)) {
       if (!l.cards.length) drawEmpty(ctx, l.pile === 0 ? canRecycle(state) ? 'recycle' : 'exhausted' : l.pile < 6 && l.pile > 1 ? 'home' : 'pile', l.x, l.y)
     }
     const moving = new Set(tween.tweens.map(t => t.card.id))
     for (const h of geometry) {
       if (!h.card || moving.has(h.card.id)) continue
-      if (pointer.drag && h.pile === pointer.drag.source.pile && h.depth >= pointer.drag.source.depth) continue
-      if (h.card.faceUp) drawFace(ctx, h.card, h.x, h.y, { selected: keyboard && selected?.pile === h.pile && selected.depth === h.depth })
+      if (!state.options.outline && pointer.drag?.source.card?.faceUp && h.pile === pointer.drag.source.pile && h.depth >= pointer.drag.source.depth) continue
+      if (h.card.faceUp) drawFace(ctx, h.card, h.x, h.y, { selected: selected?.pile === h.pile && h.depth >= selected.depth })
       else drawBack(ctx, back, h.x, h.y, h.pile === 0 ? stockTime : 0, remy)
     }
     if (keyboard) {
-      const h = geometry.find(h => h.pile === cursor.pile && h.depth === cursor.depth) ?? layouts(state, width, height).find(l => l.pile === cursor.pile)
-      if (h) { ctx.strokeStyle = '#fff'; ctx.setLineDash([1, 2]); ctx.strokeRect(h.x + 2, h.y + 2, 67, 92) }
+      const h = geometry.find(h => h.pile === cursor.pile && h.depth === cursor.depth) ?? layouts(state, width, height, pocket).find(l => l.pile === cursor.pile)
+      if (h) drawFocus(ctx, h.x, h.y)
     }
-  }, [state, size, art, back, remy, stockTime, keyboard, cursor, selected, pointer.drag, tween.tweens, celebrating])
+  }, [state, size, pocket, art, back, remy, stockTime, keyboard, cursor, selected, pointer.drag, tween.tweens, celebrating])
+  useEffect(() => {
+    if (!celebrating) return
+    const ctx = canvas.current?.getContext('2d')
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    ctx.save()
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0)
+    ctx.imageSmoothingEnabled = false
+    // Lazy court decodes refresh only foundation faces, never the felt or trail surface.
+    for (const h of geometry) {
+      if (h.pile >= 2 && h.pile < 6 && h.card) drawFace(ctx, h.card, h.x, h.y)
+    }
+    ctx.restore()
+    const simulation = physics.current
+    const trails = cascade.current?.getContext('2d')
+    if (!simulation || simulation.done || !trails) return
+    const card = state.homes[simulation.homes[simulation.index % 4]][12 - Math.floor(simulation.index / 4)]
+    if (!card) return
+    trails.save()
+    trails.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0)
+    trails.imageSmoothingEnabled = false
+    drawFace(trails, card, simulation.x, simulation.y)
+    trails.restore()
+  }, [art, celebrating])
   useEffect(() => {
     const c = overlay.current
     if (!c) return
     const dpr = window.devicePixelRatio || 1
-    c.width = Math.round(size.width * dpr); c.height = Math.round(size.height * dpr)
+    c.width = Math.round(size.width * dpr)
+    c.height = Math.round(size.height * dpr)
     const ctx = c.getContext('2d')!
     ctx.scale(dpr * scale, dpr * scale)
-    for (const t of tween.tweens) t.card.faceUp ? drawFace(ctx, t.card, t.x, t.y) : drawBack(ctx, back, t.x, t.y, 0, remy)
-    const drag = pointer.drag
-    if (drag) {
-      const dx = (drag.x - drag.originX) / scale, dy = (drag.y - drag.originY) / scale
-      for (const h of geometry) {
-        if (!h.card || h.pile !== drag.source.pile || h.depth < drag.source.depth || !h.card.faceUp) continue
-        if (state.options.outline) {
-          ctx.globalCompositeOperation = 'difference'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1
-          ctx.strokeRect(h.x + dx, h.y + dy, 71, 96)
-        } else drawFace(ctx, h.card, h.x + dx, h.y + dy)
+    const paint = () => {
+      ctx.clearRect(0, 0, width, height)
+      ctx.globalCompositeOperation = 'source-over'
+      for (const t of tween.tweens) {
+        if (t.card.faceUp) drawFace(ctx, t.card, t.x, t.y)
+        else drawBack(ctx, back, t.x, t.y, 0, remy)
+      }
+      const drag = pointer.drag
+      if (drag) {
+        const dx = (drag.x - drag.originX) / scale
+        const dy = (drag.y - drag.originY) / scale
+        for (const h of geometry) {
+          if (!h.card || h.pile !== drag.source.pile || h.depth < drag.source.depth || !h.card.faceUp) continue
+          if (state.options.outline) {
+            ctx.globalCompositeOperation = 'difference'
+            ctx.strokeStyle = '#fff'
+            ctx.lineWidth = 1
+            ctx.strokeRect(Math.round(h.x + dx) + .5, Math.round(h.y + dy) + .5, 70, 95)
+          } else drawFace(ctx, h.card, h.x + dx, h.y + dy)
+        }
       }
     }
-    if (pointer.longPress) {
-      ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
-      ctx.beginPath(); ctx.arc(pointer.longPress.x / scale, pointer.longPress.y / scale, 16 * (1 - pointer.longPress.progress), 0, Math.PI * 2); ctx.stroke()
+    paint()
+    if (!pointer.drag || hidden) return
+    let frame = 0
+    const step = () => {
+      paint()
+      frame = requestAnimationFrame(step)
     }
-  }, [pointer.drag, pointer.longPress, tween.tweens, size, back, remy, state.options.outline])
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [pointer.drag, tween.tweens, size, pocket, back, remy, state.options.outline, hidden])
   useEffect(() => {
     if (!celebrating || hidden) return
     const c = cascade.current!
@@ -207,7 +285,7 @@ export default function Solitaire({ close }: AppProps) {
     const ctx = c.getContext('2d')!
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0)
     ctx.imageSmoothingEnabled = false
-    const simulation = physics.current ?? createCascade(width)
+    const simulation = physics.current ?? createCascade(width, state.homes)
     physics.current = simulation
     let frame = 0, previous = 0, debt = 0, bounceAt = 0
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -224,7 +302,7 @@ export default function Solitaire({ close }: AppProps) {
           finish()
           return
         }
-        const card = state.homes[CASCADE_SUITS[simulation.index % 4]][12 - Math.floor(simulation.index / 4)]
+        const card = state.homes[simulation.homes[simulation.index % 4]][12 - Math.floor(simulation.index / 4)]
         if (card) drawFace(ctx, card, simulation.x, simulation.y)
       }
       frame = requestAnimationFrame(step)
@@ -233,14 +311,19 @@ export default function Solitaire({ close }: AppProps) {
     return () => cancelAnimationFrame(frame)
   }, [celebrating, hidden, size])
   useEffect(() => {
-    if (!celebrating) {
+    if (!celebrating && dialog !== 'again') {
       physics.current = null
       cascade.current?.getContext('2d')?.clearRect(0, 0, cascade.current.width, cascade.current.height)
     }
-  }, [celebrating])
+  }, [celebrating, dialog])
   function applyOptions() {
-    if (draft.draw !== state.options.draw || draft.scoring !== state.options.scoring) { setDialog('confirm'); return }
-    setGamesMuted(!draftSound); setState(s => ({ ...s, options: draft })); setDialog(null)
+    if (draft.draw !== state.options.draw || draft.scoring !== state.options.scoring) {
+      setDialog('confirm')
+      return
+    }
+    setGamesMuted(!draftSound)
+    setState(s => ({ ...s, options: draft }))
+    setDialog(null)
   }
   return <div className='solitaire' onPointerDownCapture={e => {
     if (celebrating && active) {
@@ -258,7 +341,11 @@ export default function Solitaire({ close }: AppProps) {
     <GameMenuBar menus={[
       { label: S.game, items: [{ label: S.deal, hotkey: 'F2', onClick: () => newDeal() }, '-',
         { label: S.undo, hotkey: 'Ctrl+Z', disabled: !state.undo || celebrating, onClick: () => commit(undo(current.current), S.undone, false) }, '-',
-        { label: S.deck, onClick: () => setDialog('deck') }, { label: S.options, onClick: () => { setDraft({ ...state.options }); setDraftSound(!muted); setDialog('options') } }, '-',
+        { label: S.deck, onClick: () => setDialog('deck') }, { label: S.options, onClick: () => {
+          setDraft({ ...state.options })
+          setDraftSound(!muted)
+          setDialog('options')
+        } }, '-',
         { label: S.exit, onClick: close }] },
       { label: S.help, items: [{ label: S.contents, hotkey: 'F1', onClick: () => setDialog('help') }, '-', { label: S.about, onClick: () => setDialog('about') }] }
     ]}/>
@@ -266,22 +353,40 @@ export default function Solitaire({ close }: AppProps) {
       onPointerMove={pointer.onPointerMove} onPointerUp={pointer.onPointerUp} onPointerCancel={pointer.onPointerCancel}
       onLostPointerCapture={pointer.onLostPointerCapture} onContextMenu={pointer.onContextMenu} onPointerDown={e => {
         if (!active) return
-        unlockAudio(); setKeyboard(false)
-        if (celebrating) { finish(); return }
+        unlockAudio()
+        setKeyboard(false)
+        if (celebrating) {
+          finish()
+          return
+        }
         modifiers.current = e.ctrlKey && e.altKey && e.shiftKey
         pointer.onPointerDown(e)
       }} onKeyDown={e => {
         if (!active) return
         unlockAudio()
-        if (celebrating) { e.preventDefault(); finish(); return }
+        if (celebrating) {
+          e.preventDefault()
+          finish()
+          return
+        }
         if (dialog) return
-        if (e.altKey && e.shiftKey && e.code === 'Digit2') { e.preventDefault(); commit(cheatWin(current.current), S.won, false); return }
+        if (e.altKey && e.shiftKey && e.code === 'Digit2') {
+          e.preventDefault()
+          commit(cheatWin(current.current), S.won, false)
+          return
+        }
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Escape'].includes(e.key)) return
-        e.preventDefault(); setKeyboard(true)
-        if (e.key === 'Escape') { select(null); announce(S.cancelled); return }
+        e.preventDefault()
+        setKeyboard(true)
+        if (e.key === 'Escape') {
+          select(null)
+          announce(S.cancelled)
+          return
+        }
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           const p = (cursor.pile + (e.key === 'ArrowLeft' ? 12 : 1)) % 13
-          setCursor({ pile: p, depth: Math.max(0, pile(state, p).length - 1) }); return
+          setCursor({ pile: p, depth: Math.max(0, pile(state, p).length - 1) })
+          return
         }
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           if (cursor.pile >= 6) {
@@ -291,10 +396,14 @@ export default function Solitaire({ close }: AppProps) {
           }
           return
         }
-        const h = geometry.find(h => h.pile === cursor.pile && h.depth === cursor.depth)
+        const depth = Math.min(cursor.depth, Math.max(0, pile(state, cursor.pile).length - 1))
+        const h = geometry.find(h => h.pile === cursor.pile && h.depth === depth)
         tap(h ?? { pile: cursor.pile, depth: -1, x: 0, y: 0 })
       }}>
-      <canvas ref={canvas}/><canvas ref={cascade} className='solitaire-cascade'/><canvas ref={overlay} className='solitaire-overlay'/>
+      <canvas ref={canvas}/><canvas ref={cascade} className='solitaire-cascade'/>
+      <canvas ref={overlay} className='solitaire-overlay'
+        style={{ mixBlendMode: state.options.outline && pointer.drag ? 'difference' : 'normal' }}/>
+      <CardHoldFeedback hold={pointer.longPress}/>
     </div>
     {state.options.status && <div className='solitaire-status'><span>{celebrating ? S.cabald : ''}</span>
       <span title={state.options.scoring === 'vegas' ? S.bankTip : undefined} className={state.score < 0 ? 'negative' : ''}>
@@ -318,7 +427,10 @@ export default function Solitaire({ close }: AppProps) {
       <label><input type='checkbox' checked={draftSound} onChange={e => setDraftSound(e.target.checked)}/>{S.sound}</label>
     </div></GameDialog>}
     {(dialog === 'confirm' || dialog === 'again') && <GameDialog title={S.title} onClose={() => setDialog(null)} buttons={[
-      { label: S.yes, default: true, onClick: () => { if (dialog === 'confirm') setGamesMuted(!draftSound); newDeal(dialog === 'confirm' ? draft : state.options) } },
+      { label: S.yes, default: true, onClick: () => {
+        if (dialog === 'confirm') setGamesMuted(!draftSound)
+        newDeal(dialog === 'confirm' ? draft : state.options)
+      } },
       { label: S.no, cancel: true, onClick: () => setDialog(dialog === 'confirm' ? 'options' : null) }
     ]}><p>{dialog === 'confirm' ? S.confirm : S.again}</p></GameDialog>}
   </div>

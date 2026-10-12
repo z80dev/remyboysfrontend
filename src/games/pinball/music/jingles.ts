@@ -1,4 +1,5 @@
-import type { Note, Song } from '../../kit'
+import type { Note } from '../../../quest/music/song'
+import type { Song } from '../../kit'
 
 function sting(title: string, length: number, parts: Song['parts']): Song {
   return { title, bpm: 160, stepsPerBeat: 4, beatsPerBar: 4, length, loopStart: 0, room: 0.4, parts }

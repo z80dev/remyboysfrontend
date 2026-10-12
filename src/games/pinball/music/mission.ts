@@ -1,4 +1,5 @@
-import type { Note, Song } from '../../kit'
+import type { Note } from '../../../quest/music/song'
+import type { Song } from '../../kit'
 
 // Original 32-bar mission cue: D minor pedal, flat-second incursion,
 // rising sequence and dominant tension resolving back into the opening pedal.

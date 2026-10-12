@@ -323,13 +323,13 @@ export function drawInventory(ctx: CanvasRenderingContext2D, tile: Tile, x: numb
 
 const silhouettes = new WeakMap<ChallengeArt, Map<number, HTMLCanvasElement>>()
 
-function silhouette(art: ChallengeArt, idx: number, color: string, burnt: boolean) {
+function silhouette(art: ChallengeArt, idx: number, color: string, burnt: boolean, villain: boolean) {
   let cache = silhouettes.get(art)
   if (!cache) {
     cache = new Map()
     silhouettes.set(art, cache)
   }
-  const key = idx + (burnt ? 4490 : 0)
+  const key = idx + (burnt ? 4490 : 0) + (villain ? 8980 : 0)
   let image = cache.get(key)
   if (!image) {
     image = document.createElement('canvas')
@@ -341,15 +341,19 @@ function silhouette(art: ChallengeArt, idx: number, color: string, burnt: boolea
     ctx.drawImage(art.heads!.front, r.sx, r.sy, r.sw, r.sh, 0, 0, 32, 32)
     ctx.globalCompositeOperation = 'source-in'
     rect(ctx, color, 0, 0, 32, 32)
+    if (!burnt) {
+      ctx.globalCompositeOperation = 'source-atop'
+      rect(ctx, villain ? '#ffe0b8' : P.charcoal, 0, 4, 32, 2)
+    }
     cache.set(key, image)
   }
   return image
 }
 
-function head(c: CanvasRenderingContext2D, art: ChallengeArt | null, idx: number, dir: Direction, color: string, swim = false, burnt = false) {
+function head(c: CanvasRenderingContext2D, art: ChallengeArt | null, idx: number, dir: Direction, color: string, swim = false, burnt = false, villain = false) {
   c.save()
   c.beginPath()
-  c.rect(0, 0, 32, swim ? 25 : 20)
+  c.rect(0, 0, 32, swim ? 25 : 24)
   c.clip()
   if (art?.heads && idx >= 0 && dir !== 0 && !burnt) {
     const r = art.heads.rect(idx)
@@ -357,30 +361,32 @@ function head(c: CanvasRenderingContext2D, art: ChallengeArt | null, idx: number
       c.translate(32, 0)
       c.scale(-1, 1)
     }
-    c.drawImage(dir === 2 || swim ? art.heads.front : art.heads.side, r.sx, r.sy, r.sw, r.sh, 0, swim ? 0 : -8, 32, 32)
+    c.drawImage(dir === 2 || swim ? art.heads.front : art.heads.side, r.sx, r.sy, r.sw, r.sh, 0, 0, 32, 32)
   } else if (art?.heads && idx >= 0) {
-    c.drawImage(silhouette(art, idx, color, burnt), 0, swim ? 0 : -8)
-    if (!burnt) rect(c, P.charcoal, 7, 1, 18, 2)
+    c.drawImage(silhouette(art, idx, color, burnt, villain), 0, 0)
   } else {
-    // Back view and offline art share a period silhouette, never a fabricated face.
-    rect(c, color, 6, swim ? 8 : 0, 20, 16)
-    rect(c, color, 4, swim ? 11 : 3, 24, 10)
-    rect(c, burnt ? P.black : P.charcoal, 7, swim ? 9 : 1, 18, 2)
-    if (dir !== 0 && !burnt) rect(c, art?.palette?.skin ?? P.goldHi, 8, swim ? 16 : 10, 16, 8)
+    // Civilian hair silhouettes and bald scalp domes never invent portrait details.
+    rect(c, color, 10, 2, 12, 2)
+    rect(c, color, 6, 4, 20, 4)
+    rect(c, color, 4, 8, 24, 10)
+    rect(c, color, 6, 18, 20, 4)
+    rect(c, color, 10, 22, 12, 2)
+    if (villain && !burnt) rect(c, '#ffe0b8', 10, 4, 12, 2)
+    else if (dir !== 0 && !burnt) rect(c, art?.palette?.skin ?? P.goldHi, 8, 12, 16, 10)
   }
   c.restore()
 }
 
 function remy(c: CanvasRenderingContext2D, art: ChallengeArt | null, idx: number, dir: Direction, frame: number, villain: boolean, swim = false, burnt = false) {
-  const hair = villain ? P.brown : art?.palette?.hair ?? P.brown
+  const hair = villain ? '#d8b090' : art?.palette?.hair ?? P.brown
   if (burnt) {
-    head(c, art, idx, dir, P.charcoal, false, true)
+    head(c, art, idx, dir, P.charcoal, false, true, villain)
     rect(c, P.black, 8 + (frame & 3) * 2, 0, 5, 4)
     rect(c, P.charcoal, 6, 27, 21, 4)
     rect(c, P.fireMid, 12, 28, 2, 1)
     return
   }
-  head(c, art, idx, dir, hair, swim)
+  head(c, art, idx, dir, hair, swim, false, villain)
   if (swim) {
     rect(c, P.waterHi, 2, 21, 28, 2)
     rect(c, P.water, 0, 24, 32, 8)
@@ -396,28 +402,28 @@ function remy(c: CanvasRenderingContext2D, art: ChallengeArt | null, idx: number
     c.scale(-1, 1)
   }
   if (villain) {
-    for (let y = 17; y < 29; y++) rect(c, P.black, 10 - Math.floor((y - 17) / 3), y, 12 + Math.floor((y - 17) / 3) * 2, 1)
-    if (dir !== 0) rect(c, P.red, 11, 21, 10, 5)
-    rect(c, P.charcoal, 15, 19, 2, 9)
+    for (let y = 23; y < 30; y++) rect(c, P.black, 10 - Math.floor((y - 23) / 2), y, 12 + Math.floor((y - 23) / 2) * 2, 1)
+    if (dir !== 0) rect(c, P.red, 11, 25, 10, 3)
+    rect(c, P.charcoal, 15, 24, 2, 5)
   } else {
-    rect(c, P.black, 9, 16, 14, 10)
-    rect(c, art?.palette?.shirt ?? P.blue, 10, 17, 12, 8)
+    rect(c, P.black, 9, 23, 14, 6)
+    rect(c, art?.palette?.shirt ?? P.blue, 10, 24, 12, 4)
     if (dir === 1 || dir === 3) {
-      rect(c, P.black, 17, 18, 9, 4)
-      rect(c, art?.palette?.skin ?? P.goldHi, 19, 19, 6, 2)
-      rect(c, P.charcoal, 12, 18, 3, 6)
+      rect(c, P.black, 17, 24, 9, 3)
+      rect(c, art?.palette?.skin ?? P.goldHi, 19, 25, 6, 1)
+      rect(c, P.charcoal, 12, 24, 3, 3)
     } else {
-      rect(c, P.black, 6, 18, 3, 8)
-      rect(c, P.black, 23, 18, 3, 8)
-      rect(c, art?.palette?.skin ?? P.goldHi, 7, 19, 2, 6)
-      rect(c, art?.palette?.skin ?? P.goldHi, 23, 19, 2, 6)
-      if (dir === 0) rect(c, P.charcoal, 11, 17, 10, 1)
+      rect(c, P.black, 6, 24, 3, 5)
+      rect(c, P.black, 23, 24, 3, 5)
+      rect(c, art?.palette?.skin ?? P.goldHi, 7, 25, 2, 3)
+      rect(c, art?.palette?.skin ?? P.goldHi, 23, 25, 2, 3)
+      if (dir === 0) rect(c, P.charcoal, 11, 24, 10, 1)
     }
   }
-  rect(c, P.waterLo, 10, 25, 5, 5 - stride)
-  rect(c, P.waterLo, 17, 25, 5, 4 + stride)
-  rect(c, P.black, 9, 29 - stride, 6, 2)
-  rect(c, P.black, 17, 28 + stride, 6, 2)
+  rect(c, P.waterLo, 10, 28, 5, 3 - stride)
+  rect(c, P.waterLo, 17, 28, 5, 2 + stride)
+  rect(c, P.black, 9, 30 - stride, 6, 2)
+  rect(c, P.black, 17, 29 + stride, 6, 2)
   c.restore()
 }
 
@@ -606,7 +612,7 @@ export function drawViewport(ctx: CanvasRenderingContext2D, state: State, frame:
   ctx.beginPath()
   ctx.rect(0, 0, 32, 32)
   ctx.clip()
-  remy(ctx, art, art?.player ?? -1, state.player.dir, state.tick, false,
+  remy(ctx, art, art?.player ?? -1, state.player.dir, frame, false,
     state.tiles[state.player.pos] === Tile.Water || state.death === 'water', state.death === 'fire')
   ctx.restore()
   ctx.restore()

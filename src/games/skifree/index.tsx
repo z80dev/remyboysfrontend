@@ -1,28 +1,28 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AppProps } from '../../os/apps'
+import { useIsMobile } from '../../os/shell'
 import {
   AboutDialog, BestScoresDialog, CAST, ChooseRemyDialog, GameDialog, GameMenuBar, NameEntryDialog,
   cabaldRemy, loadGame, loadHeads, loadPalette, saveGame, unlockAudio, useAnimationFrame, useCrispCanvas, useGamesMuted,
-  useGamesPlayer, useWindowState, type BestScoreRow, type GameMenu,
+  useGamesPlayer, useWindowFit, useWindowState, type BestScoreRow, type GameMenu,
 } from '../kit'
 import { command, createGame, FIXED_DT, steer, stepGame } from './engine'
 import { skiFreeIcon } from './icon'
 import { disposeSprites, renderSlope } from './render'
 import { createSkiAudio, type SkiAudio } from './sound'
 import { STRINGS } from './strings'
-import type { Course, GameEvent, SkiArt, SkiCommand, SkiState } from './types'
+import type { GameEvent, SkiArt, SkiCommand, SkiState } from './types'
 import './skifree.css'
 
 type RecordKey = 'slalom' | 'tree' | 'freestyle' | 'distance'
 type BestRecord = { score: number; name: string }
 type SavedGame = { version: 1; snowboard: boolean; best: Record<RecordKey, BestRecord | null> }
-type Dialog = 'new' | 'scores' | 'player' | 'help' | 'about' | 'name' | null
-type Terminal = 'course' | 'over' | null
+type Dialog = 'scores' | 'player' | 'help' | 'about' | 'name' | null
+type Terminal = 'over' | null
 type Viewport = { width: number; height: number; scale: number; pocket: boolean }
 type Candidate = { key: RecordKey; score: number }
 
 const RECORD_KEYS: RecordKey[] = ['slalom', 'tree', 'freestyle', 'distance']
-const COURSES: Course[] = ['free', 'slalom', 'tree', 'freestyle']
 const emptyBest = (): SavedGame['best'] => ({ slalom: null, tree: null, freestyle: null, distance: null })
 const defaultSave = (): SavedGame => ({ version: 1, snowboard: false, best: emptyBest() })
 
@@ -46,7 +46,7 @@ function isSavedGame(value: unknown): value is SavedGame {
 }
 
 function formatTime(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds * 100))
+  const total = Math.max(0, Math.floor(seconds * 100))
   const hours = Math.floor(total / 360000)
   const minutes = Math.floor(total / 6000) % 60
   const secs = Math.floor(total / 100) % 60
@@ -85,6 +85,8 @@ function keyboardCommand(event: KeyboardEvent): SkiCommand | null {
 
 export default function SkiFree({ close }: AppProps) {
   const { active, hidden } = useWindowState()
+  const pocket = useIsMobile()
+  const fitWindow = useWindowFit()
   const { muted, toggleMuted } = useGamesMuted()
   const { player } = useGamesPlayer()
   const [saved, setSaved] = useState(() => loadGame('skifree', defaultSave(), isSavedGame))
@@ -94,15 +96,17 @@ export default function SkiFree({ close }: AppProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [fast, setFast] = useState(false)
   const [touch, setTouch] = useState(false)
-  const [courseChoice, setCourseChoice] = useState<Course>('free')
   const [helpTab, setHelpTab] = useState(0)
   const [announcement, setAnnouncement] = useState({ text: STRINGS.startLine, serial: 0 })
   const [viewport, setViewport] = useState<Viewport>({ width: 640, height: 448, scale: 1, pocket: false })
+  const rootRef = useRef<HTMLDivElement>(null)
+  const fitted = useRef(false)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const helpRefs = useRef<(HTMLButtonElement | null)[]>([])
   const helpId = useId()
   const gameRef = useRef<SkiState | null>(null)
   if (!gameRef.current) gameRef.current = createGame((Math.random() * 0x100000000) >>> 0)
+  const previousStyle = useRef(gameRef.current.style)
   const savedRef = useRef(saved)
   const viewportRef = useRef(viewport)
   const playerRef = useRef(player)
@@ -114,7 +118,7 @@ export default function SkiFree({ close }: AppProps) {
   const paintRef = useRef<() => void>(() => {})
   const flow = useRef({ active, hidden, muted, paused, dialog, terminal, menuOpen, blurred: !document.hasFocus() })
   const pointer = useRef({ id: -1, x: 0, y: 0, dragged: false })
-  const canvas = useCrispCanvas(viewport.width, viewport.height, { smoothing: false, onResize: () => paintRef.current() })
+  const canvas = useCrispCanvas(viewport.width * viewport.scale, viewport.height * viewport.scale, { smoothing: false, onResize: () => paintRef.current() })
 
   savedRef.current = saved
   viewportRef.current = viewport
@@ -127,7 +131,11 @@ export default function SkiFree({ close }: AppProps) {
     const state = gameRef.current
     if (!ctx || !state || !mounted.current || flow.current.hidden) return
     const view = viewportRef.current
+    artRef.current.displayScale = view.scale
+    ctx.save()
+    ctx.scale(view.scale, view.scale)
     renderSlope(ctx, state, view.width, view.height, artRef.current)
+    ctx.restore()
   }, [canvas.ctx])
   paintRef.current = paint
 
@@ -175,12 +183,14 @@ export default function SkiFree({ close }: AppProps) {
     if (!next) surfaceRef.current?.focus({ preventScroll: true })
   }, [announce, setPause])
 
-  const finish = useCallback((result: Exclude<Terminal, null>) => {
+  const finish = useCallback((result: 'course' | 'over') => {
     const state = gameRef.current
     if (!state) return
-    flow.current.terminal = result
-    accumulator.current = 0
-    setTerminal(result)
+    if (result === 'over') {
+      flow.current.terminal = 'over'
+      accumulator.current = 0
+      setTerminal('over')
+    }
     const candidates: Candidate[] = []
     const best = { ...savedRef.current.best }
     const name = playerRef.current.name.trim().slice(0, 32)
@@ -207,7 +217,8 @@ export default function SkiFree({ close }: AppProps) {
 
   const consumeEvents = useCallback(() => {
     const state = gameRef.current
-    if (!state) return
+    if (!state || state.events.length === 0) return
+    const styleChanged = state.style !== previousStyle.current
     let notice: string | undefined
     for (let i = 0; i < state.events.length; i++) {
       const event: GameEvent = state.events[i]
@@ -216,13 +227,20 @@ export default function SkiFree({ close }: AppProps) {
       switch (event) {
         case 'course-start': notice = `${STRINGS.announcements.courseStart} ${STRINGS.courseNames[state.course]}`; break
         case 'course-finish':
-          notice = `${STRINGS.announcements.courseFinish} ${STRINGS.courseNames[state.course]}`
+          notice = STRINGS.announcements.courseFinish(
+            STRINGS.courseNames[state.course],
+            formatRecord(state.course === 'freestyle' ? 'freestyle' : 'slalom', state.course === 'freestyle' ? Math.max(0, state.style) : state.courseTime + state.penalties),
+            state.course === 'freestyle' ? 0 : state.penalties,
+          )
           finish('course')
           break
         case 'game-over': notice = STRINGS.announcements.gameOver; finish('over'); break
         case 'gate-pass': notice = STRINGS.announcements.gatePass; break
         case 'gate-miss': notice = STRINGS.announcements.gateMiss; break
-        case 'crash': notice = STRINGS.announcements.crash; break
+        case 'crash': notice = STRINGS.announcements.crash(state.style, styleChanged || state.course === 'freestyle'); break
+        case 'land':
+          if (styleChanged || state.course === 'freestyle') notice = STRINGS.announcements.land(state.style)
+          break
         case 'jump': notice = STRINGS.announcements.jump; break
         case 'trick': notice = STRINGS.announcements.trick; break
         case 'roar': notice = STRINGS.announcements.monster; break
@@ -232,6 +250,7 @@ export default function SkiFree({ close }: AppProps) {
           break
       }
     }
+    previousStyle.current = state.style
     state.events.length = 0
     if (notice) announce(notice)
   }, [announce, finish])
@@ -242,6 +261,7 @@ export default function SkiFree({ close }: AppProps) {
     consumeEvents()
     syncAudio()
     paint()
+    if (document.activeElement !== surfaceRef.current) surfaceRef.current?.focus({ preventScroll: true })
   }, [consumeEvents, paint, running, syncAudio])
 
   const advanceFrame = useCallback(() => {
@@ -254,13 +274,9 @@ export default function SkiFree({ close }: AppProps) {
     paint()
   }, [consumeEvents, paint, syncAudio])
 
-  const openNewGame = useCallback(() => {
-    setCourseChoice(gameRef.current?.course ?? 'free')
-    showDialog('new')
-  }, [showDialog])
-
-  const startGame = useCallback(() => {
-    gameRef.current = createGame((Math.random() * 0x100000000) >>> 0, courseChoice)
+  const newGame = useCallback(() => {
+    gameRef.current = createGame((Math.random() * 0x100000000) >>> 0)
+    previousStyle.current = gameRef.current.style
     candidatesRef.current = []
     pointer.current.id = -1
     accumulator.current = 0
@@ -269,19 +285,10 @@ export default function SkiFree({ close }: AppProps) {
     setFast(false)
     setPause(!flow.current.active || flow.current.hidden || flow.current.blurred)
     showDialog(null)
-    announce(`${STRINGS.announcements.newGame} ${STRINGS.courseNames[courseChoice]}`)
+    announce(STRINGS.announcements.newGame)
     paint()
     surfaceRef.current?.focus({ preventScroll: true })
-  }, [announce, courseChoice, paint, setPause, showDialog])
-
-  const continueSkiing = useCallback(() => {
-    if (!flow.current.active || flow.current.hidden || flow.current.blurred || gameRef.current?.gameOver) return
-    flow.current.terminal = null
-    setTerminal(null)
-    setPause(false)
-    announce(STRINGS.announcements.resume)
-    surfaceRef.current?.focus({ preventScroll: true })
-  }, [announce, setPause])
+  }, [announce, paint, setPause, showDialog])
 
   const submitName = useCallback((name: string) => {
     const best = { ...savedRef.current.best }
@@ -325,14 +332,23 @@ export default function SkiFree({ close }: AppProps) {
   }, [canvas.ref])
 
   useLayoutEffect(() => {
+    if (fitted.current) return
+    const menu = rootRef.current?.querySelector<HTMLElement>('.gk-menubar')
+    if (!menu) return
+    fitted.current = true
+    fitWindow(640, 448 + menu.getBoundingClientRect().height)
+  }, [fitWindow])
+
+  useLayoutEffect(() => {
     const surface = surfaceRef.current
     if (!surface) return
-    const pocketQuery = window.matchMedia('(max-width: 719px)')
     const fit = () => {
       const box = surface.getBoundingClientRect()
       if (box.width < 1 || box.height < 1) return
-      const pocket = pocketQuery.matches
-      const scale = pocket ? (box.width >= 480 ? 3 : 2) : 1
+      const scale = pocket
+        ? Math.floor(box.width / 3) >= 240 && Math.floor(box.height / 3) >= 360 ? 3
+          : Math.floor(box.height / 2) >= 240 ? 2 : 1
+        : 1
       const width = Math.max(1, Math.floor(box.width / scale))
       const height = Math.max(1, Math.floor(box.height / scale))
       setViewport((old) => old.width === width && old.height === height && old.scale === scale && old.pocket === pocket
@@ -340,13 +356,11 @@ export default function SkiFree({ close }: AppProps) {
     }
     const observer = new ResizeObserver(fit)
     observer.observe(surface)
-    pocketQuery.addEventListener('change', fit)
     fit()
     return () => {
       observer.disconnect()
-      pocketQuery.removeEventListener('change', fit)
     }
-  }, [])
+  }, [pocket])
 
   useEffect(() => {
     let cancelled = false
@@ -386,7 +400,7 @@ export default function SkiFree({ close }: AppProps) {
     syncAudio()
   }, [active, hidden, announce, paint, setPause, syncAudio])
 
-  useLayoutEffect(() => { paint() }, [paint, viewport.width, viewport.height, saved.snowboard])
+  useLayoutEffect(() => { paint() }, [paint, viewport.width, viewport.height, viewport.scale, saved.snowboard])
 
   useEffect(() => {
     syncAudio()
@@ -398,10 +412,11 @@ export default function SkiFree({ close }: AppProps) {
 
   useEffect(() => {
     const blur = () => {
+      const announcePause = flow.current.active && !flow.current.paused && !flow.current.terminal
       flow.current.blurred = true
       pointer.current.id = -1
       inputRef.current.setPause(true)
-      inputRef.current.announce(STRINGS.announcements.pause)
+      if (announcePause) inputRef.current.announce(STRINGS.announcements.pause)
     }
     const focus = () => {
       flow.current.blurred = false
@@ -409,8 +424,10 @@ export default function SkiFree({ close }: AppProps) {
     }
     const onKeyDown = (event: KeyboardEvent) => {
       const current = flow.current
+      if (current.active && !current.hidden && !(event.target instanceof Element && event.target.closest('.skifree-controls'))) setTouch(false)
       if (!current.active || current.hidden || current.blurred || current.dialog || current.menuOpen || event.defaultPrevented || event.isComposing ||
         event.altKey || event.ctrlKey || event.metaKey || !surfaceRef.current?.contains(document.activeElement)) return
+      if (event.key === 'F1' || event.key === 'F2' || event.key === 'F3' || event.key === 'F10' || event.key === 'Alt') return
       if (event.key.toLowerCase() === 't' && current.paused) {
         event.preventDefault()
         if (!event.repeat) inputRef.current.advanceFrame()
@@ -430,11 +447,11 @@ export default function SkiFree({ close }: AppProps) {
     }
     window.addEventListener('blur', blur)
     window.addEventListener('focus', focus)
-    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
     return () => {
       window.removeEventListener('blur', blur)
       window.removeEventListener('focus', focus)
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown, true)
     }
   }, [])
 
@@ -494,6 +511,7 @@ export default function SkiFree({ close }: AppProps) {
 
   const pointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (event.pointerType === 'mouse') {
+      setTouch(false)
       pointSkier(event)
       return
     }
@@ -518,7 +536,7 @@ export default function SkiFree({ close }: AppProps) {
 
   const menus: GameMenu[] = [
     { label: STRINGS.ui.gameMenu, items: [
-      { label: STRINGS.ui.newGame, hotkey: STRINGS.ui.newGameKey, onClick: openNewGame },
+      { label: STRINGS.ui.newGame, hotkey: STRINGS.ui.newGameKey, onClick: newGame },
       { label: STRINGS.ui.pause, hotkey: STRINGS.ui.pauseKey, checked: paused, disabled: !!terminal, onClick: pauseGame },
       '-',
       { label: STRINGS.ui.bestScores, onClick: () => showDialog('scores') },
@@ -544,15 +562,13 @@ export default function SkiFree({ close }: AppProps) {
 
   return (
     <div
+      ref={rootRef}
       className={`skifree${showControls ? ' skifree-touch' : ''}`}
       onPointerDownCapture={(event) => {
         unlockAudio()
-        setTouch(event.pointerType === 'touch')
+        if (!(event.target as Element).closest('.skifree-controls')) setTouch(event.pointerType === 'touch')
       }}
-      onKeyDownCapture={() => {
-        unlockAudio()
-        setTouch(false)
-      }}
+      onKeyDownCapture={() => { unlockAudio() }}
     >
       <GameMenuBar menus={menus} disabled={!!dialog} onOpenChange={changeMenu} />
       <div ref={surfaceRef} className="skifree-surface" role="application" aria-label={STRINGS.ui.slopeAria} tabIndex={0} onContextMenu={(event) => event.preventDefault()}>
@@ -581,49 +597,29 @@ export default function SkiFree({ close }: AppProps) {
           </div>
         )}
         {showPause && (
-          <section className="skifree-panel" aria-label={STRINGS.paused}>
+          <section className="skifree-panel skifree-pause-plate" aria-label={STRINGS.announcements.pause}>
             <h2>{STRINGS.announcements.pause}</h2>
-            <p>{STRINGS.ui.pausedHint}</p>
+            <p>{showControls ? STRINGS.ui.touchPausedHint : STRINGS.ui.pausedHint}</p>
             <div className="skifree-panel-buttons">
               <button className="btn default" type="button" onClick={pauseGame} disabled={!active || hidden}>{STRINGS.ui.resume}</button>
-              <button className="btn" type="button" onClick={openNewGame}>{menuCaption(STRINGS.ui.newGame)}</button>
+              <button className="btn" type="button" onClick={newGame}>{menuCaption(STRINGS.ui.newGame)}</button>
             </div>
-            <p className="skifree-frame-hint">{STRINGS.ui.frameStep}</p>
+            {!showControls && <p className="skifree-frame-hint">{STRINGS.ui.frameStep}</p>}
           </section>
         )}
         {!dialog && terminal && state && (
-          <section className="skifree-panel" aria-label={terminal === 'course' ? STRINGS.ui.courseComplete : STRINGS.gameOver}>
-            <h2>{terminal === 'course' ? STRINGS.ui.courseComplete : STRINGS.gameOver}</h2>
-            {terminal === 'course' && <p>{STRINGS.ui.courseResult(STRINGS.courseNames[state.course], formatRecord(state.course === 'freestyle' ? 'freestyle' : 'slalom', state.course === 'freestyle' ? Math.max(0, state.style) : state.courseTime + state.penalties))}</p>}
-            {terminal === 'course' && state.course !== 'freestyle' && state.penalties > 0 && <p>{STRINGS.ui.penaltyNote(state.penalties)}</p>}
+          <section className="skifree-panel" aria-label={STRINGS.gameOver}>
+            <h2>{STRINGS.ui.gameOverTitle}</h2>
+            <p>{STRINGS.gameOver}</p>
             <p>{STRINGS.scoreNames.distance}: {formatRecord('distance', state.distance)}</p>
             <div className="skifree-panel-buttons">
-              {terminal === 'course' && <button className="btn default" type="button" onClick={continueSkiing}>{STRINGS.ui.continueSkiing}</button>}
-              <button className={`btn${terminal === 'over' ? ' default' : ''}`} type="button" onClick={openNewGame}>{menuCaption(STRINGS.ui.newGame)}</button>
+              <button className="btn default" type="button" onClick={newGame}>{menuCaption(STRINGS.ui.newGame)}</button>
               <button className="btn" type="button" onClick={() => showDialog('scores')}>{menuCaption(STRINGS.ui.bestScores)}</button>
             </div>
           </section>
         )}
       </div>
       <div className="skifree-announcement" role="status" aria-live="polite" aria-atomic="true"><span key={announcement.serial}>{announcement.text}</span></div>
-      {dialog === 'new' && (
-        <GameDialog title={STRINGS.ui.newGameTitle} onClose={() => showDialog(null)} width={360} buttons={[
-          { label: STRINGS.ui.start, default: true, onClick: startGame },
-          { label: STRINGS.ui.cancel, cancel: true, onClick: () => showDialog(null) },
-        ]}>
-          <p>{STRINGS.startLine}</p>
-          <fieldset className="skifree-course-chooser">
-            <legend>{STRINGS.ui.coursePrompt}</legend>
-            {COURSES.map((course) => (
-              <label key={course}>
-                <input type="radio" name="skifree-course" value={course} checked={courseChoice === course} onChange={() => setCourseChoice(course)} />
-                {STRINGS.courseNames[course]}
-              </label>
-            ))}
-          </fieldset>
-          <p>{STRINGS.ui.newGameHint}</p>
-        </GameDialog>
-      )}
       {dialog === 'scores' && (
         <BestScoresDialog
           title={STRINGS.ui.bestTitle}

@@ -14,6 +14,7 @@ const isChoice = (value: unknown): value is DeckChoice => {
 }
 let choice: DeckChoice | undefined
 const listeners = new Set<() => void>()
+const confirmedRemys = new Set([46])
 const current = () => {
   if (!choice) choice = loadGame('cards', { back: 0, remy: 46 }, isChoice)
   return choice
@@ -32,14 +33,20 @@ const setBack = (back: number, remy = current().remy) => {
 export function useDeckBack() {
   const selected = useSyncExternalStore(subscribe, current, current)
   useEffect(() => {
-    if (selected.back !== 12) return
+    if (confirmedRemys.has(selected.remy)) return
     let cancelled = false
     void loadCabald().then((bald) => {
-      if (!cancelled && bald.includes(selected.remy) && current() === selected) setBack(12, 46)
+      if (cancelled || current() !== selected) return
+      if (bald.includes(selected.remy)) setBack(selected.back, 46)
+      else {
+        confirmedRemys.add(selected.remy)
+        choice = { ...selected }
+        for (const listener of listeners) listener()
+      }
     }).catch(() => {})
     return () => { cancelled = true }
   }, [selected])
-  return { ...selected, setBack }
+  return { ...selected, remy: confirmedRemys.has(selected.remy) ? selected.remy : 46, setBack }
 }
 
 function BackPreview({ back, remy }: { back: number; remy: number }) {
@@ -48,16 +55,32 @@ function BackPreview({ back, remy }: { back: number; remy: number }) {
     const paint = () => {
       const canvas = ref.current
       if (!canvas) return
-      const dpr = window.devicePixelRatio || 1
-      canvas.width = Math.round(CARD_W * dpr)
-      canvas.height = Math.round(CARD_H * dpr)
+      const width = canvas.getBoundingClientRect().width || CARD_W
+      const dpr = Math.max(1, Math.min(3, Math.ceil(window.devicePixelRatio || 1)))
+      canvas.width = Math.round(width * dpr)
+      canvas.height = Math.round(width * CARD_H / CARD_W * dpr)
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-      ctx.scale(dpr, dpr)
+      ctx.setTransform(canvas.width / CARD_W, 0, 0, canvas.height / CARD_H, 0, 0)
       drawBack(ctx, back, 0, 0, 0, remy)
     }
+    let resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+    const resolutionChange = () => {
+      resolution.removeEventListener('change', resolutionChange)
+      resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+      resolution.addEventListener('change', resolutionChange)
+      paint()
+    }
+    resolution.addEventListener('change', resolutionChange)
+    const observer = new ResizeObserver(paint)
+    if (ref.current) observer.observe(ref.current)
     paint()
-    return subscribeCardArt(paint)
+    const unsubscribe = subscribeCardArt(paint)
+    return () => {
+      observer.disconnect()
+      resolution.removeEventListener('change', resolutionChange)
+      unsubscribe()
+    }
   }, [back, remy])
   return <canvas ref={ref} width={CARD_W} height={CARD_H} style={{ width: CARD_W, height: CARD_H }} aria-hidden="true" />
 }
@@ -67,6 +90,9 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState(saved.back)
   const [remy, setRemy] = useState(saved.remy)
   const [prompt, setPrompt] = useState(false)
+  const previousBack = useRef(selected)
+  const customReady = useRef(saved.back === 12)
+  const promptRequest = useRef(0)
   const [input, setInput] = useState(String(saved.remy))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -78,16 +104,27 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
   }, [])
 
   const commit = () => {
+    if (selected === 12 && !customReady.current) { choose(12); return }
     saved.setBack(selected, remy)
     onClose()
   }
   const choose = (back: number) => {
-    setSelected(back)
     if (back === 12) {
+      if (selected !== 12 || customReady.current) previousBack.current = selected
+      customReady.current = false
+      setSelected(back)
       setInput(String(remy))
       setError('')
       setPrompt(true)
     }
+    else setSelected(back)
+  }
+  const cancelPrompt = () => {
+    promptRequest.current++
+    customReady.current = previousBack.current === 12
+    setBusy(false)
+    setSelected(previousBack.current)
+    setPrompt(false)
   }
   const pickRemy = async (random = false) => {
     const idx = Number(input)
@@ -95,11 +132,12 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
       setError(s.invalid)
       return
     }
+    const request = ++promptRequest.current
     setBusy(true)
     setError('')
     try {
       const bald = new Set(await loadCabald())
-      if (!alive.current) return
+      if (!alive.current || request !== promptRequest.current) return
       let candidate = idx
       if (random) {
         const start = Math.floor(Math.random() * 4490)
@@ -110,14 +148,16 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
         setError(s.bald)
         return
       }
+      confirmedRemys.add(candidate)
+      customReady.current = true
       setRemy(candidate)
       setInput(String(candidate))
       setSelected(12)
       setPrompt(false)
     } catch {
-      if (alive.current) setError(s.unavailable)
+      if (alive.current && request === promptRequest.current) setError(s.unavailable)
     } finally {
-      if (alive.current) setBusy(false)
+      if (alive.current && request === promptRequest.current) setBusy(false)
     }
   }
   return (
@@ -140,6 +180,10 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
           }
           else return
           e.preventDefault()
+          if (next === 12 && selected !== 12) {
+            previousBack.current = selected
+            customReady.current = false
+          }
           setSelected(next)
           grid.current?.querySelector<HTMLButtonElement>(`[data-back="${next}"]`)?.focus()
         }}>
@@ -157,10 +201,10 @@ export function DeckDialog({ onClose }: { onClose: () => void }) {
           </button>)}
         </div>
       </GameDialog>}
-      {prompt && <GameDialog title={s.promptTitle} width={310} onClose={() => setPrompt(false)} buttons={[
+      {prompt && <GameDialog title={s.promptTitle} width={310} onClose={cancelPrompt} buttons={[
         { label: s.random, onClick: () => { void pickRemy(true) }, disabled: busy },
         { label: s.ok, onClick: () => { void pickRemy() }, default: true, disabled: busy },
-        { label: s.cancel, onClick: () => setPrompt(false), cancel: true },
+        { label: s.cancel, onClick: cancelPrompt, cancel: true },
       ]}>
         <label className="remy-deck-index">{s.prompt}<input data-autofocus type="number" min={0} max={4489} value={input}
           onChange={(e) => setInput(e.target.value)} /></label>

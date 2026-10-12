@@ -1,0 +1,17 @@
+import { T } from './timeline.js';
+// Original 96 BPM G-minor synth-funk: syncopated bass, dry backbeat, FM keys,
+// portamento whistle and a rising Bb-major escape answer. No sampled recordings.
+export function score(k){
+ const beat=.625;
+ function tone(t,n,d,g=.08,slide=0,pan=0){k.at(t,()=>{const o=k.osc('sawtooth',k.hz(n-slide),t,d);o.frequency.exponentialRampToValueAtTime(k.hz(n),t+.075);const f=k.ac.createBiquadFilter();f.type='lowpass';f.frequency.value=1700;f.Q.value=1.4;const a=k.ac.createGain();a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g,t+.018);a.gain.setValueAtTime(g*.75,t+d*.65);a.gain.linearRampToValueAtTime(0,t+d);o.connect(f).connect(a);k.out(a,1,.12,pan);});}
+ function rhodes(t,n,d,g=.1){k.at(t,()=>{const o=k.osc('sine',k.hz(n),t,d),m=k.osc('sine',k.hz(n)*2,t,d),mg=k.ac.createGain(),a=k.ac.createGain();mg.gain.setValueAtTime(k.hz(n)*.9,t);mg.gain.exponentialRampToValueAtTime(1,t+d);m.connect(mg).connect(o.frequency);a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g,t+.006);a.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(a);k.out(a,1,.16,-.25,.35);});}
+ for(let b=0;b<24;b++){const t=b*beat;if(b<23){k.hat(t,.09,.04);k.hat(t+beat*.53,.048,.025);}if(b%4===0||b%4===2)k.kick(t,.54);if(b%4===1||b%4===3)k.clap(t,.23);if(b%4===2&&b<20)k.kick(t+beat*.72,.3);}
+ const roots=[43,43,39,41,46,46];for(let bar=0;bar<6;bar++){const at=bar*2.5,root=roots[bar];for(const [s,n,d] of [[0,0,.3],[.75,12,.15],[1.5,0,.23],[2.5,7,.2],[3.25,10,.25]])k.bass(at+s*beat,root+n,d,.17,'sawtooth',600);const chord=bar<4?[root+12,root+15,root+19,root+22]:[58,62,65,69];for(const off of [.3,1.55])chord.forEach(n=>rhodes(at+off,n,.72,.065));}
+ const lead=[[.3,74,.35],[.94,77,.28],[1.56,79,.58],[2.25,77,.19],[3.25,74,.37],[4.05,72,.29],[4.65,70,.3],[5.2,74,.5],[6.25,77,.3],[6.88,79,.4],[7.55,82,.48],[8.2,79,.26],[8.75,77,.35],[9.4,74,.55],[10.5,77,.45],[11.7,77,.3],[12.1,79,.3],[12.5,82,.5],[13.2,86,.6],[14,82,.75]];lead.forEach(([t,n,d],i)=>tone(t,n,d,.055,i%3===0?2:0,.2));
+ function noise(t,d,g,cut=1200){k.at(t,()=>{const o=k.noise(t,d),f=k.ac.createBiquadFilter(),a=k.ac.createGain();f.type='bandpass';f.frequency.value=cut;f.Q.value=.65;a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g,t+.008);a.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(f).connect(a);k.out(a,1,.03);});}
+ for(let t=.13;t<1.48;t+=.24)noise(t,.1,.07,300);noise(T.door,.11,.22,550);noise(2.78,.18,.32,300);
+ // Engine revs are continuously enveloped voices, not restarted frame oscillators.
+ for(let i=0;i<18;i++){const t=2.8+i*.5;k.at(t,()=>{const d=.62,o=k.osc('sawtooth',48+(i%6)*8,t,d),f=k.ac.createBiquadFilter(),a=k.ac.createGain();f.type='lowpass';f.frequency.value=380;o.frequency.linearRampToValueAtTime(70+(i%6)*9,t+d);a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(.048,t+.06);a.gain.linearRampToValueAtTime(0,t+d);o.connect(f).connect(a);k.out(a,1,0,-.25);});}
+ for(let t=4;t<10;t+=.8){k.at(t,()=>{const o=k.osc('sine',640,t,.8),a=k.ac.createGain();o.frequency.linearRampToValueAtTime(1000,t+.4);o.frequency.linearRampToValueAtTime(640,t+.8);a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(.025,t+.07);a.gain.setValueAtTime(.025,t+.68);a.gain.linearRampToValueAtTime(0,t+.8);o.connect(a);k.out(a,1,.06,.4);});}
+ noise(T.turn,1.55,.15,2300);tone(T.turn,88,.9,.025,-3,-.45);noise(T.airborne,.35,.13,500);k.impact(T.crash,.25,80);noise(T.crash,.5,.25,1900);noise(T.land,.23,.26,240);k.kick(T.land,.35);[70,74,77,82].forEach((n,i)=>rhodes(T.passed+i*.12,n,1,.13));k.crash(T.passed,.12);
+}

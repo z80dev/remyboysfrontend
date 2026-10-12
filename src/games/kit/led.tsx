@@ -1,5 +1,5 @@
 /** Minesweeper-style red seven-segment LED digits: a canvas renderer and a React counter. */
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useCrispCanvas } from './canvas'
 import { drawBevel } from './bevel'
 import './visual.css'
@@ -27,13 +27,23 @@ type Rect = readonly [x: number, y: number, w: number, h: number]
 
 // Segments A..G of the 13×23 hexagonal glyph (1px margin each side, tapered ends). Rects are [x, y, w, h].
 const SEGMENTS: readonly (readonly Rect[])[] = [
-  [[2, 0, 9, 1], [3, 1, 7, 1]], // A top
+  [
+    [2, 0, 9, 1],
+    [3, 1, 7, 1],
+  ], // A top
   [[10, 2, 2, 8]], // B upper right
   [[10, 13, 2, 8]], // C lower right
-  [[3, 21, 7, 1], [2, 22, 9, 1]], // D bottom
+  [
+    [3, 21, 7, 1],
+    [2, 22, 9, 1],
+  ], // D bottom
   [[1, 13, 2, 8]], // E lower left
   [[1, 2, 2, 8]], // F upper left
-  [[3, 10, 7, 1], [2, 11, 9, 1], [3, 12, 7, 1]], // G middle
+  [
+    [3, 10, 7, 1],
+    [2, 11, 9, 1],
+    [3, 12, 7, 1],
+  ], // G middle
 ]
 
 // Lit-segment bit masks (bit 0 = A … bit 6 = G).
@@ -58,7 +68,7 @@ function format(value: number | string, digits: number): string {
   if (n < 0) {
     if (digits < 2) return '-'
     const mag = Math.min(-n, 10 ** (digits - 1) - 1)
-    return '-' + String(mag).padStart(digits - 1, '0')
+    return `-${String(mag).padStart(digits - 1, '0')}`
   }
   return String(Math.min(n, 10 ** digits - 1)).padStart(digits, '0')
 }
@@ -111,12 +121,13 @@ export function LedCounter({ value, digits = 3, scale = 1 }: { value: number | s
   const h = LED_H + 2
   const draw = useRef<() => void>(() => {})
   const { ref, ctx } = useCrispCanvas(w, h, { onResize: () => draw.current() })
-  draw.current = () => {
+  const drawReadout = useCallback(() => {
     const c = ctx.current
     if (!c) return
     drawLed(c, value, 1, 1, { digits: cells })
-    drawBevel(c, 0, 0, w, h, { inset: true })
-  }
-  useEffect(() => draw.current(), [value, cells, w, h])
-  return <canvas ref={ref} className='gk-led' style={{ width: w * k, height: h * k }} role='img' aria-label={String(value)} />
+    drawBevel(c, 0, 0, cells * LED_W + 2, LED_H + 2, { inset: true })
+  }, [ctx, value, cells])
+  draw.current = drawReadout
+  useEffect(() => drawReadout(), [drawReadout])
+  return <canvas ref={ref} className="gk-led" style={{ width: w * k, height: h * k }} role="img" aria-label={String(value)} />
 }

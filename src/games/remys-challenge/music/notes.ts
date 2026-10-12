@@ -22,3 +22,8 @@ export function everyBar(bars: number, barLen: number, make: (bar: number) => No
 
 export const MAJ = [0, 4, 7]
 export const MIN = [0, 3, 7]
+
+/** Chord tones of `root` + `qual` folded into the octave [low, low + 12) for smooth, voice-led comping. */
+export function voiced(root: number, qual: readonly number[], low: number): number[] {
+  return qual.map(t => low + (((root + t - low) % 12) + 12) % 12).sort((a, b) => a - b)
+}

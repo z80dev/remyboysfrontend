@@ -100,15 +100,36 @@ async function fetchCatalogue(): Promise<Catalogue> {
   const res = await fetch(questSrc('art.json'))
   if (!res.ok) throw new Error(`art.json: ${res.status}`)
   const data: unknown = await res.json()
-  if (typeof data !== 'object' || data === null || !('rows' in data) || !Array.isArray(data.rows) ||
-      !('v' in data) || data.v !== 1 || !('cols' in data) || data.cols !== 67 ||
-      !('count' in data) || data.count !== REMY_COUNT || data.rows.length !== REMY_COUNT) throw new Error('Invalid art catalogue')
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    !('rows' in data) ||
+    !Array.isArray(data.rows) ||
+    !('v' in data) ||
+    data.v !== 1 ||
+    !('cols' in data) ||
+    data.cols !== 67 ||
+    !('count' in data) ||
+    data.count !== REMY_COUNT ||
+    data.rows.length !== REMY_COUNT
+  )
+    throw new Error('Invalid art catalogue')
   const bald: number[] = []
   for (let i = 0; i < data.rows.length; i++) {
     const row = data.rows[i]
-    if (!Array.isArray(row) || row.length !== 11 || !row.slice(0, 6).every((c) => typeof c === 'string' && /^[0-9a-f]{6}$/.test(c)) ||
-        !Number.isInteger(row[6]) || row[6] < 0 || row[6] > 7 || !Number.isInteger(row[8]) || row[8] < 0 || row[8] > 3 ||
-        typeof row[10] !== 'string') throw new Error('Invalid art record')
+    if (
+      !Array.isArray(row) ||
+      row.length !== 11 ||
+      !row.slice(0, 6).every((c) => typeof c === 'string' && /^[0-9a-f]{6}$/.test(c)) ||
+      !Number.isInteger(row[6]) ||
+      row[6] < 0 ||
+      row[6] > 7 ||
+      !Number.isInteger(row[8]) ||
+      row[8] < 0 ||
+      row[8] > 3 ||
+      typeof row[10] !== 'string'
+    )
+      throw new Error('Invalid art record')
     if (row[9]) bald.push(i)
   }
   return { rows: data.rows as ArtRow[], bald, baldSet: new Set(bald) }
@@ -118,7 +139,9 @@ function loadCatalogue(): Promise<Catalogue> {
   if (!catalogue) {
     const pending = fetchCatalogue()
     catalogue = pending
-    pending.catch(() => { if (catalogue === pending) catalogue = undefined })
+    pending.catch(() => {
+      if (catalogue === pending) catalogue = undefined
+    })
   }
   return catalogue
 }
@@ -135,9 +158,22 @@ export function loadCabald(): Promise<number[]> {
 
 /** Named story seeds, resolved by cabaldRemy/civRemy to the same faces as Remy Quest. */
 export const CAST = {
-  RUG_LORD: 67, NOBODY: 10, SHORT: 1010, SQUEEZE: 57, ESCROW: 2086,
-  AMY: 60, CARL: 2038, DAN: 5757, RAY: 1000,
-  GWEI: 46, RIVAL: 42, NURSE: 14, CLERK: 6, MAXI: 2084, GOLD: 2002, CURATOR: 2016,
+  RUG_LORD: 67,
+  NOBODY: 10,
+  SHORT: 1010,
+  SQUEEZE: 57,
+  ESCROW: 2086,
+  AMY: 60,
+  CARL: 2038,
+  DAN: 5757,
+  RAY: 1000,
+  GWEI: 46,
+  RIVAL: 42,
+  NURSE: 14,
+  CLERK: 6,
+  MAXI: 2084,
+  GOLD: 2002,
+  CURATOR: 2016,
 } as const
 
 // Identity algorithms ported verbatim from src/quest/data.ts; importing it would eagerly load Quest's art atlases.
@@ -175,6 +211,8 @@ export async function loadPalette(idx: number): Promise<RemyPalette> {
   const hit = palettes.get(index)
   if (hit) return hit
   const { rows } = await loadCatalogue()
+  const cached = palettes.get(index)
+  if (cached) return cached
   const row = rows[index]
   const palette = { skin: `#${row[0]}`, hair: `#${row[1]}`, shirt: `#${row[2]}`, bg: `#${row[3]}`, accent: `#${row[4]}`, eye: `#${row[5]}` }
   palettes.set(index, palette)
@@ -209,7 +247,9 @@ export function loadFrontHeads(): Promise<FrontRemyHeads> {
       }
     })
     frontHeads = pending
-    pending.catch(() => { if (frontHeads === pending) frontHeads = undefined })
+    pending.catch(() => {
+      if (frontHeads === pending) frontHeads = undefined
+    })
   }
   return frontHeads
 }
@@ -219,7 +259,9 @@ export function loadHeads(): Promise<RemyHeads> {
   if (!heads) {
     const pending = Promise.all([loadFrontHeads(), decode(questSrc('sides.webp'))]).then(([front, side]) => ({ ...front, side }))
     heads = pending
-    pending.catch(() => { if (heads === pending) heads = undefined })
+    pending.catch(() => {
+      if (heads === pending) heads = undefined
+    })
   }
   return heads
 }

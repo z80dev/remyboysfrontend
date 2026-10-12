@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { AppProps } from '../../os/apps'
 import {
-  AboutDialog, BestScoresDialog, GameDialog, GameMenuBar, NameEntryDialog, civRemy, loadCabald, loadGame, loadHeads,
+  AboutDialog, BestScoresDialog, GameDialog, GameHelpTabs, GameMenuBar, NameEntryDialog, civRemy, loadCabald, loadGame, loadHeads,
   loadPalette, loadRemy, loadRemyMeta, mulberry32, saveGame, unlockAudio, useAnimationFrame, useCrispCanvas, useGamesMuted,
   useWindowFit, useWindowState, type GameMenu,
 } from '../kit'
 import { GameAudio } from './audio'
-import { advance, createGame, nextLevel, startWall, CELL, COLS, HEIGHT, ROWS, WIDTH, type Orientation } from './engine'
+import { advance, createGame, nextLevel, startWall, CELL, HEIGHT, WIDTH, type Orientation } from './engine'
 import { icon } from './icon'
+import { longPressWall, moveCursor, newRunSeed, pointCursor, type Cursor } from './input'
+import { fitField, STATUS_HEIGHT } from './layout'
 import { createPainter, draw, type Painter } from './render'
 import { addScore, defaults, isSettings, qualifies } from './scores'
 import { strings as s } from './strings'
@@ -22,7 +24,7 @@ export default function JezzBald({ close }: AppProps) {
   const [settings, setSettings] = useState(() => loadGame('jezzbald', defaults, isSettings))
   const pictures = useRef(settings.reveal)
   pictures.current = settings.reveal
-  const [initial] = useState(() => createGame(1, 1992, settings.fast))
+  const [initial] = useState(() => createGame(1, newRunSeed(), settings.fast))
   const game = useRef(initial)
   const [round, setRound] = useState(0)
   const [, refresh] = useState(0)
@@ -32,29 +34,35 @@ export default function JezzBald({ close }: AppProps) {
   const [helpTab, setHelpTab] = useState(0)
   const [orientation, setOrientation] = useState<Orientation>('vertical')
   const [touch, setTouch] = useState(false)
-  const [ring, setRing] = useState<{ x: number; y: number } | null>(null)
+  const [layout, setLayout] = useState(() => ({ ...fitField(WIDTH, HEIGHT + STATUS_HEIGHT, false), controls: false }))
+  const [revealed, setRevealed] = useState(false)
+  const [ring, setRing] = useState<{ x: number, y: number } | null>(null)
   const [announcement, announce] = useState(s.start)
   const [balloon, setBalloon] = useState(false)
+  const balloonEnd = useRef(0)
   const surface = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
   const painter = useRef<Painter | null>(null)
   const [audio] = useState(() => new GameAudio())
   const [motion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)'))
-  const cursor = useRef({ x: 18, y: 9, orientation: 'vertical' as Orientation })
+  const cursor = useRef<Cursor>({ x: 18, y: 9, px: 18 * CELL + CELL / 2, py: 9 * CELL + CELL / 2, orientation: 'vertical', visible: true })
   const gesture = useRef({ primary: -1, secondary: -1, skip: false, x: 0, y: 0, startX: 0, startY: 0 })
   const pressTimer = useRef<number | undefined>(undefined)
   const fade = useRef(0)
   const reported = useRef({ seconds: 80, score: 0, lives: 2, phase: 'playing', balloon: false })
-  const { active, hidden } = useWindowState()
+  const { active, hidden, pocket } = useWindowState()
   const { muted, toggleMuted } = useGamesMuted()
   const fit = useWindowFit()
   const canvas = useCrispCanvas(WIDTH, HEIGHT, { onResize: () => paint() })
   const g = game.current
   const blocked = paused || menuOpen || modal !== null || !active || hidden
+  const interaction = useRef(blocked)
+  interaction.current = blocked
 
   function paint() {
     if (canvas.ctx.current && painter.current) {
-      draw(canvas.ctx.current, painter.current, game.current, cursor.current.x, cursor.current.y, cursor.current.orientation,
-        pictures.current, Math.min(1, fade.current / 1200))
+      draw(canvas.ctx.current, painter.current, game.current, cursor.current, pictures.current,
+        Math.min(1, fade.current / 1200), !interaction.current)
     }
   }
 
@@ -82,8 +90,9 @@ export default function JezzBald({ close }: AppProps) {
   function newGame() {
     audio.reset()
     cancelPress()
-    game.current = createGame(1, 1992, settings.fast)
+    game.current = createGame(1, newRunSeed(), settings.fast)
     fade.current = 0
+    setRevealed(false)
     reported.current = { seconds: 80, score: 0, lives: 2, phase: 'playing', balloon: false }
     setBalloon(false)
     setPaused(false)
@@ -94,8 +103,9 @@ export default function JezzBald({ close }: AppProps) {
 
   function continueLevel() {
     audio.reset()
-    game.current = nextLevel(game.current)
+    game.current = nextLevel(game.current, settings.fast)
     fade.current = 0
+    setRevealed(false)
     reported.current = { seconds: Math.ceil(game.current.remaining / 1000), score: game.current.score,
       lives: game.current.lives, phase: 'playing', balloon: false }
     setBalloon(false)
@@ -125,14 +135,30 @@ export default function JezzBald({ close }: AppProps) {
 
   function point(e: ReactPointerEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
-    cursor.current.x = Math.max(0, Math.min(COLS - 1, Math.floor((e.clientX - rect.left) * WIDTH / rect.width / CELL)))
-    cursor.current.y = Math.max(0, Math.min(ROWS - 1, Math.floor((e.clientY - rect.top) * HEIGHT / rect.height / CELL)))
+    pointCursor(cursor.current, e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height)
     paint()
   }
 
   useEffect(() => {
-    fit(608, 400) // 24px kit menu + the specified 376px field/status client.
-  }, [fit])
+    fit(608, touch ? 460 : 400) // 24px menu + 320px field + 56px status; touch adds a 60px thumb-control band.
+  }, [fit, touch])
+
+  useLayoutEffect(() => {
+    const client = body.current
+    if (!client) return
+    const measure = () => {
+      const controls = touch || pocket
+      const next = fitField(client.clientWidth, client.clientHeight, controls)
+      setLayout((previous) => previous.width === next.width && previous.height === next.height &&
+        previous.landscape === next.landscape && previous.controls === controls ? previous : { ...next, controls })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(client)
+    return () => {
+      observer.disconnect()
+    }
+  }, [touch, pocket])
 
   useEffect(() => {
     painter.current = createPainter()
@@ -208,29 +234,37 @@ export default function JezzBald({ close }: AppProps) {
       setPaused(true)
       cancelPress()
       audio.stop()
-    } else if (!modal && !menuOpen) surface.current?.focus({ preventScroll: true })
+    }
   }, [active, hidden])
 
   useEffect(() => {
-    if (blocked || muted) audio.stop()
+    if (!active || hidden || modal || menuOpen) return
+    // Title-bar activation finishes the shell's focus work first; one owned frame then restores the game cursor.
+    const id = window.requestAnimationFrame(() => surface.current?.focus({ preventScroll: true }))
+    return () => window.cancelAnimationFrame(id)
+  }, [active, hidden, modal, menuOpen])
+
+  useEffect(() => {
+    // Terminal jingles may finish over their tally/name dialogs, but never over a pause, blur or hidden window.
+    if (paused || menuOpen || !active || hidden || muted || (modal !== null && game.current.phase === 'playing')) audio.stop()
     if (blocked) {
       gesture.current.primary = gesture.current.secondary = -1
       gesture.current.skip = true
       cancelPress()
     }
-  }, [blocked, muted, audio])
+  }, [blocked, muted, audio, paused, menuOpen, active, hidden, modal])
 
   useEffect(() => {
     if (painter.current) painter.current.dirty = true
     paint()
-    if (!modal && !menuOpen && active) surface.current?.focus({ preventScroll: true })
-  }, [settings.reveal, orientation, modal, paused, menuOpen])
+  }, [settings.reveal, orientation, modal, paused, menuOpen, touch, active, hidden])
 
   useAnimationFrame((dt) => {
     const current = game.current
-    if (current.phase === 'playing') {
+    if (reported.current.phase === 'playing') {
       advance(current, dt * 1000)
       audio.update(current)
+      if (balloon && current.elapsed >= balloonEnd.current) setBalloon(false)
       const r = reported.current
       const seconds = Math.ceil(current.remaining / 1000)
       if (seconds !== r.seconds || current.score !== r.score || current.lives !== r.lives || current.phase !== r.phase) {
@@ -238,6 +272,7 @@ export default function JezzBald({ close }: AppProps) {
           announce(s.lostAnnouncement(current.lives))
           if (!r.balloon) {
             r.balloon = true
+            balloonEnd.current = current.elapsed + 2500
             setBalloon(true)
           }
         } else if (current.score !== r.score) announce(s.scoreAnnouncement(current.area, current.score))
@@ -254,10 +289,13 @@ export default function JezzBald({ close }: AppProps) {
       }
     } else if (current.phase === 'complete') {
       fade.current = Math.min(1200, fade.current + dt * 1000 * (motion.matches ? 2 : 1))
-      if (fade.current >= 1200) setModal('complete')
+      if (fade.current >= 1200) {
+        setRevealed(true)
+        announce(s.tallyPrompt)
+      }
     }
     paint()
-  }, { paused: blocked || g.phase === 'over' })
+  }, { paused: blocked || g.phase === 'over' || revealed })
 
   const menus: GameMenu[] = [
     { label: s.game, items: [
@@ -269,12 +307,7 @@ export default function JezzBald({ close }: AppProps) {
       { label: s.sound, checked: !muted, onClick: () => { toggleMuted() } },
       { label: s.fast, checked: settings.fast, onClick: () => {
         const fast = !settings.fast
-        const ratio = fast ? 1.5 : 1 / 1.5
-        for (let i = 0; i < game.current.atomCount; i++) {
-          game.current.vx[i] *= ratio
-          game.current.vy[i] *= ratio
-        }
-        game.current.fast = fast
+        announce(s.fastPending(fast))
         const next = { ...settings, fast }
         saveGame('jezzbald', next)
         setSettings(next)
@@ -289,144 +322,170 @@ export default function JezzBald({ close }: AppProps) {
       { label: s.about, onClick: () => setModal('about') }] },
   ]
 
-  return <div className={`jezzbald${touch ? ' jezzbald-touch' : ''}`}>
+  return <div className={`jezzbald${layout.controls ? ' jezzbald-touch' : ''}${layout.landscape ? ' jezzbald-landscape' : ''}`}
+    onPointerDownCapture={(e) => {
+      setTouch(e.pointerType === 'touch')
+      if (e.pointerType === 'touch') {
+        cursor.current.visible = false
+        paint()
+      }
+    }}>
     <GameMenuBar menus={menus} onOpenChange={setMenuOpen} />
-    <div className="jezzbald-surface" ref={surface} tabIndex={0} role="application" aria-label={s.title}
-      onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={(e) => {
-        if (!active || hidden || modal || menuOpen || e.altKey || e.ctrlKey || e.metaKey) return
-        unlockAudio()
-        if (e.key === 'F1' || e.key === 'F2' || e.key === 'F3') return
-        if (paused || game.current.phase === 'complete') {
+    <div className="jezzbald-body" ref={body} style={layout.landscape
+      ? { gridTemplateColumns: `minmax(0, 1fr) ${layout.width}px minmax(0, 1fr)` }
+      : { gridTemplateRows: `${layout.height}px ${STATUS_HEIGHT}px minmax(0, 1fr)` }}>
+      <div className={`jezzbald-surface${blocked || g.phase !== 'playing' || touch ? ' jezzbald-native-cursor' : ''}`}
+        style={{ width: layout.width, height: layout.height }} ref={surface} tabIndex={0} role="application" aria-label={s.title}
+        onContextMenu={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (!active || hidden || modal || menuOpen || e.altKey || e.ctrlKey || e.metaKey) return
+          unlockAudio()
+          if (e.key === 'F1' || e.key === 'F2' || e.key === 'F3' || (e.key === 'Escape' && game.current.phase !== 'complete')) return
+          if (paused || game.current.phase === 'complete') {
+            e.preventDefault()
+            if (paused) setPaused(false)
+            else skipReveal()
+            return
+          }
+          if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'r', 'R', 'Tab'].includes(e.key)) return
           e.preventDefault()
-          if (paused) setPaused(false)
-          else skipReveal()
-          return
-        }
-        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'r', 'R', 'Tab'].includes(e.key)) return
-        e.preventDefault()
-        if (e.key === 'r' || e.key === 'R' || e.key === 'Tab') changeOrientation()
-        else if (e.key === ' ') build()
-        else {
-          if (e.key === 'ArrowLeft') cursor.current.x = Math.max(0, cursor.current.x - 1)
-          if (e.key === 'ArrowRight') cursor.current.x = Math.min(COLS - 1, cursor.current.x + 1)
-          if (e.key === 'ArrowUp') cursor.current.y = Math.max(0, cursor.current.y - 1)
-          if (e.key === 'ArrowDown') cursor.current.y = Math.min(ROWS - 1, cursor.current.y + 1)
-          paint()
-        }
-      }}
-      onPointerMove={(e) => {
-        if (e.pointerType !== 'touch') {
-          point(e)
-          return
-        }
-        if (e.pointerId === gesture.current.primary && Math.hypot(e.clientX - gesture.current.startX, e.clientY - gesture.current.startY) > 10) {
-          gesture.current.skip = true
-          cancelPress()
-        }
-      }}
-      onPointerDown={(e) => {
-        e.preventDefault()
-        if (!active || hidden || modal || menuOpen) return
-        const resumed = activate()
-        point(e)
-        if (resumed) return
-        if (e.pointerType !== 'touch') {
           setTouch(false)
-          if (e.button === 2) changeOrientation()
-          else if (e.button === 0) build()
-          return
-        }
-        setTouch(true)
-        e.currentTarget.setPointerCapture(e.pointerId)
-        const state = gesture.current
-        if (state.primary !== -1) {
-          state.secondary = e.pointerId
-          state.skip = true
-          cancelPress()
-          changeOrientation()
-          return
-        }
-        state.primary = e.pointerId
-        state.secondary = -1
-        state.skip = false
-        state.x = cursor.current.x
-        state.y = cursor.current.y
-        state.startX = e.clientX
-        state.startY = e.clientY
-        const rect = e.currentTarget.getBoundingClientRect()
-        setRing({ x: (e.clientX - rect.left) / rect.width * 100, y: (e.clientY - rect.top) / rect.height * 100 })
-        pressTimer.current = window.setTimeout(() => {
-          pressTimer.current = undefined
-          state.skip = true
-          setRing(null)
-          navigator.vibrate?.(10)
-          cursor.current.x = state.x
-          cursor.current.y = state.y
-          changeOrientation()
-          build()
-        }, 450)
-      }}
-      onPointerUp={(e) => {
-        if (e.pointerType !== 'touch') return
-        const state = gesture.current
-        if (e.pointerId === state.primary) {
-          cancelPress()
-          if (!state.skip && state.secondary === -1) {
+          cursor.current.visible = true
+          if (e.key === 'r' || e.key === 'R' || e.key === 'Tab') changeOrientation()
+          else if (e.key === ' ') build()
+          else {
+            if (e.key === 'ArrowLeft') moveCursor(cursor.current, -1, 0)
+            if (e.key === 'ArrowRight') moveCursor(cursor.current, 1, 0)
+            if (e.key === 'ArrowUp') moveCursor(cursor.current, 0, -1)
+            if (e.key === 'ArrowDown') moveCursor(cursor.current, 0, 1)
+            paint()
+          }
+        }}
+        onPointerMove={(e) => {
+          if (e.pointerType !== 'touch') {
+            cursor.current.visible = true
+            setTouch(false)
+            point(e)
+            return
+          }
+          if (e.pointerId === gesture.current.primary && Math.hypot(e.clientX - gesture.current.startX, e.clientY - gesture.current.startY) > 10) {
+            gesture.current.skip = true
+            cancelPress()
+          }
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'touch') return
+          cursor.current.visible = false
+          paint()
+        }}
+        onPointerDown={(e) => {
+          e.preventDefault()
+          if (!active || hidden || modal || menuOpen) return
+          cursor.current.visible = e.pointerType !== 'touch'
+          const resumed = activate()
+          point(e)
+          if (resumed) return
+          if (e.pointerType !== 'touch') {
+            if (e.button === 2) changeOrientation()
+            else if (e.button === 0) build()
+            return
+          }
+          e.currentTarget.setPointerCapture(e.pointerId)
+          const state = gesture.current
+          if (state.primary !== -1) {
+            state.secondary = e.pointerId
+            state.skip = true
+            cancelPress()
+            changeOrientation()
+            return
+          }
+          state.primary = e.pointerId
+          state.secondary = -1
+          state.skip = false
+          state.x = cursor.current.x
+          state.y = cursor.current.y
+          state.startX = e.clientX
+          state.startY = e.clientY
+          const rect = e.currentTarget.getBoundingClientRect()
+          setRing({ x: (e.clientX - rect.left) / rect.width * 100, y: (e.clientY - rect.top) / rect.height * 100 })
+          pressTimer.current = window.setTimeout(() => {
+            pressTimer.current = undefined
+            state.skip = true
+            setRing(null)
+            if (interaction.current) return
             cursor.current.x = state.x
             cursor.current.y = state.y
-            build()
+            if (longPressWall(game.current, cursor.current)) {
+              navigator.vibrate?.(10)
+              setOrientation(cursor.current.orientation)
+              audio.update(game.current)
+              refresh((value) => value + 1)
+              paint()
+            }
+          }, 450)
+        }}
+        onPointerUp={(e) => {
+          if (e.pointerType !== 'touch') return
+          const state = gesture.current
+          if (e.pointerId === state.primary) {
+            cancelPress()
+            if (!state.skip && state.secondary === -1) {
+              cursor.current.x = state.x
+              cursor.current.y = state.y
+              build()
+            }
+            state.primary = -1
           }
-          state.primary = -1
-        }
-        if (e.pointerId === state.secondary) state.secondary = -1
-      }}
-      onPointerCancel={() => {
-        gesture.current.primary = gesture.current.secondary = -1
-        gesture.current.skip = true
-        cancelPress()
-      }}
-      onLostPointerCapture={(e) => {
-        if (e.pointerId !== gesture.current.primary && e.pointerId !== gesture.current.secondary) return
-        gesture.current.primary = gesture.current.secondary = -1
-        gesture.current.skip = true
-        cancelPress()
-      }}>
-      <canvas ref={canvas.ref} />
-      {ring && <span className="jezzbald-ring" style={{ left: `${ring.x}%`, top: `${ring.y}%` }} />}
-      {paused && <div className="jezzbald-overlay"><strong>{s.paused}</strong><span>{s.resume}</span></div>}
-      {!paused && g.phase === 'over' && <div className="jezzbald-overlay"><strong>{s.over}</strong><span>{s.overMessage}</span>
-        <button type="button" className="btn" onClick={newGame}>{s.newGame.replace('&', '')}</button></div>}
-      {!paused && g.phase === 'playing' && g.starts === 0 && <div className="jezzbald-caption">{s.start}</div>}
-      {!paused && g.phase === 'complete' && painter.current && painter.current.art.idx >= 0 &&
-        <div className="jezzbald-caption">{s.caption(g.level, painter.current.art.idx, painter.current.art.epithet)}</div>}
-      {balloon && g.phase === 'playing' && <button type="button" className="jezzbald-balloon"
-        onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} onClick={() => setBalloon(false)}>{s.lifeLost}</button>}
-    </div>
-    <div className="jezzbald-status">
-      <span>{s.level}: {g.level} · {s.lives}: {g.lives}</span>
-      <span>{s.area}: {g.area}%</span>
-      <span>{s.score}: {g.score} · {s.time}: {Math.ceil(g.remaining / 1000)}</span>
-    </div>
-    <div className="jezzbald-controls">
-      <button type="button" className="btn" aria-label={s.orientation} onClick={() => {
-        unlockAudio()
-        changeOrientation()
-      }}>
-        {orientation === 'horizontal' ? s.horizontal : s.vertical}
-      </button>
-      <button type="button" className="btn" onClick={() => { if (!activate()) build() }}>{s.build}</button>
-      <button type="button" className="btn" onClick={() => setPaused((value) => !value)}>{s.pause.replace('&', '')}</button>
+          if (e.pointerId === state.secondary) state.secondary = -1
+        }}
+        onPointerCancel={() => {
+          gesture.current.primary = gesture.current.secondary = -1
+          gesture.current.skip = true
+          cancelPress()
+        }}
+        onLostPointerCapture={(e) => {
+          if (e.pointerId !== gesture.current.primary && e.pointerId !== gesture.current.secondary) return
+          gesture.current.primary = gesture.current.secondary = -1
+          gesture.current.skip = true
+          cancelPress()
+        }}>
+        <canvas ref={canvas.ref} />
+        {ring && <span className="jezzbald-ring" style={{ left: `${ring.x}%`, top: `${ring.y}%` }} />}
+        {paused && <div className="jezzbald-overlay"><strong>{s.paused}</strong><span>{layout.controls ? s.resumeTouch : s.resume}</span></div>}
+        {!paused && g.phase === 'over' && <div className="jezzbald-overlay"><strong>{s.over}</strong><span>{s.overMessage}</span>
+          <button type="button" className="btn" onClick={newGame}>{s.newGame.replace('&', '')}</button></div>}
+        {!paused && g.phase === 'complete' && <div className="jezzbald-caption">
+          {painter.current && painter.current.art.idx >= 0 ? s.caption(g.level, painter.current.art.idx, painter.current.art.epithet) : s.levelComplete}
+          {revealed && <small>{layout.controls ? s.tallyTouch : s.tallyPrompt}</small>}
+        </div>}
+        {balloon && !paused && g.phase === 'playing' && <button type="button" className="jezzbald-balloon"
+          onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} onClick={() => setBalloon(false)}>{s.lifeLost}</button>}
+      </div>
+      <div className="jezzbald-status">
+        <span>{s.level}: {g.level} · {s.lives}: {g.lives}</span>
+        <span>{s.area}: {g.area}%</span>
+        <span>{s.score}: {s.number(g.score)} · {s.time}: {Math.ceil(g.remaining / 1000)}</span>
+        <small className="jezzbald-start-hint">{settings.fast !== g.fast ? s.fastPending(settings.fast)
+          : g.phase === 'playing' && g.starts === 0 ? s.start : ''}</small>
+      </div>
+      <div className="jezzbald-controls">
+        <button type="button" className="btn" aria-label={s.orientation} onClick={() => {
+          if (activate()) return
+          changeOrientation()
+        }}>
+          {orientation === 'horizontal' ? s.horizontal : s.vertical}
+        </button>
+        <button type="button" className="btn" onClick={() => { if (!activate()) build() }}>{s.build}</button>
+        <button type="button" className="btn" onClick={() => setPaused((value) => !value)}>{paused ? s.resumeButton : s.pause.replace('&', '')}</button>
+      </div>
     </div>
     <div className="jezzbald-live" aria-live="polite">{announcement}</div>
-    {modal === 'help' && <GameDialog title={s.helpTitle} onClose={() => setModal(null)} width={440}>
-      <div className="jezzbald-help-tabs" role="tablist">{s.tabs.map((label, index) => <button key={label} type="button" role="tab"
-        aria-selected={helpTab === index} id={`jezzbald-tab-${index}`} aria-controls="jezzbald-help-panel" onClick={() => setHelpTab(index)}>{label}</button>)}</div>
-      <p id="jezzbald-help-panel" role="tabpanel" aria-labelledby={`jezzbald-tab-${helpTab}`}>{s.helpText[helpTab]}</p>
+    {modal === 'help' && <GameDialog title={s.helpTitle} onClose={() => setModal(null)} width={440} className="jezzbald-help">
+      <GameHelpTabs tabs={s.tabs} selected={helpTab} onChange={setHelpTab}><p>{s.helpText[helpTab]}</p></GameHelpTabs>
     </GameDialog>}
     {modal === 'about' && <AboutDialog game={s.title} icon={icon} version={s.version} flavour={s.flavour} lines={s.aboutLines}
       onClose={() => setModal(null)} />}
-    {modal === 'scores' && <BestScoresDialog title={s.scoreTitle}
+    {modal === 'scores' && <BestScoresDialog title={s.scoreTitle} format={s.number}
       rows={Array.from({ length: 10 }, (_, index) => ({ label: s.rank(index + 1), score: settings.scores[index]?.score ?? null,
         name: settings.scores[index]?.name }))}
       onReset={() => {
@@ -445,8 +504,8 @@ export default function JezzBald({ close }: AppProps) {
     {modal === 'complete' && <GameDialog title={s.levelComplete} onClose={continueLevel} width={330}
       buttons={[{ label: s.next, onClick: continueLevel, default: true }]}>
       <dl className="jezzbald-tally">
-        <dt>{s.areaBonus}</dt><dd>{g.tally.area}</dd><dt>{s.livesBonus}</dt><dd>{g.tally.lives}</dd>
-        <dt>{s.timeBonus}</dt><dd>{g.tally.time}</dd><dt>{s.total}</dt><dd>{g.tally.total}</dd>
+        <dt>{s.areaBonus}</dt><dd>{s.number(g.tally.area)}</dd><dt>{s.livesBonus}</dt><dd>{s.number(g.tally.lives)}</dd>
+        <dt>{s.timeBonus}</dt><dd>{s.number(g.tally.time)}</dd><dt>{s.total}</dt><dd>{s.number(g.tally.total)}</dd>
       </dl>
     </GameDialog>}
   </div>

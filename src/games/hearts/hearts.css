@@ -1,33 +1,50 @@
-.hearts-game { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #008000; font: 11px var(--font); }
+.hearts-game { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: #008000; font: 11px var(--font); }
 .hearts-surface { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; outline: none; }
 .hearts-surface:focus-visible { outline: 1px dotted #fff; outline-offset: -2px; }
 .hearts-surface canvas { position: absolute; width: 100%; height: 100%; }
 .hearts-status { height: 24px; flex-shrink: 0; background: #ece9d8; color: #000; border-top: 1px solid #808080; padding: 4px 7px; }
 .hearts-plates { position: absolute; pointer-events: none; }
-.hearts-plate { position: absolute; display: flex; align-items: center; gap: 4px; color: #fff; text-shadow: 1px 1px #004000; max-width: 160px; }
+.hearts-plate { position: absolute; display: flex; align-items: center; gap: 4px; color: #fff; text-shadow: 1px 1px #004000; }
 .hearts-plate img, .hearts-portrait-placeholder { width: 48px; height: 48px; object-fit: cover; border: 1px solid #c0c0c0; background: #808080; flex-shrink: 0; }
 .hearts-portrait-placeholder { background: radial-gradient(ellipse at 50% 37%, #c0c0c0 0 22%, transparent 24%), radial-gradient(ellipse at 50% 110%, #c0c0c0 0 47%, #808080 49%); }
-.hearts-plate.seat-1 { left: 1%; top: 20%; }
-.hearts-plate.seat-2 { left: 50%; top: 1%; transform: translateX(-50%); }
-.hearts-plate.seat-3 { right: 1%; top: 20%; flex-direction: row-reverse; text-align: right; }
-.hearts-your-score { position: absolute; bottom: 1%; left: 2%; color: #fff; }
-.hearts-pass { position: absolute; left: 50%; top: 64%; transform: translateX(-50%); min-width: 100px; min-height: 32px; }
+.hearts-plate.seat-3 { flex-direction: row-reverse; text-align: right; }
+.hearts-opponent-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.hearts-opponent-name { overflow-wrap: anywhere; }
+.hearts-your-score { position: absolute; display: flex; align-items: center; justify-content: space-between; color: #fff; }
+.hearts-pass { position: absolute; min-height: 32px; }
+.hearts-hand-viewport { position: absolute; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior: contain;
+  scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.hearts-hand-viewport::-webkit-scrollbar { display: none; }
+.hearts-hand-content { position: relative; }
+.hearts-card-target { position: absolute; min-width: 0; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; color: transparent;
+  box-shadow: none; touch-action: pan-x; scroll-snap-align: start; }
+.hearts-card-target:hover, .hearts-card-target:active, .hearts-card-target:disabled { background: transparent; box-shadow: none; }
+.hearts-hand-edge { position: absolute; width: 12px; pointer-events: none; }
+.hearts-hand-edge-left { background: linear-gradient(to right, #008000, #00800000); }
+.hearts-hand-edge-right { background: linear-gradient(to left, #008000, #00800000); }
+.hearts-hand-navigation { position: absolute; display: flex; align-items: center; justify-content: space-between; gap: 4px; color: #fff; }
+.hearts-hand-navigation button { width: 44px; height: 44px; flex-shrink: 0; font: bold 20px var(--font); }
+.hearts-hand-caption { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 11px var(--font); }
+.hearts-trick-seat { position: absolute; width: 71px; height: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff; text-align: center; font: 11px/11px var(--font); pointer-events: none; }
 .hearts-balloon { position: absolute; z-index: 4; background: #ffffe1; border: 1px solid #000; border-radius: 6px; padding: 7px 10px;
-  color: #000; white-space: nowrap; max-width: 95%; pointer-events: none; box-shadow: 2px 2px 2px #0004; }
+  color: #000; font: 11px var(--font); white-space: nowrap; max-width: 95%; pointer-events: none; box-shadow: 2px 2px 2px #0004; }
 .hearts-balloon::after { content: ''; position: absolute; top: -6px; left: 18px; width: 10px; height: 10px; background: #ffffe1;
   border-top: 1px solid #000; border-left: 1px solid #000; transform: rotate(45deg); }
 .balloon-0 { bottom: 24%; left: 25%; }.balloon-1 { left: 2%; top: 34%; }.balloon-2 { left: 30%; top: 16%; }.balloon-3 { right: 2%; top: 34%; }
-.hearts-rugged { position: absolute; bottom: 25%; left: 43%; border: 3px double #e00000; color: #e00000; font: bold 14px monospace;
-  padding: 2px 4px; transform: rotate(-8deg); animation: hearts-stamp .2s steps(3, end) forwards; }
-@keyframes hearts-stamp { 0% { opacity: 1; transform: rotate(-8deg) scale(1.3); } 25% { transform: rotate(-8deg) scale(1); } 100% { opacity: 0; } }
+.balloon-0::after { top: auto; bottom: -6px; transform: rotate(225deg); }
+.balloon-1::after { top: 10px; left: -6px; transform: rotate(-45deg); }
+.balloon-2::after { top: -6px; transform: rotate(45deg); }
+.balloon-3::after { top: 10px; left: auto; right: -6px; transform: rotate(135deg); }
+.hearts-rugged { position: absolute; bottom: 25%; left: 43%; overflow: visible; transform: rotate(-8deg); animation: hearts-stamp .2s steps(1, end) forwards; }
+@keyframes hearts-stamp { 0% { opacity: 1; } 33% { opacity: .66; } 66% { opacity: .33; } 100% { opacity: 0; } }
 .hearts-moon { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.hearts-moon[style*='paused'] * { animation-play-state: paused !important; }
 .hearts-moon strong { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); white-space: nowrap;
   color: #fff; font: bold 34px 'Trebuchet MS', sans-serif; -webkit-text-stroke: 1px #000; text-shadow: 2px 2px #000; }
-.hearts-moon-disc { position: absolute; top: 10px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: #fff0a0; box-shadow: inset -8px -4px #e0d080; }
+.hearts-moon-disc { position: absolute; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: #fff0a0; box-shadow: inset -8px -4px #e0d080; }
 .hearts-rocket { position: absolute; width: 28px; height: 60px; image-rendering: pixelated; animation: hearts-flight 2.5s ease-in forwards;
-  offset-path: path('M 320 350 Q 150 100 600 30'); offset-rotate: auto -90deg; }
-.rocket-1 { offset-path: path('M 70 220 Q 170 20 600 30'); }.rocket-2 { offset-path: path('M 320 60 Q 440 200 600 30'); }
-.rocket-3 { offset-path: path('M 570 220 Q 300 100 600 30'); }
+  offset-rotate: auto 90deg; }
 .rocket-card { position: absolute; width: 28px; height: 38px; left: 0; top: 10px; border: 2px solid #000; background: #fff; color: #e00000; font: bold 14px monospace; }
 .rocket-nose { position: absolute; left: 0; top: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-bottom: 12px solid #e00000; }
 .rocket-fins { position: absolute; width: 40px; height: 12px; background: #0000c0; left: -6px; top: 38px; clip-path: polygon(0 100%, 15% 0, 85% 0, 100% 100%); }
@@ -38,9 +55,22 @@
 @keyframes hearts-exhaust { to { height: 10px; } }
 .hearts-sheet { max-height: 300px; overflow: auto; }.hearts-sheet table { border-collapse: collapse; width: 100%; }
 .hearts-sheet th, .hearts-sheet td { padding: 5px 6px; border: 1px solid #808080; text-align: center; }
-.hearts-sheet small { color: #555; }.hearts-game fieldset { margin: 8px 0; padding: 8px; }
-.hearts-game fieldset label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.hearts-game fieldset input[type=text], .hearts-game fieldset input:not([type]) { margin-left: auto; width: 170px; }
-@media (max-width: 719px) { .hearts-plate { font-size: 10px; max-width: 130px; }.hearts-plate.seat-1, .hearts-plate.seat-3 { top: 24%; }
-  .hearts-balloon { font-size: 10px; white-space: normal; }.hearts-moon strong { font-size: 25px; }.hearts-pass { min-height: 44px; } }
+.hearts-sheet small { color: #555; }
+.hearts-sheet-flavour td { font: italic 11px var(--font); text-align: left; white-space: nowrap; }
+.hearts-options fieldset { margin: 8px 0; padding: 8px; }
+.hearts-options fieldset label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.hearts-options fieldset input[type=text], .hearts-options fieldset input:not([type]) { margin-left: auto; width: 170px; max-width: 70%; }
+.hearts-peek-hands { max-height: 380px; overflow: auto; }
+.hearts-peek-hands p { margin: 6px 0; }
+.hearts-peek-hands canvas { display: block; max-width: 100%; }
+.hearts-pocket .hearts-surface { touch-action: pan-x; }
+.hearts-pocket-plates .hearts-plate { flex-direction: column; gap: 3px; text-align: center; }
+.hearts-pocket-plates .hearts-opponent-copy { width: 100%; gap: 2px; }
+.hearts-pocket-plates .hearts-opponent-name { height: 28px; overflow: hidden; line-height: 14px; }
+.hearts-pocket .hearts-balloon { font-size: 10px; white-space: normal; }
+.hearts-pocket .hearts-moon strong { font-size: 25px; }
+.hearts-pocket .hearts-pass { min-height: 44px; }
+.hearts-wide-short-plates .hearts-plate { flex-direction: row; text-align: left; }
+.hearts-wide-short-plates .hearts-plate.seat-3 { flex-direction: row-reverse; text-align: right; }
+.hearts-wide-short-plates .hearts-opponent-name { height: auto; max-height: 28px; }
 @media (prefers-reduced-motion: reduce) { .hearts-rocket { animation-duration: 1.5s; }.rocket-exhaust i { animation: none; } }

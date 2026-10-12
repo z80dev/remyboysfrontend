@@ -1,4 +1,5 @@
-import type { Note, Song } from '../../kit'
+import type { Note } from '../../../quest/music/song'
+import type { Song } from '../../kit'
 
 // Original 64-bar score in D: launch fanfare, two theme statements, orbital bridge,
 // broad reprise and an A dominant turnaround. All timing is on the sixteenth grid.

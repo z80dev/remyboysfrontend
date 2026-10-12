@@ -41,26 +41,65 @@
   text-align: center;
 }
 
-.nibbles-help-tabs {
+.nibbles-phone-score {
+  flex: none;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 4px;
+  padding: 4px 6px;
+  color: #ffff55;
+  background: #000000;
+  font: 14px/18px 'Courier New', monospace;
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
 }
 
-.nibbles-help-tabs button {
-  min-width: 56px;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid #808080;
-  background: #c0c0c0;
-  font: 11px var(--font);
+.nibbles-phone-score span {
+  font: inherit;
+  white-space: inherit;
+  font-variant-numeric: inherit;
 }
 
-.nibbles-help-tabs button[aria-selected='true'] {
-  background: #ffffff;
-  border-color: #000000;
+.nibbles-phone-score span:first-child:not(:last-child) {
+  color: #ff55ff;
 }
 
-.nibbles-help-tabs + p {
-  min-height: 100px;
-  line-height: 1.5;
+@media (pointer: coarse) and (max-height: 480px) {
+  .nibbles-client {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-rows: 22px auto minmax(0, 1fr);
+  }
+
+  .nibbles-client > .nibbles-menu {
+    grid-column: 1 / -1;
+  }
+
+  .nibbles-client .qbasic-letterbox {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .nibbles-client .nibbles-controls {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0;
+    padding: 4px;
+  }
+
+  .nibbles-controls form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nibbles-client .nibbles-phone-score {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
 }

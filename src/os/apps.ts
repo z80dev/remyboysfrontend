@@ -45,7 +45,7 @@ export type AppDef = {
   game?: boolean
   /** No Luna frame: the app paints its own skinned chrome (ChromeContext in Window.tsx). `size` only places it. */
   skinned?: boolean
-  /** Stays mounted while minimized (keeps playing); unmounting means it was closed. */
+  /** Retains the hidden physical frame/client; all open apps keep their React instance until closed. */
   persistent?: boolean
   Component: ComponentType<AppProps>
 }

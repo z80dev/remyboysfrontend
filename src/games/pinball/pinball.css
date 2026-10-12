@@ -1,12 +1,15 @@
 .pinball-app { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: #000; font: 11px var(--font); color: #d8e3ed; overflow: hidden; }
-.pinball-stage { position: relative; display: flex; width: 600px; height: 416px; flex: 0 0 auto; margin: auto; background: #000; }
+.pinball-stage { position: relative; display: flex; width: 600px; height: 416px; flex: 0 0 auto; margin: auto; background: #000; touch-action: none; }
+.pinball-playfield { display: flex; align-items: center; justify-content: center; width: 375px; height: 416px; flex: 0 0 auto; min-height: 0; }
 .pinball-table-wrap { position: relative; width: 375px; height: 416px; flex: 0 0 auto; }
+.pinball-panel-wrap { width: 225px; height: 416px; flex: 0 0 auto; }
 .pinball-table { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
 .pinball-table:focus-visible { outline: 1px dotted #e8f3ff; outline-offset: -3px; }
 .pinball-pause { position: absolute; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center; background: #000a; color: #c9f7ec; text-shadow: 0 2px #000; font: bold 18px var(--font); }
-.pinball-pause button { min-width: 120px; min-height: 44px; font: 12px var(--font); }
+.pinball-pause button { min-width: 120px; min-height: 44px; font: 12px var(--font); color: #000; text-shadow: none; }
 .pinball-touch { display: flex; gap: 6px; justify-content: center; flex: 0 0 auto; padding: 6px; background: linear-gradient(#283c58, #071323); }
 .pinball-touch button { min-width: 44px; min-height: 44px; padding: 4px 10px; touch-action: none; color: #e6f5ff; background: linear-gradient(#59728c, #1e344d); border: 2px outset #8a9aab; font: bold 13px var(--font); }
+.pinball-touch button:last-child { margin-left: auto; }
 .pinball-touch button:active { border-style: inset; background: #152f46; }
 .pinball-controls { display: grid; gap: 8px; color: #000; }
 .pinball-control-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
@@ -14,13 +17,45 @@
 .pinball-help-tabs { display: flex; gap: 2px; margin-bottom: 12px; }
 .pinball-help-tabs button { padding: 5px 12px; }
 .pinball-help-tabs button[aria-selected='true'] { font-weight: bold; background: #fff; }
-.pinball-help-copy { white-space: pre-line; line-height: 1.55; color: #000; }
+.pinball-help-copy { white-space: pre-line; line-height: 1.55; color: #000; max-height: min(320px, 55vh); overflow-y: auto; }
 .pinball-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.pinball-app:fullscreen { display: flex; justify-content: center; background: #000; }
-.pinball-app:fullscreen .pinball-stage { transform-origin: center; transform: scale(var(--pinball-scale, 1)); }
-@media (max-width: 719px) {
-  .pinball-stage { width: 100%; height: auto; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: center; margin: 0; }
-  .pinball-table-wrap { width: min(100%, calc((100dvh - 174px) * 375 / 416)); height: auto; aspect-ratio: 375 / 416; min-height: 0; flex: 0 1 auto; }
+.pinball-app:fullscreen, .pinball-fullviewport { display: flex; justify-content: center; background: #000; }
+.pinball-fullviewport { position: fixed; inset: 0; z-index: 10000; width: 100%; height: 100dvh; }
+.window:has(.pinball-fullviewport) { z-index: 10000 !important; }
+.window:has(.pinball-fullviewport) > .gk-modal { position: fixed; inset: 0; z-index: 10001; }
+body:has(.pinball-fullviewport) > .ctx-menu.gk-menu { z-index: 10002; }
+@media (min-width: 720px) {
+  .pinball-app:fullscreen .pinball-stage, .pinball-fullviewport .pinball-stage {
+    width: calc(600px * var(--pinball-scale, 1)); height: calc(416px * var(--pinball-scale, 1));
+  }
+  .pinball-app:fullscreen .pinball-playfield, .pinball-fullviewport .pinball-playfield,
+  .pinball-app:fullscreen .pinball-table-wrap, .pinball-fullviewport .pinball-table-wrap {
+    width: calc(375px * var(--pinball-scale, 1)); height: calc(416px * var(--pinball-scale, 1));
+  }
+  .pinball-app:fullscreen .pinball-panel-wrap, .pinball-fullviewport .pinball-panel-wrap {
+    width: calc(225px * var(--pinball-scale, 1)); height: calc(416px * var(--pinball-scale, 1));
+  }
+  .pinball-app:fullscreen .base-cadet-panel, .pinball-fullviewport .base-cadet-panel {
+    transform-origin: top left; transform: scale(var(--pinball-scale, 1));
+  }
+}
+@media (max-width: 720px), (pointer: coarse) and (max-height: 480px) {
+  :is(.pinball-app:fullscreen, .pinball-app) .pinball-stage {
+    width: 100%; height: auto; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: center; margin: 0;
+  }
+  :is(.pinball-app:fullscreen, .pinball-app) .pinball-playfield { width: 100%; height: 0; flex: 1 1 auto; container-type: size; }
+  :is(.pinball-app:fullscreen, .pinball-app) .pinball-table-wrap {
+    width: min(100cqw, calc(100cqh * 375 / 416)); height: auto; aspect-ratio: 375 / 416; flex: 0 0 auto; margin-top: auto;
+  }
+  :is(.pinball-app:fullscreen, .pinball-app) .pinball-panel-wrap { order: -1; width: 100%; height: 40px; }
+  :is(.pinball-app:fullscreen, .pinball-app) .base-cadet-panel { transform: none; }
   .pinball-table { width: 100%; height: 100%; }
   .pinball-touch { margin-top: auto; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+}
+@media (min-width: 720px) and (pointer: coarse) and (max-height: 480px) {
+  .pinball-app:not(.pinball-fullviewport) { position: relative; }
+  .pinball-touch {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 2; margin: 0; background: transparent; pointer-events: none;
+  }
+  .pinball-touch button { pointer-events: auto; }
 }

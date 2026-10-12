@@ -9,25 +9,6 @@ const glyphs: Record<string, string[]> = {
   H: ['11011', '11011', '11011', '11111', '11011', '11011', '11011'],
   L: ['11000', '11000', '11000', '11000', '11000', '11000', '11111'],
   A: ['01110', '11011', '11011', '11111', '11011', '11011', '11011'],
-  '2': ['01110', '11011', '00011', '00110', '01100', '11000', '11111'],
-  '3': ['11110', '00011', '00011', '01110', '00011', '00011', '11110'],
-  '4': ['00011', '00111', '01111', '11011', '11111', '00011', '00011'],
-  '5': ['11111', '11000', '11000', '11110', '00011', '11011', '01110'],
-  '6': ['01110', '11000', '11000', '11110', '11011', '11011', '01110'],
-  '7': ['11111', '00011', '00110', '00110', '01100', '01100', '01100'],
-  '8': ['01110', '11011', '11011', '01110', '11011', '11011', '01110'],
-  '9': ['01110', '11011', '11011', '01111', '00011', '00011', '01110'],
-  '1': ['010', '110', '010', '010', '010', '010', '111'],
-  '0': ['01110', '11011', '11011', '11011', '11011', '11011', '01110'],
-  J: ['00111', '00011', '00011', '00011', '11011', '11011', '01110'],
-  Q: ['01110', '11011', '11011', '11011', '11011', '01110', '00011'],
-  K: ['11011', '11011', '11110', '11100', '11110', '11011', '11011'],
-  R: ['11110', '11011', '11011', '11110', '11100', '11010', '11011'],
-  E: ['11111', '11000', '11000', '11110', '11000', '11000', '11111'],
-  M: ['11011', '11111', '11111', '11011', '11011', '11011', '11011'],
-  Y: ['11011', '11011', '01110', '00100', '00100', '00100', '00100'],
-  O: ['01110', '11011', '11011', '11011', '11011', '11011', '01110'],
-  S: ['01111', '11000', '11000', '01110', '00011', '00011', '11110'],
   f: ['00111', '01100', '01100', '11110', '01100', '01100', '01100'],
 }
 const rankText = (rank: number) => rank === 1 ? 'A' : rank === 11 ? 'J' : rank === 12 ? 'Q' : rank === 13 ? 'K' : String(rank)
@@ -91,28 +72,164 @@ function shell(c: CanvasRenderingContext2D) {
   c.lineWidth = 1
   c.stroke()
 }
-const pipMasks: Record<Suit, readonly string[]> = {
-  hearts: ['01110001110', '11111011111', '11111111111', '11111111111', '11111111111', '01111111110', '00111111100', '00011111000', '00001110000', '00000100000', '00000000000', '00000000000'],
-  diamonds: ['00000100000', '00001110000', '00011111000', '00111111100', '01111111110', '11111111111', '11111111111', '01111111110', '00111111100', '00011111000', '00001110000', '00000100000'],
-  spades: ['00000100000', '00001110000', '00011111000', '00111111100', '01111111110', '11111111111', '11111111111', '11111011111', '01110001110', '00000100000', '00001110000', '00011111000'],
-  clubs: ['00001110000', '00011111000', '00011111000', '00001110000', '01110101110', '11111111111', '11111111111', '11111111111', '01110101110', '00000100000', '00001110000', '00011111000'],
+// Authoritative native-pixel masks: local://cards-independent-art-fixes.md.
+const rankMasks: Record<string, readonly string[]> = {
+  A: ['...#...', '..###..', '..###..', '.##.##.', '.##.##.', '.#####.', '##...##', '##...##', '###.###'],
+  '2': ['.#####.', '##...##', '.....##', '....##.', '...##..', '..##...', '.##....', '##....#', '#######'],
+  '3': ['.#####.', '##...##', '.....##', '...###.', '.....##', '.....##', '.....##', '##...##', '.#####.'],
+  '4': ['....##.', '...###.', '..####.', '.##.##.', '##..##.', '#######', '....##.', '....##.', '...####'],
+  '5': ['#######', '##.....', '##.....', '######.', '.....##', '.....##', '.....##', '##...##', '.#####.'],
+  '6': ['..####.', '.##....', '##.....', '######.', '##...##', '##...##', '##...##', '##...##', '.#####.'],
+  '7': ['#######', '#....##', '....##.', '....##.', '...##..', '...##..', '..##...', '..##...', '..##...'],
+  '8': ['.#####.', '##...##', '##...##', '.#####.', '##...##', '##...##', '##...##', '##...##', '.#####.'],
+  '9': ['.#####.', '##...##', '##...##', '##...##', '.######', '.....##', '.....##', '....##.', '.####..'],
+  '10': ['.##..###.', '###.##.##', '.##.##.##', '.##.##.##', '.##.##.##', '.##.##.##', '.##.##.##', '.##.##.##', '####.###.'],
+  J: ['..#####', '....##.', '....##.', '....##.', '....##.', '....##.', '##..##.', '##..##.', '.####..'],
+  Q: ['.#####.', '##...##', '##...##', '##...##', '##...##', '##...##', '##.#.##', '.#####.', '....###'],
+  K: ['###.###', '.##.##.', '.####..', '.###...', '.####..', '.##.##.', '.##.##.', '.##..##', '###.###'],
 }
-function pipPath(c: CanvasRenderingContext2D, suit: Suit) {
-  c.beginPath()
-  const rows = pipMasks[suit]
+const indexMasks: Record<Suit, readonly string[]> = {
+  hearts: ['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
+  diamonds: ['...#...', '..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'],
+  spades: ['...#...', '..###..', '.#####.', '#######', '#######', '..#.#..', '.#####.'],
+  clubs: ['..###..', '..###..', '##.#.##', '#######', '##.#.##', '...#...', '..###..'],
+}
+const pipMasks: Record<Suit, readonly string[]> = {
+  hearts: ['.###...###.', '#####.#####', '###########', '###########', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '....###....', '.....#.....'],
+  diamonds: ['.....#.....', '....###....', '...#####...', '..#######..', '.#########.', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '.....#.....'],
+  spades: ['.....#.....', '....###....', '...#####...', '..#######..', '.#########.', '###########', '###########', '###########', '.###.#.###.', '.....#.....', '....###....', '..#######..'],
+  clubs: ['....###....', '...#####...', '...#####...', '...#####...', '.##.###.##.', '###########', '###########', '###########', '.##..#..##.', '.....#.....', '....###....', '..#######..'],
+}
+const aceMasks: Record<Exclude<Suit, 'spades'>, readonly string[]> = {
+  hearts: ['...####.....####...', '.#######...#######.', '.########.########.', '#########.#########', '###################', '###################', '###################', '.#################.', '..###############..', '...#############...', '...#############...', '....###########....', '.....#########.....', '.....#########.....', '......#######......', '......#######......', '.......#####.......', '.......#####.......', '........###........', '.........#.........', '.........#.........'],
+  diamonds: ['.........#.........', '........###........', '.......#####.......', '......#######......', '.....#########.....', '.....#########.....', '....###########....', '...#############...', '..###############..', '.#################.', '###################', '.#################.', '..###############..', '...#############...', '....###########....', '.....#########.....', '.....#########.....', '......#######......', '.......#####.......', '........###........', '.........#.........'],
+  clubs: ['.......#####.......', '......#######......', '.....#########.....', '.....#########.....', '.....#########.....', '.....#########.....', '..###############..', '.#################.', '###################', '###################', '###################', '###################', '###################', '.#######...#######.', '...###..###..###...', '........###........', '........###........', '........###........', '.......#####.......', '......#######......', '.....#########.....'],
+}
+const signatureSpade = [
+  '.................K.................',
+  '................KKK................',
+  '...............KRWGK...............',
+  '..............KRRWGGK..............',
+  '.............KRRRWGGGK.............',
+  '............KRRRRWGGGGK............',
+  '...........KRRRRRWGGGGGK...........',
+  '..........KRRRRRRWGGGGGGK..........',
+  '..........KRRRRRRWGGGGGGK..........',
+  '.........KRRRRRRRWGGGGGGGK.........',
+  '........KRRRRRRRRWGGGGGGGGK........',
+  '......KKRRRRRRRRRWGGGGGGGGGKK......',
+  '....KKRRRRRRRRRRRWGGGGGGGGGGGKK....',
+  '..KKRRRRRRRRRRRRRWGGGGGGGGGGGGGKK..',
+  '.KRRRRRRRRRRRRRRRWGGGGGGGGGGGGGGGK.',
+  '.KRRRRRRRRRRRRRRRWGGGGGGGGWWWWWWWK.',
+  'KRRRRRRRRRRRRRRRRWGGGGGWWWWYYYYYYYK',
+  'KRRRRRRRRRRRRRRRRWGGWWWWYYYYYYYYYYK',
+  'KRRRRRRRRRRRRRRRRWWWWYYYYYYYYYYYYYK',
+  'KWRRRRRRRRRRRRRWWWWYYYYYYYYYYYYYYYK',
+  'KWWWWWRRRRRWWWWWBWYYYYYYYYYYYYYYYYK',
+  'KBBBBWWWWWWWBBBBBWYYYYYYYYYYYYYYYYK',
+  'KBBBBBBBBBBBBBBBBWYYYYYYYYYYYYYYYYK',
+  'KBBBBBBBBBBBBBBBBWYYYYYYYYYYYYYYYYK',
+  'KBBBBBBBBBBBBBBBBWYYYYYYYYYYYYYYYYK',
+  'KBBBBBBBBBBBBBBBBWYYYYYYYYYYYYYYYYK',
+  '.KBBBBBBBBBBBBBKKKKKYYYYYYYYYYYYYK.',
+  '..KBBBBBBBBBBBK.KKK.KYYYYYYYYYYYK..',
+  '...KKBBBBBBBKK..KKK..KKYYYYYYYKK...',
+  '.....KKKKKKK....KKK....KKKKKKK.....',
+  '...............KKKKK...............',
+  '...............KKKKK...............',
+  '..............KKKKKKK..............',
+  '.............KKKKKKKKK.............',
+  '............KKKKKKKKKKK............',
+  '...........KKKKKKKKKKKKK...........',
+  '..........KKKKKKKKKKKKKKK..........',
+]
+const signatureRibbon = [
+  '....KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK....',
+  '....KRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRK....',
+  'KKKKKRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRKKKKK',
+  'KDDDKRRWWRRWWWRWRRRWRWRWRRRWWWRWWWRRKDDDK',
+  'KDDDKRRWRWRWRRRWWRWWRWRWRRRWRWRWRRRRKDDDK',
+  '.KDDKRRWWRRWWRRWRWRWRRWRRRRWRWRWWWRRKDDK.',
+  '..KDKRRWRWRWRRRWRRRWRRWRRRRWRWRRRWRRKDK..',
+  '...KKRRWRWRWWWRWRRRWRRWRRRRWWWRWWWRRKK...',
+  '..KDKRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRKDK..',
+  '.KDDKRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRKDDK.',
+  'KDDDKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKDDDK',
+  'KDDDK...............................KDDDK',
+  'KKKKK...............................KKKKK',
+]
+const recycleMask = [
+  '.........#######.........', '.......###########.......', '.....###############.....',
+  '....#################....', '...#####.........#####...', '..#####...........#####..',
+  '..####.............####..', '.####...............####.', '.###.................###.',
+  '####.................####', '####.................####', '####.................####',
+  '####.................####', '####.................####', '####.................####',
+  '####.................####', '.###.................###.', '.####...............####.',
+  '..####.............####..', '..#####...........#####..', '...#####.........#####...',
+  '....#################....', '.....###############.....', '.......###########.......',
+  '.........#######.........',
+]
+const exhaustedMask = [
+  '##...................##', '###.................###', '.###...............###.',
+  '..###.............###..', '...###...........###...', '....###.........###....',
+  '.....###.......###.....', '......###.....###......', '.......###...###.......',
+  '........###.###........', '.........#####.........', '..........###..........',
+  '.........#####.........', '........###.###........', '.......###...###.......',
+  '......###.....###......', '.....###.......###.....', '....###.........###....',
+  '...###...........###...', '..###.............###..', '.###...............###.',
+  '###.................###', '##...................##',
+]
+const ghostMask = [
+  '.......hhhhhhhhhhhhh.......', '.....hhhhhhhhhhhhhhhhh.....', '....hhhhhhhhhhhhhhhhhhh....',
+  '...hhhhhhhhhhhhhhhhhhhhh...', '..hhhhhhhhhhhhhhhhhhhhhhh..', '..hhhhhhhhhhhhhhhhhhhhhhh..',
+  '.hhhhhhhhhhhhhhhhhhhhhhhhh.', '.hhhohhhhhohhhhhohhhhhohhh.', '.hhoooohhoooohhoooohhooooh.',
+  '.hoooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.', '.ooooKKKKoooooooooKKKKoooo.',
+  '.ooooKwKKoooooooooKwKKoooo.', '.ooooKKKKoooooooooKKKKoooo.', '.ooooKKKKoooooooooKKKKoooo.',
+  '.ooooKKKKoooooooooKKKKoooo.', '.ooooooooooooooooooooooooo.', '.oooooooooooKKKooooooooooo.',
+  '.ooooooooooKoooKoooooooooo.', '.oooooooooooKKKooooooooooo.', '.ooooooooooooooooooooooooo.',
+  '.ooooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.',
+  '.ooooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.',
+  '.ooooooooooooooooooooooooo.', '.ooooooooooooooooooooooooo.', '.ooooooo.ooooooooo.ooooooo.',
+  '.oooooo...ooooooo...oooooo.', '.ooooo.....ooooo.....ooooo.', '..ooo.......ooo.......oooo.',
+]
+const signatureColors: Record<string, string> = { K: '#000000', R: FLAG_COLORS[0], G: FLAG_COLORS[1], B: FLAG_COLORS[2], Y: FLAG_COLORS[3], W: '#ffffff' }
+const ribbonColors: Record<string, string> = { K: '#000000', R: '#e00000', D: '#800000', W: '#ffffff' }
+const ghostColors: Record<string, string> = { o: '#e0f8ff', h: '#c8e0f0', K: '#000000', w: '#ffffff' }
+function colorMask(c: CanvasRenderingContext2D, rows: readonly string[], x: number, y: number, colors: Readonly<Record<string, string>>, dither = false) {
   for (let row = 0; row < rows.length; row++) {
-    for (let col = 0; col < rows[row].length; col++) if (rows[row][col] === '1') c.rect(col - 5.5, row - 6, 1, 1)
+    for (let col = 0; col < rows[row].length;) {
+      const cell = rows[row][col]
+      if (!colors[cell] || dither && row >= 22 && cell === 'o' && (col + row) % 2 === 1) { col++; continue }
+      const start = col++
+      while (col < rows[row].length && rows[row][col] === cell && !(dither && row >= 22 && cell === 'o' && (col + row) % 2 === 1)) col++
+      c.fillStyle = colors[cell]
+      c.fillRect(x + start, y + row, col - start, 1)
+    }
   }
 }
-function pip(c: CanvasRenderingContext2D, suit: Suit, x: number, y: number, scale = 1, inverted = false) {
-  c.save()
-  c.translate(x, y)
-  c.scale(scale, scale)
-  if (inverted) c.rotate(Math.PI)
+function mask(c: CanvasRenderingContext2D, rows: readonly string[], x: number, y: number, inverted = false, scale = 1) {
+  const width = rows[0].length
+  for (let row = 0; row < rows.length; row++) {
+    for (let col = 0; col < width;) {
+      if (rows[row][col] !== '#') { col++; continue }
+      const start = col++
+      while (col < width && rows[row][col] === '#') col++
+      c.fillRect(x + (inverted ? width - col : start) * scale, y + (inverted ? rows.length - 1 - row : row) * scale, (col - start) * scale, scale)
+    }
+  }
+}
+function pip(c: CanvasRenderingContext2D, suit: Suit, x: number, y: number, inverted = false) {
   c.fillStyle = suit === 'hearts' || suit === 'diamonds' ? '#ff0000' : '#000000'
-  pipPath(c, suit)
-  c.fill()
-  c.restore()
+  mask(c, pipMasks[suit], x, y, inverted)
+}
+export function drawCardIndex(c: CanvasRenderingContext2D, card: Card, x: number, y: number, scale = 1): void {
+  scale = Math.max(1, Math.round(Number.isFinite(scale) ? scale : 1))
+  x = Math.round(x)
+  y = Math.round(y)
+  c.fillStyle = card.suit === 'hearts' || card.suit === 'diamonds' ? '#ff0000' : '#000000'
+  mask(c, rankMasks[rankText(card.rank)], x, y, false, scale)
+  mask(c, indexMasks[card.suit], x + (card.rank === 10 ? scale : 0), y + 10 * scale, false, scale)
 }
 
 // No eager fetches: only the portraits actually painted get resolved and decoded.
@@ -121,6 +238,8 @@ const resolved = new Map<string, Promise<number>>()
 const listeners = new Set<() => void>()
 const backCache = new Map<string, HTMLCanvasElement>()
 const faceCache = new Map<string, HTMLCanvasElement>()
+let courtCrops = new WeakMap<HTMLImageElement, Map<number, HTMLCanvasElement>>()
+let courtCropCount = 0
 export function subscribeCardArt(listener: () => void): () => void {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
@@ -145,6 +264,8 @@ function portrait(seed: number, cabald = false, raw = false): HTMLImageElement |
       art.set(key, image)
       backCache.clear()
       faceCache.clear()
+      courtCrops = new WeakMap()
+      courtCropCount = 0
       for (const listener of listeners) listener()
     }).catch(() => { /* The monogram remains readable offline. */ })
   }
@@ -157,13 +278,14 @@ const courts: Record<Suit, readonly number[]> = {
   spades: [1010, 67, 2086],
 }
 function monogram(c: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, h: number) {
-  rect(c, '#000080', x, y, w, h)
-  polygon(c, '#e00000', [x, y + h, x + w / 2, y + 3, x + w, y + h])
-  oval(c, '#ffd700', x + w / 2, y + h / 2, 11, 12)
-  c.fillStyle = '#000000'
-  bitmap(c, text, x + w / 2 - 5, y + h / 2 - 7, 2)
-  rect(c, '#fff4b0', x + 3, y + 3, 2, 2)
-  rect(c, '#fff4b0', x + w - 5, y + h - 5, 2, 2)
+  rect(c, '#ffd700', x, y, w, h)
+  const left = Math.floor(x + (w - 14) / 2)
+  const top = Math.floor(y + (h - 18) / 2)
+  const rows = rankMasks[text] ?? rankMasks.K
+  c.fillStyle = '#e00000'
+  mask(c, rows, left + 1, top + 1, false, 2)
+  c.fillStyle = '#0000c0'
+  mask(c, rows, left, top, false, 2)
 }
 function crop(c: CanvasRenderingContext2D, image: HTMLImageElement | null, x: number, y: number, w: number, h: number, letter: string) {
   if (!image) return monogram(c, letter, x, y, w, h)
@@ -173,7 +295,35 @@ function crop(c: CanvasRenderingContext2D, image: HTMLImageElement | null, x: nu
   c.clip()
   c.imageSmoothingEnabled = true
   c.imageSmoothingQuality = 'high'
-  c.drawImage(image, image.naturalWidth * 0.05, image.naturalHeight * 0.11, image.naturalWidth * 0.90, image.naturalHeight * 0.715, x, y, w, h)
+  if (w === 39 && h === 31 && typeof document !== 'undefined') {
+    const dpr = cardDpr()
+    let sizes = courtCrops.get(image)
+    let intermediate = sizes?.get(dpr)
+    if (!intermediate) {
+      intermediate = document.createElement('canvas')
+      intermediate.width = Math.ceil(78 * dpr)
+      intermediate.height = Math.ceil(62 * dpr)
+      const layer = intermediate.getContext('2d')
+      if (layer) {
+        layer.imageSmoothingEnabled = true
+        layer.imageSmoothingQuality = 'high'
+        layer.drawImage(image, image.naturalWidth * 0.05, image.naturalHeight * 0.11, image.naturalWidth * 0.90, image.naturalHeight * 0.715, 0, 0, intermediate.width, intermediate.height)
+        if (courtCropCount >= 32) {
+          courtCrops = new WeakMap()
+          courtCropCount = 0
+          sizes = undefined
+        }
+        if (!sizes) {
+          sizes = new Map()
+          courtCrops.set(image, sizes)
+        }
+        sizes.set(dpr, intermediate)
+        courtCropCount++
+      } else intermediate = undefined
+    }
+    if (intermediate) c.drawImage(intermediate, x, y, w, h)
+    else c.drawImage(image, image.naturalWidth * 0.05, image.naturalHeight * 0.11, image.naturalWidth * 0.90, image.naturalHeight * 0.715, x, y, w, h)
+  } else c.drawImage(image, image.naturalWidth * 0.05, image.naturalHeight * 0.11, image.naturalWidth * 0.90, image.naturalHeight * 0.715, x, y, w, h)
   c.restore()
 }
 function court(c: CanvasRenderingContext2D, card: Card) {
@@ -194,7 +344,8 @@ function court(c: CanvasRenderingContext2D, card: Card) {
     const halfSeed = end && card.suit === 'spades' && card.rank === 11 ? 57 : seed
     crop(c, portrait(halfSeed, card.suit === 'spades'), 16, 15, 39, 31, rankText(card.rank))
     rect(c, '#ffffff', 16, 15, 9, 9)
-    pip(c, card.suit, 20.5, 19.5, 0.5)
+    c.fillStyle = card.suit === 'hearts' || card.suit === 'diamonds' ? '#ff0000' : '#000000'
+    mask(c, indexMasks[card.suit], 17, 16)
     c.restore()
   }
   rect(c, '#000000', 13, 46, 45, 4)
@@ -236,39 +387,27 @@ function flag(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   c.restore()
 }
 function ace(c: CanvasRenderingContext2D, suit: Suit) {
-  if (suit !== 'spades') return pip(c, suit, 35.5, 48, 2.2)
-  c.save()
-  c.translate(35.5, 45)
-  c.scale(3.6, 3.6)
-  pipPath(c, 'spades')
-  c.fillStyle = '#000000'
-  c.fill()
-  c.restore()
-  c.save()
-  c.translate(35.5, 45)
-  c.scale(3.25, 3.25)
-  pipPath(c, 'spades')
-  c.clip()
-  c.scale(1 / 3.25, 1 / 3.25)
-  flag(c, -19, -17, 38, 31)
-  c.restore()
-  polygon(c, '#000000', [15, 71, 56, 71, 53, 80, 18, 80])
-  c.fillStyle = '#ffffff'
-  bitmap(c, 'REMY OS', 16, 73)
+  if (suit !== 'spades') {
+    c.fillStyle = suit === 'clubs' ? '#000000' : '#ff0000'
+    mask(c, aceMasks[suit], 26, 37)
+  } else {
+    colorMask(c, signatureSpade, 18, 22, signatureColors)
+    colorMask(c, signatureRibbon, 15, 63, ribbonColors)
+  }
 }
 const layouts: readonly (readonly [number, number][])[] = [
-  [], [], [[35.5, 24], [35.5, 72]], [[35.5, 24], [35.5, 48], [35.5, 72]],
-  [[23, 24], [48, 24], [23, 72], [48, 72]],
-  [[23, 24], [48, 24], [35.5, 48], [23, 72], [48, 72]],
-  [[23, 24], [48, 24], [23, 48], [48, 48], [23, 72], [48, 72]],
-  [[23, 24], [48, 24], [35.5, 36], [23, 48], [48, 48], [23, 72], [48, 72]],
-  [[23, 24], [48, 24], [35.5, 36], [23, 48], [48, 48], [35.5, 60], [23, 72], [48, 72]],
-  [[23, 21], [48, 21], [23, 39], [48, 39], [35.5, 48], [23, 57], [48, 57], [23, 75], [48, 75]],
-  [[23, 21], [48, 21], [35.5, 30], [23, 39], [48, 39], [23, 57], [48, 57], [35.5, 66], [23, 75], [48, 75]],
+  [], [], [[30, 10], [30, 74]], [[30, 10], [30, 42], [30, 74]],
+  [[17, 10], [43, 10], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [30, 42], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [17, 42], [43, 42], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [30, 26], [17, 42], [43, 42], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [30, 26], [17, 42], [43, 42], [30, 58], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [17, 31], [43, 31], [30, 42], [17, 53], [43, 53], [17, 74], [43, 74]],
+  [[17, 10], [43, 10], [30, 20], [17, 31], [43, 31], [17, 53], [43, 53], [30, 64], [17, 74], [43, 74]],
 ]
-export function drawFace(c: CanvasRenderingContext2D, card: Card, x: number, y: number, opts: { selected?: boolean; ghost?: boolean } = {}): void {
+export function drawFace(c: CanvasRenderingContext2D, card: Card, x: number, y: number, opts: { selected?: boolean; ghost?: boolean; smoothing?: boolean } = {}): void {
   if (typeof document === 'undefined') return paintFace(c, card, x, y, opts)
-  const dpr = typeof window === 'undefined' ? 1 : Math.max(1, Math.min(3, window.devicePixelRatio || 1))
+  const dpr = cardDpr()
   const key = `${card.suit}:${card.rank}:${dpr}:${opts.selected ? 1 : 0}`
   let cached = faceCache.get(key)
   if (!cached) {
@@ -279,12 +418,16 @@ export function drawFace(c: CanvasRenderingContext2D, card: Card, x: number, y: 
     if (!layer) return paintFace(c, card, x, y, opts)
     layer.scale(dpr, dpr)
     paintFace(layer, card, 0, 0, { selected: opts.selected })
-    if (faceCache.size >= 128) faceCache.clear()
+    if (faceCache.size >= 128) {
+      faceCache.clear()
+      courtCrops = new WeakMap()
+      courtCropCount = 0
+    }
     faceCache.set(key, cached)
   }
   c.save()
   if (opts.ghost) c.globalAlpha *= 0.45
-  c.imageSmoothingEnabled = false
+  c.imageSmoothingEnabled = opts.smoothing ?? false
   c.drawImage(cached, 0, 0, 71 * dpr, 96 * dpr, x, y, 71, 96)
   c.restore()
 }
@@ -297,14 +440,12 @@ function paintFace(c: CanvasRenderingContext2D, card: Card, x: number, y: number
   for (let end = 0; end < 2; end++) {
     c.save()
     if (end) { c.translate(71, 96); c.rotate(Math.PI) }
-    c.fillStyle = card.suit === 'hearts' || card.suit === 'diamonds' ? '#ff0000' : '#000000'
-    bitmap(c, rankText(card.rank), 4, 4)
-    pip(c, card.suit, card.rank === 10 ? 8 : 6.5, 18, 0.55)
+    drawCardIndex(c, card, card.rank === 10 ? 2 : 3, 4)
     c.restore()
   }
   if (card.rank === 1) ace(c, card.suit)
   else if (card.rank >= 11) court(c, card)
-  else for (const [px, py] of layouts[card.rank] ?? []) pip(c, card.suit, px, py, 0.95, py > 48)
+  else for (const [px, py] of layouts[card.rank] ?? []) pip(c, card.suit, px, py, py >= 53)
   if (opts.selected) drawHighlight(c, 0, 0)
   c.restore()
 }
@@ -325,23 +466,11 @@ export function drawEmpty(c: CanvasRenderingContext2D, kind: 'pile' | 'stock' | 
   c.lineWidth = 1
   c.stroke()
   if (kind === 'recycle') {
-    c.strokeStyle = '#00c000'
-    c.lineWidth = 4
-    c.beginPath()
-    c.arc(35.5, 48, 15, 0, Math.PI * 2)
-    c.stroke()
+    c.fillStyle = '#00ff00'
+    mask(c, recycleMask, 23, 35)
   } else if (kind === 'exhausted') {
-    c.strokeStyle = '#ff0000'
-    c.lineWidth = 4
-    c.beginPath()
-    c.moveTo(23, 35)
-    c.lineTo(48, 61)
-    c.moveTo(48, 35)
-    c.lineTo(23, 61)
-    c.stroke()
-  } else if (kind === 'home') {
-    c.globalAlpha *= 0.35
-    pip(c, 'spades', 35.5, 48, 1.6)
+    c.fillStyle = '#ff0000'
+    mask(c, exhaustedMask, 24, 36)
   }
   c.restore()
 }
@@ -356,24 +485,55 @@ function waves(c: CanvasRenderingContext2D, color: string, start = 60) {
     }
   }
 }
+const thornMask = ['#.#', '###', '.#.']
+const dialRim = ['..#####..', '.#######.', '#########', '#########', '#########', '#########', '#########', '.#######.', '..#####..']
+const dialFace = ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..']
 function rose(c: CanvasRenderingContext2D, x: number, y: number) {
   line(c, '#247733', x, y + 3, x - 3, y + 17)
   polygon(c, '#328847', [x - 2, y + 10, x - 8, y + 6, x - 6, y + 12])
-  pip(c, 'hearts', x + 2, y + 12, 0.24)
+  c.fillStyle = '#ff6080'
+  mask(c, thornMask, Math.round(x), Math.round(y + 11))
   oval(c, '#780014', x, y, 6, 5)
   polygon(c, '#e00028', [x - 5, y - 1, x - 2, y - 5, x + 3, y - 4, x + 5, y, x + 1, y + 4, x - 4, y + 2])
   line(c, '#ff6a70', x - 3, y - 1, x + 1, y - 2)
   line(c, '#800010', x + 1, y - 2, x + 2, y + 1)
   rect(c, '#ff293e', x - 1, y, 2, 2)
 }
+const batFrames = [
+  ['#.......#', '##..#..##', '.#######.', '...#.#...'],
+  ['....#....', '.#######.', '##.....##', '#.......#'],
+]
 function bat(c: CanvasRenderingContext2D, x: number, y: number, flap: number) {
-  polygon(c, '#080818', [x - 7, y - flap, x - 4, y + 2, x - 1, y + 1, x, y + 3, x + 1, y + 1, x + 4, y + 2, x + 7, y - flap, x + 3, y, x, y - 2, x - 3, y])
+  x = Math.round(x) - 4
+  y = Math.round(y) - 2
+  const rows = batFrames[flap === 4 ? 0 : 1]
+  c.fillStyle = '#8070c0'
+  for (let row = 0; row < rows.length; row++) for (let col = 0; col < 9; col++) {
+    if (rows[row][col] === '#' && (row === 0 || rows[row - 1][col] !== '#')) c.fillRect(x + col, y + row - 1, 1, 1)
+  }
+  c.fillStyle = '#000000'
+  mask(c, rows, x, y)
+}
+function pixelLine(c: CanvasRenderingContext2D, x: number, y: number, xx: number, yy: number) {
+  const dx = Math.abs(xx - x)
+  const dy = -Math.abs(yy - y)
+  const sx = x < xx ? 1 : -1
+  const sy = y < yy ? 1 : -1
+  let error = dx + dy
+  for (;;) {
+    c.fillRect(x, y, 1, 1)
+    if (x === xx && y === yy) break
+    const twice = 2 * error
+    if (twice >= dy) { error += dy; x += sx }
+    if (twice <= dx) { error += dx; y += sy }
+  }
 }
 /** t is supplied by the stock animation hook; this module never starts a timer or animation loop. */
-export function drawBack(c: CanvasRenderingContext2D, backId: number, x: number, y: number, t = 0, remy = 42): void {
-  const id = Number.isInteger(backId) && backId >= 0 && backId < 13 ? backId : 0
-  if (typeof document === 'undefined') return paintBack(c, id, x, y, t, remy)
-  const dpr = typeof window === 'undefined' ? 1 : Math.max(1, Math.min(3, window.devicePixelRatio || 1))
+function cardDpr(): number {
+  return typeof window === 'undefined' ? 1 : Math.max(1, Math.min(3, Math.ceil(window.devicePixelRatio || 1)))
+}
+function backRaster(id: number, remy: number, dpr: number): HTMLCanvasElement | undefined {
+  if (typeof document === 'undefined') return undefined
   const key = `${id}:${dpr}:${id === 12 ? remy : 0}`
   let cached = backCache.get(key)
   if (!cached) {
@@ -381,20 +541,30 @@ export function drawBack(c: CanvasRenderingContext2D, backId: number, x: number,
     cached.width = Math.ceil(71 * dpr)
     cached.height = Math.ceil(96 * dpr)
     const layer = cached.getContext('2d')
-    if (!layer) return paintBack(c, id, x, y, t, remy)
+    if (!layer) return undefined
     layer.scale(dpr, dpr)
     paintBack(layer, id, 0, 0, 0, remy)
     // My Remy previews must not retain an unbounded catalog of raster surfaces.
     if (backCache.size >= 32) backCache.clear()
     backCache.set(key, cached)
   }
+  return cached
+}
+export function drawBack(c: CanvasRenderingContext2D, backId: number, x: number, y: number, t = 0, remy = 42): void {
+  const id = Number.isInteger(backId) && backId >= 0 && backId < 13 ? backId : 0
+  const dpr = cardDpr()
+  const cached = backRaster(id, remy, dpr)
+  if (!cached) return paintBack(c, id, x, y, t, remy)
   c.save()
   c.imageSmoothingEnabled = false
   c.drawImage(cached, 0, 0, 71 * dpr, 96 * dpr, x, y, 71, 96)
   if (t > 0 && t < 1800 && (id === 2 || id === 6 || id === 7 || id === 8)) {
     // Repaint only the sprite region over the cached still layer. Tower lightning also changes its sky.
     c.beginPath()
-    if (id === 2) c.rect(x + 24, y + 42, 23, 29)
+    if (id === 2) {
+      c.rect(x + 25, y + 22, 21, 8)
+      c.rect(x + 24, y + 42, 23, 29)
+    }
     else if (id === 7) c.rect(x + 30, y + 21, 30, 27)
     else if (id === 6) c.rect(x + 4, y + 4, 63, 69)
     else c.rect(x + 15, y + 6, 43, 86)
@@ -402,6 +572,38 @@ export function drawBack(c: CanvasRenderingContext2D, backId: number, x: number,
     paintBack(c, id, x, y, t, remy)
   }
   c.restore()
+}
+/** Covered cards expose art, not the full card's white paper margin. */
+function backStrip(c: CanvasRenderingContext2D, backId: number, x: number, y: number, width: number, height: number, remy: number) {
+  const id = Number.isInteger(backId) && backId >= 0 && backId < 13 ? backId : 0
+  const dpr = cardDpr()
+  const cached = backRaster(id, remy, dpr)
+  x = Math.round(x)
+  y = Math.round(y)
+  c.save()
+  c.beginPath()
+  c.rect(x, y, width, height)
+  c.clip()
+  c.imageSmoothingEnabled = false
+  if (cached) c.drawImage(cached, 4 * dpr, 4 * dpr, 63 * dpr, 88 * dpr, x + 1, y + 1, 69, 94)
+  else {
+    c.save()
+    c.translate(x + 1 - 4 * 69 / 63, y + 1 - 4 * 94 / 88)
+    c.scale(69 / 63, 94 / 88)
+    paintBack(c, id, 0, 0, 0, remy)
+    c.restore()
+  }
+  rect(c, '#000000', x, y, width, 1)
+  rect(c, '#000000', x, y, 1, height)
+  if (width === 71) rect(c, '#000000', x + 70, y, 1, height)
+  if (height === 96) rect(c, '#000000', x, y + 95, width, 1)
+  c.restore()
+}
+export function drawBackStrip(c: CanvasRenderingContext2D, backId: number, x: number, y: number, stripH: number, remy = 42): void {
+  backStrip(c, backId, x, y, 71, Math.max(1, Math.min(96, Math.round(Number.isFinite(stripH) ? stripH : 1))), remy)
+}
+export function drawBackSideStrip(c: CanvasRenderingContext2D, backId: number, x: number, y: number, stripW: number, remy = 42): void {
+  backStrip(c, backId, x, y, Math.max(1, Math.min(71, Math.round(Number.isFinite(stripW) ? stripW : 1))), 96, remy)
 }
 function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: number, t: number, remy: number): void {
   c.save()
@@ -413,7 +615,7 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
   c.imageSmoothingEnabled = false
   const id = Number.isInteger(backId) && backId >= 0 && backId < 13 ? backId : 0
   const phase = Number.isFinite(t) && t > 0 && t < 1800 ? t / 1800 : 0
-  const pulse = phase ? Math.sin(Math.PI * phase) : 0
+  const blinking = t >= 900 && t <= 1000
   if (id === 0) {
     rect(c, '#2058d8', 4, 4, 63, 88)
     for (let yy = -60; yy < 150; yy += 6) {
@@ -454,14 +656,27 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
     rect(c, '#738591', 53, 40, 5, 25)
     rect(c, '#c7d6d2', 21, 17, 29, 20)
     rect(c, '#07111d', 25, 22, 21, 8)
-    rect(c, '#66dfdd', 28, 24, 4, 3)
-    rect(c, '#66dfdd', 39, 24, 4, 3)
+    if (blinking) {
+      rect(c, '#07111d', 28, 25, 4, 1)
+      rect(c, '#07111d', 39, 25, 4, 1)
+    } else {
+      rect(c, '#66dfdd', 28, 24, 4, 3)
+      rect(c, '#66dfdd', 39, 24, 4, 3)
+    }
     rect(c, '#e00000', 29, 33, 13, 2)
     line(c, '#e2b43b', 35.5, 17, 35.5, 11)
     polygon(c, '#8a481c', [27, 12, 29, 7, 32, 10, 35, 5, 38, 9, 42, 7, 43, 12])
     rect(c, '#27333d', 24, 42, 23, 19)
-    oval(c, '#f7e8ac', 35.5, 51, 8, 7)
-    line(c, '#000000', 35.5, 51, 35.5 + Math.sin(phase * Math.PI * 4) * 6, 45)
+    for (let dial = 0; dial < 2; dial++) {
+      const cx = dial ? 41 : 29
+      c.fillStyle = '#000000'
+      mask(c, dialRim, cx - 4, 42)
+      c.fillStyle = '#f7e8ac'
+      mask(c, dialFace, cx - 3, 43)
+      const angle = (dial ? 20 + (phase ? (Math.floor(t / 100) % 3 - 1) * 10 : 0) : phase ? -60 + 120 * Math.sin(Math.PI * phase) : -30) * Math.PI / 180
+      c.fillStyle = '#000000'
+      pixelLine(c, cx, 46, cx + Math.round(Math.sin(angle) * 4), 46 - Math.round(Math.cos(angle) * 4))
+    }
     for (let i = 0; i < 3; i++) oval(c, phase && Math.floor(phase * 12) % 3 === i ? '#ffff7b' : ['#ef3b39', '#68ac5c', '#409ac8'][i], 27 + i * 9, 66, 2, 2)
   } else if (id === 3) {
     rect(c, '#080808', 4, 4, 63, 88)
@@ -508,8 +723,19 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
     polygon(c, '#110b20', [4, 83, 15, 72, 24, 80, 38, 70, 52, 80, 67, 73, 67, 92, 4, 92])
     rect(c, '#100b1d', 23, 32, 25, 51)
     rect(c, '#67527b', 25, 33, 21, 48)
-    polygon(c, '#161025', [20, 33, 35, 16, 51, 33])
-    for (let yy = 36; yy < 79; yy += 9) for (let xx = 25; xx < 47; xx += 7) line(c, '#493759', xx, yy, xx + 5, yy)
+    for (let xx = 24; xx <= 42; xx += 6) {
+      rect(c, '#100b1d', xx, 28, 4, 4)
+      rect(c, '#67527b', xx + 1, 29, 2, 3)
+    }
+    for (let yy = 14; yy <= 27; yy++) {
+      const left = Math.round(35 - (yy - 14) * 10 / 13)
+      const right = Math.round(35 + (yy - 14) * 11 / 13)
+      rect(c, '#800080', left, yy, right - left + 1, 1)
+      rect(c, '#a040a0', left, yy, 1, 1)
+    }
+    for (let yy = 36; yy < 79; yy += 4) {
+      for (let xx = 26 + ((yy - 36) / 4 % 2) * 3; xx <= 44; xx += 7) rect(c, '#493759', xx, yy, Math.min(4, 45 - xx), 1)
+    }
     for (let yy = 39; yy < 68; yy += 13) {
       rect(c, '#130d24', 29, yy, 4, 7)
       rect(c, '#ead475', 39, yy, 4, 7)
@@ -550,17 +776,21 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
     rect(c, '#600020', 4, 4, 63, 88)
     for (let yy = 8; yy < 92; yy += 8) for (let xx = 8; xx < 67; xx += 8) rect(c, '#800030', xx, yy, 1, 1)
     c.save()
-    c.translate(35, 51)
-    c.rotate(-0.18)
-    const rise = Math.round(pulse * 25)
-    rect(c, '#000000', -11, -16 - rise, 23, 33)
-    rect(c, '#ffffff', -10, -15 - rise, 21, 31)
-    c.fillStyle = '#000000'
-    bitmap(c, 'A', -8, -13 - rise)
-    pip(c, 'spades', 1, -rise, 0.85)
+    c.translate(35.5, 53)
+    c.rotate(Math.atan2(10, 27))
+    const travel = phase ? Math.min(1, t / 600, (1800 - t) / 600) : 0
+    const rise = Math.round(14 * travel * travel * (3 - 2 * travel))
+    rect(c, '#000000', -11, -5 - rise, 23, 33)
+    rect(c, '#ffffff', -10, -4 - rise, 21, 31)
+    c.fillStyle = '#ff0000'
+    mask(c, rankMasks.A, -8, -2 - rise)
+    mask(c, indexMasks.hearts, -8, 8 - rise)
     c.restore()
     polygon(c, '#090d19', [4, 80, 23, 49, 47, 59, 67, 87, 67, 92, 4, 92])
     polygon(c, '#272d45', [8, 80, 23, 57, 41, 64, 58, 92, 24, 92])
+    line(c, '#f0c8a0', 22, 47, 49, 57)
+    line(c, '#f0c8a0', 22, 46, 49, 56)
+    line(c, '#f0c8a0', 22, 45, 49, 55)
     polygon(c, '#ffd700', [22, 48, 49, 58, 46, 67, 18, 57])
     line(c, '#ffe379', 23, 50, 48, 59)
     line(c, '#c09000', 21, 55, 46, 64)
@@ -594,20 +824,7 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
     rect(c, '#ffff00', 12, 17, 1, 1)
     rect(c, '#ffff00', 59, 50, 1, 1)
     rect(c, '#ffff00', 18, 42, 1, 1)
-    oval(c, '#b6e7c6', 43, 33, 12, 14)
-    polygon(c, '#b6e7c6', [31, 32, 29, 61, 35, 57, 40, 63, 45, 57, 51, 61, 55, 36])
-    const ghost = portrait(42)
-    if (ghost) {
-      c.save()
-      c.globalAlpha = 0.45
-      crop(c, ghost, 34, 22, 19, 24, 'R')
-      c.restore()
-    } else {
-      polygon(c, '#6b7f69', [34, 25, 36, 19, 40, 22, 44, 17, 49, 22, 51, 29])
-      oval(c, '#376d66', 39, 31, 2, 2)
-      oval(c, '#376d66', 47, 31, 2, 2)
-      oval(c, '#376d66', 43, 39, 2, 3)
-    }
+    colorMask(c, ghostMask, 30, 20, ghostColors, true)
     oval(c, '#81351d', 27, 74, 19, 14)
     oval(c, '#ed7f20', 27, 72, 18, 13)
     oval(c, '#ff9f2d', 23, 72, 8, 13)
@@ -626,7 +843,11 @@ function paintBack(c: CanvasRenderingContext2D, backId: number, x: number, y: nu
       const sw = Math.min(image.naturalWidth, image.naturalHeight * 61 / 86)
       const sh = sw * 86 / 61
       c.drawImage(image, (image.naturalWidth - sw) / 2, (image.naturalHeight - sh) / 2, sw, sh, 5, 5, 61, 86)
-    } else monogram(c, 'R', 5, 5, 61, 86)
+    } else {
+      rect(c, '#c0c0c0', 5, 5, 61, 86)
+      oval(c, '#808080', 35, 38, 7.5, 8.5)
+      polygon(c, '#808080', [17, 73, 23, 60, 47, 60, 54, 73])
+    }
   }
   c.restore()
 }

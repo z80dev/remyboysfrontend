@@ -10,6 +10,13 @@ export const LAYOUT_IDS: readonly LayoutId[] = ['standard', 'bridge', 'castle', 
 export const TILE_COUNT = 144
 export const FACE_COUNT = 42
 
+export function clockRuns(started: boolean, hidden: boolean, modal: boolean, tilesLeft: number): boolean {
+  return started && !hidden && !modal && tilesLeft > 0
+}
+export function clockSeconds(milliseconds: number, since: number | null, now: number): number {
+  return Math.floor((milliseconds + (since === null ? 0 : now - since)) / 1000)
+}
+
 function rectangle(out: Position[], x: number, y: number, w: number, h: number, z: number) {
   for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) out.push({ x: x + col, y: y + row, z })
 }
@@ -66,11 +73,15 @@ function makeLayout(id: LayoutId): readonly Position[] {
     rectangle(path, 2, 9, 7, 1, 0)
     rectangle(path, 2, 4, 1, 5, 0)
     rectangle(path, 3, 4, 1, 1, 0)
-    p.push(...path, ...path.map((tile) => ({ ...tile, z: 1 })))
+    p.push(...path, ...path.slice(12).map((tile) => ({ ...tile, z: 1 })), ...path.slice(60).map((tile) => ({ ...tile, z: 2 })))
   } else {
     for (const x of [0, 7]) for (const y of [0, 6]) {
-      for (let col = 0; col < 6; col++) rectangle(p, x + col, y + [0, 0.25, 0.5, 0.5, 0.25, 0][col], 1, 5, 0)
-      rectangle(p, x + 1.5, y + 1.5, 3, 2, 1)
+      for (let col = 0; col < 6; col++) {
+        const wave = [0, 0.25, 0.5, 0.5, 0.25, 0][col]
+        rectangle(p, x + col, y + wave, 1, 4, 0)
+        rectangle(p, x + col, y + wave + 1.5, 1, 1, 1)
+        rectangle(p, x + col, y + wave + 1.5, 1, 1, 2)
+      }
     }
   }
   return Object.freeze(p.map((tile) => Object.freeze(tile)))
@@ -197,7 +208,7 @@ export function backup(game: Game): Game {
 }
 export function remaining(game: Game): number { return game.removed.filter((v) => !v).length }
 export function noMoves(game: Game): boolean { return remaining(game) > 0 && availablePairs(game).length === 0 }
-export function nearestFree(game: Game, current: number | null, dx: number, dy: number): number | null {
+export function nearestFree(game: Game, current: number | null, dx = 0, dy = 0): number | null {
   const free = freeTiles(game.deal.positions, game.removed)
   if (current === null || !game.deal.positions[current]) return free[0] ?? null
   const origin = game.deal.positions[current]
@@ -208,11 +219,11 @@ export function nearestFree(game: Game, current: number | null, dx: number, dy: 
     const x = (p.x - origin.x) * 40 - (p.z - origin.z) * 4
     const y = (p.y - origin.y) * 52 - (p.z - origin.z) * 4
     const forward = x * dx + y * dy
-    if (forward <= 0) continue
+    if ((dx !== 0 || dy !== 0) && forward <= 0) continue
     const score = Math.hypot(x, y) + Math.abs(x * dy - y * dx) * 2
     if (score < distance) { distance = score; best = index }
   }
-  return best ?? current
+  return best ?? (free.includes(current) ? current : null)
 }
 
 // A complete rule-based solver. A generated witness is only a move-ordering hint:

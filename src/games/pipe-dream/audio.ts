@@ -10,7 +10,7 @@ export function playEvents(game: PipeGame, last: Record<string, number>, now: nu
     if (event === 'place') {
       const piece = placedPiece
       const frequency = piece === 'cross' ? 262 : piece === 'horizontal' || piece === 'vertical' ? 330 : 392
-      tone(frequency, .07, { type: 'triangle', vol: .12, owner: AUDIO_OWNER })
+      tone(frequency, .14, { type: 'sine', fmRatio: 2.73, fmDepth: frequency * 3.5, vol: .1, owner: AUDIO_OWNER })
       noise(.025, { freq: 3000, vol: .045, owner: AUDIO_OWNER })
     } else if (event === 'replace') {
       noise(.16, { freq: 420, vol: .13, owner: AUDIO_OWNER })

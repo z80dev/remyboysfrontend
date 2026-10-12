@@ -2,13 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import type { AppProps } from '../../os/apps'
 import {
-  AboutDialog, BestScoresDialog, FLAG_COLORS, GameDialog, GameMenuBar, NameEntryDialog, loadCabald, loadFrontHeads, loadGame, loadPalette,
-  mulberry32, noise, saveGame, sequence, tone, unlockAudio, useCrispCanvas, useGamesMuted, useGamesPlayer, useWindowFit, useWindowState,
+  AboutDialog, BestScoresDialog, ChooseRemyDialog, FLAG_COLORS, GameDialog, GameHelpTabs, GameMenuBar, NameEntryDialog, loadCabald, loadFrontHeads,
+  loadGame, loadPalette,
+  mulberry32, noise, saveGame, sequence, stopSounds, tone, unlockAudio, useCrispCanvas, useGamesMuted, useGamesPlayer, useWindowFit, useWindowState,
 } from '../kit'
 import type { FrontRemyHeads, GameMenu, RemyPalette } from '../kit'
-import { FLAG, HIDDEN, LEVELS, QUESTION, REVEALED, chordCell, chordPreview, clampCustom, createGame, cycleMark, reveal, tick } from './engine'
+import { FLAG, HIDDEN, LEVELS, QUESTION, REVEALED, chordCell, chordPreview, clampCustom, createGame, cycleMark, reveal, tick, touchCell } from './engine'
 import type { Config, Game, Level } from './engine'
-import { BOARD_X, BOARD_Y, FALLBACK_PALETTE, HEADER_HEIGHT, cellAt, drawBoard, drawHeader } from './render'
+import { BOARD_X, BOARD_Y, FALLBACK_PALETTE, HEADER_HEIGHT, MONOCHROME_PALETTE, cellAt, drawBoard, drawHeader } from './render'
 import type { MineArt } from './render'
 import { icon } from './icon'
 import { S } from './strings'
@@ -18,10 +19,9 @@ export { icon } from './icon'
 
 type Score = { time: number; name: string }
 type Preferences = { level: Level; custom: Config; marks: boolean; color: boolean; scores: Record<'beginner' | 'intermediate' | 'expert', Score> }
-type Dialog = 'help' | 'about' | 'scores' | 'custom' | 'name' | null
+type Dialog = 'help' | 'about' | 'scores' | 'custom' | 'name' | 'choose' | null
 type Gesture = {
   kind: 'reveal' | 'mark' | 'chord' | 'pan' | 'suppressed'
-  pointer: number
   index: number
   touch: boolean
   x: number
@@ -30,6 +30,7 @@ type Gesture = {
   startY: number
 }
 type Pinch = { distance: number; zoom: number; anchorX: number; anchorY: number }
+type PanBars = { left: number; top: number; width: number; height: number; x: number; y: number; thumbW: number; thumbH: number; horizontal: boolean; vertical: boolean }
 const STANDARD = ['beginner', 'intermediate', 'expert'] as const
 const defaultScores = () => ({ beginner: { time: 999, name: S.defaultName }, intermediate: { time: 999, name: S.defaultName }, expert: { time: 999, name: S.defaultName } })
 const defaults = (): Preferences => ({ level: 'beginner', custom: { ...LEVELS.beginner }, marks: true, color: true, scores: defaultScores() })
@@ -42,7 +43,8 @@ function isPreferences(value: unknown): value is Preferences {
   if (custom.rows !== p.custom.rows || custom.cols !== p.custom.cols || custom.mines !== p.custom.mines) return false
   return STANDARD.every((level) => {
     const score = p.scores[level]
-    return score && Number.isInteger(score.time) && score.time >= 1 && score.time <= 999 && typeof score.name === 'string' && score.name.length <= 32
+    return score && Number.isInteger(score.time) && score.time >= 1 && score.time <= 999 && typeof score.name === 'string' &&
+      score.name.length > 0 && score.name.length <= 32 && score.name === score.name.trim()
   })
 }
 
@@ -59,6 +61,8 @@ export default function Minesweeper({ param, close }: AppProps) {
   const [helpTab, setHelpTab] = useState(0)
   const [customInput, setCustomInput] = useState({ rows: String(preferences.custom.rows), cols: String(preferences.custom.cols), mines: String(preferences.custom.mines) })
   const [record, setRecord] = useState<{ level: typeof STANDARD[number]; time: number } | null>(null)
+  const [recordPending, setRecordPending] = useState(false)
+  const recordRemaining = useRef(600)
   const [expertNotice, setExpertNotice] = useState(false)
   const [announcement, setAnnouncement] = useState(S.started(S.levelNames[preferences.level], game.config.mines))
   const [cursor, setCursor] = useState(0)
@@ -74,17 +78,18 @@ export default function Minesweeper({ param, close }: AppProps) {
   const [mineArt, setMineArt] = useState<MineArt | null>(null)
   const { player } = useGamesPlayer()
   const { muted, toggleMuted } = useGamesMuted()
-  const { active, hidden } = useWindowState()
+  const { active, hidden, pocket: mobile } = useWindowState()
   const fit = useWindowFit()
   const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 164, height: 229 })
-  const [mobile, setMobile] = useState(() => window.innerWidth < 720)
   const [touchInput, setTouchInput] = useState(false)
   const [flagMode, setFlagMode] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [ring, setRing] = useState<{ x: number; y: number } | null>(null)
+  const [panBars, setPanBars] = useState<PanBars | null>(null)
+  const indicatorTimer = useRef<number | undefined>()
   const hold = useRef<number | undefined>()
   const gesture = useRef<Gesture | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -95,32 +100,41 @@ export default function Minesweeper({ param, close }: AppProps) {
   const width = game.config.cols * 16 + 20
   const boardHeight = game.config.rows * 16 + 14
   const toolbar = mobile || touchInput
-  const naturalScale = mobile ? Math.max(1, Math.floor(Math.min(size.width / width, (size.height - 22 - 44) / (boardHeight + HEADER_HEIGHT)))) : 1
-  const boardScale = mobile && game.config.cols >= 16 ? Math.max(1.5, naturalScale) * zoom : naturalScale * zoom
-  const headerScale = mobile ? naturalScale : 1
-  const headerWidth = mobile ? Math.max(164, Math.floor(size.width / headerScale)) : width
+  const minimumScale = mobile ? (game.config.cols <= 10 ? 2 : 1.5) : 1
+  const startScale = mobile && game.config.cols > 10 ? Math.max(1.5, Math.min(3, size.width / width)) : minimumScale
+  const boardScale = mobile ? Math.max(minimumScale, Math.min(3, zoom)) : 1
+  const clientWidth = mobile ? (game.config.cols <= 10 && width * boardScale <= size.width ? width * boardScale : size.width) : width
+  const headerScale = mobile ? Math.max(2, Math.min(Math.floor(size.width / 164),
+    Math.floor((size.height - (menu.current?.offsetHeight ?? 22) - 44 - 96) / HEADER_HEIGHT))) : 1
+  const headerWidth = mobile ? Math.max(164, Math.round(clientWidth / headerScale)) : width
+  const headerDisplayScale = clientWidth / headerWidth
+  const viewportHeight = mobile ? Math.min(boardHeight * boardScale, Math.max(0, size.height - (menu.current?.offsetHeight ?? 22) - 44 - HEADER_HEIGHT * headerScale)) : boardHeight
   const headerDraw = useRef<() => void>(() => {})
   const boardDraw = useRef<() => void>(() => {})
   const headerCanvas = useCrispCanvas(headerWidth, HEADER_HEIGHT, { onResize: () => headerDraw.current() })
-  const boardCanvas = useCrispCanvas(width, boardHeight, { onResize: () => boardDraw.current() })
+  const boardCanvas = useCrispCanvas(width, boardHeight, { minScale: mobile ? 2 : 1, onResize: () => boardDraw.current() })
   headerDraw.current = () => {
-    if (headerCanvas.ctx.current) drawHeader(headerCanvas.ctx.current, game, headerWidth, preferences.color ? palette : FALLBACK_PALETTE, pressing, facePressed)
+    if (headerCanvas.ctx.current) drawHeader(headerCanvas.ctx.current, game, headerWidth, preferences.color ? palette : MONOCHROME_PALETTE, pressing, facePressed, !mobile, preferences.color)
   }
   boardDraw.current = () => {
-    if (boardCanvas.ctx.current) drawBoard(boardCanvas.ctx.current, game, preferences.color, preview, keyboardCursor ? cursor : null, mineArt)
+    if (boardCanvas.ctx.current) drawBoard(boardCanvas.ctx.current, game, preferences.color, preview, keyboardCursor ? cursor : null, mineArt, !mobile)
   }
 
   useLayoutEffect(() => {
     headerDraw.current()
+  }, [game, headerWidth, palette, pressing, facePressed, preferences.color, mobile])
+  useLayoutEffect(() => {
     boardDraw.current()
-  }, [game, headerWidth, palette, pressing, facePressed, preferences.color, preview, keyboardCursor, cursor, mineArt])
+  }, [game.cells, game.mines, game.numbers, game.status, width, boardHeight, preferences.color, preview, keyboardCursor, cursor, mineArt, mobile])
+  useEffect(() => {
+    setZoom(startScale)
+  }, [startScale, game.seed])
 
   useLayoutEffect(() => {
     const el = root.current
     if (!el) return
     const measure = () => {
       setSize({ width: el.clientWidth, height: el.clientHeight })
-      setMobile(window.innerWidth < 720)
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -168,20 +182,54 @@ export default function Minesweeper({ param, close }: AppProps) {
     hold.current = undefined
     setRing(null)
   }
+  const showPanBars = () => {
+    const v = viewport.current
+    if (!mobile || hidden || !v) return
+    const horizontal = v.scrollWidth > v.clientWidth
+    const vertical = v.scrollHeight > v.clientHeight
+    if (!horizontal && !vertical) return
+    const thumbW = Math.max(20, v.clientWidth * v.clientWidth / v.scrollWidth)
+    const thumbH = Math.max(20, v.clientHeight * v.clientHeight / v.scrollHeight)
+    const rect = v.getBoundingClientRect()
+    const parent = root.current?.getBoundingClientRect()
+    setPanBars({
+      left: rect.left - (parent?.left ?? 0), top: rect.top - (parent?.top ?? 0), width: v.clientWidth, height: v.clientHeight, thumbW, thumbH, horizontal, vertical,
+      x: horizontal ? v.scrollLeft / (v.scrollWidth - v.clientWidth) * (v.clientWidth - thumbW) : 0,
+      y: vertical ? v.scrollTop / (v.scrollHeight - v.clientHeight) * (v.clientHeight - thumbH) : 0,
+    })
+    window.clearTimeout(indicatorTimer.current)
+    indicatorTimer.current = window.setTimeout(() => {
+      if (gesture.current?.kind !== 'pan') setPanBars(null)
+    }, 600)
+  }
   const cancelGesture = () => {
     clearHold()
     gesture.current = null
     pointers.current.clear()
     pinch.current = null
+    pendingScroll.current = null
+    if (panBars && !hidden) {
+      window.clearTimeout(indicatorTimer.current)
+      indicatorTimer.current = window.setTimeout(() => setPanBars(null), 600)
+    }
     setPreview([])
     setPressing(false)
     setFacePressed(false)
   }
   useEffect(() => {
-    if (hidden || !active || dialog) cancelGesture()
+    if (hidden) stopSounds('minesweeper')
+    if (hidden || !active || dialog) {
+      cancelGesture()
+      window.clearTimeout(indicatorTimer.current)
+      setPanBars(null)
+    }
     if (active && !hidden && !dialog) root.current?.focus({ preventScroll: true })
   }, [active, hidden, dialog])
-  useEffect(() => () => window.clearTimeout(hold.current), [])
+  useEffect(() => () => {
+    window.clearTimeout(hold.current)
+    window.clearTimeout(indicatorTimer.current)
+    stopSounds('minesweeper')
+  }, [])
 
   const commit = (next: Game) => {
     const previous = gameRef.current
@@ -193,23 +241,28 @@ export default function Minesweeper({ param, close }: AppProps) {
       setPreview([])
       setPressing(false)
       setAnnouncement(S.dead)
-      if (!hidden) noise(0.8, { filter: 'lowpass', freq: 2000, to: 80, vol: 0.25 })
+      if (!hidden) noise(0.8, { filter: 'lowpass', freq: 2000, to: 80, vol: 0.25, owner: 'minesweeper' })
     } else if (next.status === 'won' && previous.status !== 'won') {
       clearHold()
       setPreview([])
       setPressing(false)
       setAnnouncement(S.won(next.seconds))
-      if (!hidden) sequence([[72, 1], [76, 1], [79, 1], [84, 2]], { bpm: 300, gate: 0.95, vol: 0.1, attack: 0.005 })
+      if (!hidden) sequence([[72, 1], [76, 1], [79, 1], [84, 2]], { bpm: 300, gate: 0.95, vol: 0.1, attack: 0.005, owner: 'minesweeper' })
       const p = preferencesRef.current
       if (p.level !== 'custom' && next.seconds < p.scores[p.level].time) {
         setRecord({ level: p.level, time: next.seconds })
         setExpertNotice(p.level === 'expert')
-        setDialog('name')
+        recordRemaining.current = 600
+        setRecordPending(true)
       }
-    } else {
+    } else if (next.cells !== previous.cells) {
       let count = 0
-      for (let i = 0; i < next.cells.length; i++) if (next.cells[i] === REVEALED && previous.cells[i] !== REVEALED) count++
-      if (count) setAnnouncement(S.revealed(count))
+      let remaining = 0
+      for (let i = 0; i < next.cells.length; i++) {
+        if (next.cells[i] === REVEALED && previous.cells[i] !== REVEALED) count++
+        if (!next.mines[i] && next.cells[i] !== REVEALED) remaining++
+      }
+      if (count) setAnnouncement(S.revealed(count, remaining))
     }
   }
 
@@ -220,9 +273,11 @@ export default function Minesweeper({ param, close }: AppProps) {
     let timer: number
     let due = performance.now() + clockRemaining.current
     const advance = () => {
-      const next = tick(gameRef.current)
+      const previous = gameRef.current
+      const next = tick(previous)
+      if (next === previous) return
       commitRef.current(next)
-      tone(1000, 0.008, { type: 'square', vol: 0.08, attack: 0.001 })
+      tone(1000, 0.008, { type: 'square', vol: 0.08, attack: 0.001, owner: 'minesweeper' })
       clockRemaining.current = 1000
       due = performance.now() + 1000
       if (next.status === 'playing' && next.seconds < 999) timer = window.setTimeout(advance, 1000)
@@ -234,8 +289,29 @@ export default function Minesweeper({ param, close }: AppProps) {
     }
   }, [hidden, game.status, game.seconds === 999])
 
+  useEffect(() => {
+    if (!recordPending || hidden) return
+    const due = performance.now() + recordRemaining.current
+    const timer = window.setTimeout(() => {
+      setRecordPending(false)
+      setDialog('name')
+    }, recordRemaining.current)
+    return () => {
+      window.clearTimeout(timer)
+      recordRemaining.current = Math.max(1, due - performance.now())
+    }
+  }, [recordPending, hidden])
+
+  const continueRecord = () => {
+    setRecordPending(false)
+    setDialog('name')
+  }
+
   const newGame = (level = preferencesRef.current.level, custom = preferencesRef.current.custom) => {
+    stopSounds('minesweeper')
     cancelGesture()
+    window.clearTimeout(indicatorTimer.current)
+    setPanBars(null)
     const nextPreferences = { ...preferencesRef.current, level, custom }
     preferencesRef.current = nextPreferences
     setPreferences(nextPreferences)
@@ -249,6 +325,7 @@ export default function Minesweeper({ param, close }: AppProps) {
     setZoom(1)
     setDialog(null)
     setRecord(null)
+    setRecordPending(false)
     setExpertNotice(false)
     setAnnouncement(S.started(S.levelNames[level], next.config.mines))
     if (viewport.current) {
@@ -275,9 +352,10 @@ export default function Minesweeper({ param, close }: AppProps) {
     if (index >= 0 && next.status !== 'won' && next.status !== 'lost') setAnnouncement(describe(index, next))
   }
   const touchAction = (index: number, marking: boolean) => {
-    if (index < 0) return
-    if (marking) mark(index)
-    else commit(gameRef.current.cells[index] === REVEALED ? chordCell(gameRef.current, index) : reveal(gameRef.current, index))
+    const current = gameRef.current
+    const next = touchCell(current, index, marking, preferencesRef.current.marks)
+    commit(next)
+    if (index >= 0 && marking && current.cells[index] !== REVEALED && next.status !== 'won' && next.status !== 'lost') setAnnouncement(describe(index, next))
   }
   const point = (e: PointerEvent<HTMLDivElement>) => {
     const rect = boardCanvas.ref.current?.getBoundingClientRect()
@@ -306,20 +384,21 @@ export default function Minesweeper({ param, close }: AppProps) {
       setPreview([])
       setPressing(false)
       const [a, b] = [...pointers.current.values()]
-      const v = viewport.current
+      const v = mobile ? viewport.current : null
       if (v) {
         const rect = v.getBoundingClientRect()
         const mx = (a.x + b.x) / 2 - rect.left
         const my = (a.y + b.y) / 2 - rect.top
-        pinch.current = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom, anchorX: v.scrollLeft + mx, anchorY: v.scrollTop + my }
+        pinch.current = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: boardScale, anchorX: v.scrollLeft + mx, anchorY: v.scrollTop + my }
       }
-      gesture.current = { kind: 'pan', pointer: e.pointerId, index: -1, touch: true, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY }
+      gesture.current = { kind: mobile ? 'pan' : 'suppressed', index: -1, touch: true, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY }
+      showPanBars()
       return
     }
     if (pointers.current.size > 1) return
-    let kind: Gesture['kind'] = touch ? (index < 0 ? 'pan' : flagMode ? 'mark' : 'reveal') : (e.buttons & 4) || (e.buttons & 3) === 3 ? 'chord' : e.button === 2 ? 'mark' : 'reveal'
+    let kind: Gesture['kind'] = touch ? (index < 0 ? 'pan' : gameRef.current.cells[index] === REVEALED ? 'chord' : flagMode ? 'mark' : 'reveal') : (e.buttons & 4) || (e.buttons & 3) === 3 ? 'chord' : e.button === 2 ? 'mark' : 'reveal'
     if (gameRef.current.status === 'lost' || gameRef.current.status === 'won') kind = 'suppressed'
-    gesture.current = { kind, pointer: e.pointerId, index, touch, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY }
+    gesture.current = { kind, index, touch, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY }
     pressPreview(kind, index)
     if (!touch && kind === 'mark') mark(index)
     if (touch && index >= 0 && kind !== 'suppressed') {
@@ -350,7 +429,7 @@ export default function Minesweeper({ param, close }: AppProps) {
       const p = pinch.current
       const v = viewport.current
       if (!v) return
-      const nextZoom = Math.max(1, Math.min(3, p.zoom * Math.hypot(a.x - b.x, a.y - b.y) / p.distance))
+      const nextZoom = Math.max(minimumScale, Math.min(3, p.zoom * Math.hypot(a.x - b.x, a.y - b.y) / p.distance))
       const rect = v.getBoundingClientRect()
       const mx = (a.x + b.x) / 2 - rect.left
       const my = (a.y + b.y) / 2 - rect.top
@@ -425,6 +504,11 @@ export default function Minesweeper({ param, close }: AppProps) {
     if (!active || hidden || dialog || e.target !== root.current || e.altKey || e.ctrlKey || e.metaKey) return
     unlockAudio()
     setTouchInput(false)
+    if (recordPending && !e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault()
+      continueRecord()
+      return
+    }
     if (e.key === 'Enter' && e.shiftKey && eggKeys.current === 'xyzzy') {
       e.preventDefault()
       setEgg(true)
@@ -468,6 +552,7 @@ export default function Minesweeper({ param, close }: AppProps) {
       } }, '-',
       { label: S.exit, onClick: close },
     ] },
+    { label: S.options, items: [{ label: S.chooseRemy, onClick: () => setDialog('choose') }] },
     { label: S.help, items: [
       { label: S.contents, hotkey: 'F1', onClick: () => setDialog('help') }, '-',
       { label: S.about, onClick: () => setDialog('about') },
@@ -479,39 +564,52 @@ export default function Minesweeper({ param, close }: AppProps) {
   }
   const changeZoom = (next: number) => {
     cancelGesture()
-    setZoom(Math.max(1, Math.min(3, next)))
+    setZoom(Math.max(minimumScale, Math.min(3, next)))
   }
 
   return (
-    <div ref={root} className={`ms-game${mobile ? ' ms-pocket' : ''}`} role="application" aria-label={S.title} aria-describedby="ms-cursor-description" tabIndex={0} onKeyDown={onKeyDown}>
+    <div ref={root} className={`ms-game${mobile ? ' ms-pocket' : ''}`} role="application" aria-label={S.title} aria-describedby="ms-cursor-description" tabIndex={0} onKeyDown={onKeyDown}
+      onPointerDownCapture={(e) => {
+        if (!recordPending || !active || hidden || dialog) return
+        e.preventDefault()
+        e.stopPropagation()
+        continueRecord()
+      }}>
       <div ref={menu}><GameMenuBar menus={menus} disabled={dialog !== null} /></div>
       {egg && <span className="ms-egg" style={{ background: hover >= 0 && game.mines[hover] ? '#000000' : '#ffffff' }} aria-hidden="true" />}
-      <div className="ms-header" style={{ width: headerWidth * headerScale, height: HEADER_HEIGHT * headerScale }}>
-        <canvas ref={headerCanvas.ref} style={{ width: headerWidth * headerScale, height: HEADER_HEIGHT * headerScale }} aria-hidden="true" />
-        <button type="button" className="ms-face" aria-label={S.face} style={{ left: (Math.floor(headerWidth / 2) - 12) * headerScale, top: 12 * headerScale, width: 24 * headerScale, height: 24 * headerScale }}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return
-            unlockAudio()
-            e.currentTarget.setPointerCapture(e.pointerId)
-            setFacePressed(true)
-          }}
-          onPointerUp={(e) => {
-            setFacePressed(false)
-            if (e.button !== 0) return
-            const rect = e.currentTarget.getBoundingClientRect()
-            if (e.clientX >= rect.left && e.clientX < rect.right && e.clientY >= rect.top && e.clientY < rect.bottom) newGame()
-          }}
-          onPointerCancel={() => setFacePressed(false)} onLostPointerCapture={() => setFacePressed(false)}
-          onClick={(e) => { if (e.detail === 0) newGame() }} />
+      <div className="ms-client" style={{ width: clientWidth, height: HEADER_HEIGHT * headerScale + viewportHeight }}>
+        <div className="ms-header" style={{ width: clientWidth, height: HEADER_HEIGHT * headerScale }}>
+          <canvas ref={headerCanvas.ref} style={{ width: clientWidth, height: HEADER_HEIGHT * headerScale }} aria-hidden="true" />
+          <button type="button" className="ms-face" aria-label={S.face} style={{ left: (Math.floor(headerWidth / 2) - 12) * headerDisplayScale, top: 15 * headerScale, width: 24 * headerScale, height: 24 * headerScale }}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return
+              unlockAudio()
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setFacePressed(true)
+            }}
+            onPointerUp={(e) => {
+              setFacePressed(false)
+              if (e.button !== 0) return
+              const rect = e.currentTarget.getBoundingClientRect()
+              if (e.clientX >= rect.left && e.clientX < rect.right && e.clientY >= rect.top && e.clientY < rect.bottom) newGame()
+            }}
+            onPointerCancel={() => setFacePressed(false)} onLostPointerCapture={() => setFacePressed(false)}
+            onClick={(e) => { if (e.detail === 0) newGame() }} />
+        </div>
+        <div ref={viewport} className="ms-viewport" style={{ width: clientWidth, height: viewportHeight }}
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={cancelGesture}
+          onLostPointerCapture={(e) => { if (pointers.current.has(e.pointerId)) cancelGesture() }}
+          onScroll={showPanBars} onPointerLeave={() => { if (!gesture.current) setHover(-1) }} onContextMenu={(e) => e.preventDefault()}>
+          <canvas ref={boardCanvas.ref} className="ms-board" style={{ width: width * boardScale, height: boardHeight * boardScale }} aria-hidden="true" />
+          {ring && <span className="ms-hold-ring" style={{ left: ring.x, top: ring.y }} aria-hidden="true" />}
+        </div>
+        {mobile && <div className="ms-client-border" style={{ borderWidth: 3 * headerScale }} aria-hidden="true" />}
       </div>
-      <div ref={viewport} className="ms-viewport" style={mobile ? undefined : { width, height: boardHeight }}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={cancelGesture}
-        onLostPointerCapture={(e) => { if (pointers.current.has(e.pointerId)) cancelGesture() }}
-        onPointerLeave={() => { if (!gesture.current) setHover(-1) }} onContextMenu={(e) => e.preventDefault()}>
-        <canvas ref={boardCanvas.ref} className="ms-board" style={{ width: width * boardScale, height: boardHeight * boardScale }} aria-hidden="true" />
-        {ring && <span className="ms-hold-ring" style={{ left: ring.x, top: ring.y }} aria-hidden="true" />}
-      </div>
-      {toolbar && <div className="ms-toolbar">
+      {panBars && <div className="ms-scroll-indicators" aria-hidden="true" style={{ left: panBars.left, top: panBars.top, width: panBars.width, height: panBars.height }}>
+        {panBars.horizontal && <span className="ms-scroll-x" style={{ left: panBars.x, width: panBars.thumbW }} />}
+        {panBars.vertical && <span className="ms-scroll-y" style={{ top: panBars.y, height: panBars.thumbH }} />}
+      </div>}
+      {toolbar && <div className={`ms-toolbar${mobile ? '' : ' ms-toolbar-compact'}`}>
         <button type="button" className="btn ms-mode" aria-pressed={flagMode} onClick={() => {
           cancelGesture()
           setFlagMode((p) => !p)
@@ -523,15 +621,15 @@ export default function Minesweeper({ param, close }: AppProps) {
           </svg>
           {flagMode ? S.flagMode : S.revealMode}
         </button>
-        <button type="button" className="btn" aria-label={S.zoomOut} disabled={zoom <= 1} onClick={() => changeZoom(zoom - 0.25)}>{S.minus}</button>
-        <button type="button" className="btn" aria-label={S.zoomIn} disabled={zoom >= 3} onClick={() => changeZoom(zoom + 0.25)}>{S.plus}</button>
+        {mobile && <><button type="button" className="btn" aria-label={S.zoomOut} disabled={boardScale <= minimumScale} onClick={() => changeZoom(boardScale - 0.25)}>{S.minus}</button>
+        <button type="button" className="btn" aria-label={S.zoomIn} disabled={boardScale >= 3} onClick={() => changeZoom(boardScale + 0.25)}>{S.plus}</button>
         <button type="button" className="btn" onClick={() => {
-          changeZoom(1)
+          changeZoom(startScale)
           if (viewport.current) {
             viewport.current.scrollLeft = 0
             viewport.current.scrollTop = 0
           }
-        }}>{S.fit}</button>
+        }}>{S.fit}</button></>}
       </div>}
       <span className="ms-accessible" id="ms-cursor-description">{describe(cursor)}</span>
       <span className="ms-accessible" aria-live="polite" aria-atomic="true">{announcement}</span>
@@ -547,20 +645,12 @@ export default function Minesweeper({ param, close }: AppProps) {
         </div><p>{S.customHint}</p>
       </GameDialog>}
       {dialog === 'help' && <GameDialog title={S.helpTitle} onClose={closeDialog} width={420}>
-        <div className="ms-help-tabs" role="tablist" aria-label={S.helpTitle}>
-          {S.tabs.map((tab, i) => <button type="button" key={tab} role="tab" id={`ms-tab-${i}`} aria-selected={helpTab === i} aria-controls={`ms-panel-${i}`} tabIndex={helpTab === i ? 0 : -1} onClick={() => setHelpTab(i)}
-            onKeyDown={(e) => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
-              e.preventDefault()
-              const next = e.key === 'Home' ? 0 : e.key === 'End' ? 3 : (i + (e.key === 'ArrowRight' ? 1 : 3)) % 4
-              setHelpTab(next)
-              e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-            } }}>{tab}</button>)}
-        </div>
-        <div className="ms-help-panel" role="tabpanel" id={`ms-panel-${helpTab}`} aria-labelledby={`ms-tab-${helpTab}`}>
+        <GameHelpTabs tabs={S.tabs} selected={helpTab} onChange={setHelpTab} label={S.helpTitle}>
           {S.helpSections[helpTab].map((line) => <p key={line}>{line}</p>)}
-        </div>
+        </GameHelpTabs>
       </GameDialog>}
       {dialog === 'about' && <AboutDialog game={S.title} icon={icon} version={S.version} flavour={S.aboutFlavour} lines={S.aboutLines} onClose={closeDialog} />}
+      {dialog === 'choose' && <ChooseRemyDialog onClose={closeDialog} />}
       {dialog === 'name' && record && <NameEntryDialog title={S.title} level={record.level} message={S.recordMessage(record.level)} onSubmit={(name) => {
         setPreferences((p) => ({ ...p, scores: { ...p.scores, [record.level]: { time: record.time, name: name.trim().slice(0, 32) || S.defaultName } } }))
         setDialog('scores')

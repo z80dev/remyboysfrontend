@@ -27,7 +27,7 @@ export function movable(s: Board, p: number, depth: number): boolean {
 }
 export function canMove(s: Board, move: Move): boolean {
   if (move.pile === move.to || !s.piles[move.to] || !movable(s, move.pile, move.depth)) return false
-  const dest = s.piles[move.to].at(-1)
+  const dest = s.piles[move.to][s.piles[move.to].length - 1]
   return !dest || dest.rank === s.piles[move.pile][move.depth].rank + 1
 }
 export function completeRun(pile: readonly Card[]): boolean {
@@ -64,22 +64,44 @@ export function dealRow(s: SpiderState): SpiderState {
   return finish(n)
 }
 export function undo(s: SpiderState): SpiderState {
-  const previous = s.history.at(-1)
+  const previous = s.history[s.history.length - 1]
   return previous ? { ...s, ...copyBoard(previous), history: s.history.slice(0, -1), score: s.score - 1, moves: s.moves + 1 } : s
+}
+
+export function hasLegalMoves(s: Board): boolean {
+  for (let pile = 0; pile < 10; pile++) for (let depth = 0; depth < s.piles[pile].length; depth++) {
+    for (let to = 0; to < 10; to++) if (canMove(s, { pile, depth, to })) return true
+  }
+  return false
 }
 export function availableMoves(s: Board): Move[] {
   const moves: Move[] = []
   for (let pile = 0; pile < 10; pile++) for (let depth = 0; depth < s.piles[pile].length; depth++) {
     if (!movable(s, pile, depth)) continue
-    for (let to = 0; to < 10; to++) if (canMove(s, { pile, depth, to })) moves.push({ pile, depth, to })
+    const source = s.piles[pile][depth]
+    const predecessor = s.piles[pile][depth - 1]
+    if (predecessor?.faceUp && predecessor.suit === source.suit && predecessor.rank === source.rank + 1) continue
+    for (let to = 0; to < 10; to++) {
+      if (depth === 0 && !s.piles[to].length) continue
+      if (canMove(s, { pile, depth, to })) moves.push({ pile, depth, to })
+    }
   }
-  return moves
+  return moves.sort((a, b) => {
+    const value = (m: Move) => {
+      const source = s.piles[m.pile][m.depth]
+      const dest = s.piles[m.to][s.piles[m.to].length - 1]
+      return (dest?.suit === source.suit ? 2 : 0) + (m.depth > 0 && !s.piles[m.pile][m.depth - 1].faceUp ? 1 : 0)
+    }
+    return value(b) - value(a)
+  })
 }
-export type Hint = { kind: 'move'; move: Move } | { kind: 'deal' } | { kind: 'none' }
+export type Hint = { kind: 'move'; move: Move } | { kind: 'deal' } |
+  { kind: 'none'; reason: 'finished' | 'no-useful' | 'no-moves' }
 export function hintAt(s: Board, index: number): Hint {
   const moves = availableMoves(s)
-  if (index < moves.length) return { kind: 'move', move: moves[index] }
-  return canDeal(s) ? { kind: 'deal' } : { kind: 'none' }
+  if (index >= 0 && index < moves.length) return { kind: 'move', move: moves[index] }
+  if (index === moves.length && canDeal(s)) return { kind: 'deal' }
+  return { kind: 'none', reason: moves.length ? 'finished' : hasLegalMoves(s) ? 'no-useful' : 'no-moves' }
 }
 export type Stats = { high: number; wins: number; losses: number; streak: number; longestWin: number; longestLoss: number }
 export const emptyStats = (): Stats => ({ high: 0, wins: 0, losses: 0, streak: 0, longestWin: 0, longestLoss: 0 })
@@ -92,6 +114,13 @@ export type Options = { animation: boolean; prompt: boolean; alwaysSave: boolean
 export type Stored = { options: Options; stats: Record<Difficulty, Stats>; saved: SpiderState | null }
 export const defaults = (): Stored => ({ options: { animation: true, prompt: true, alwaysSave: false, alwaysOpen: false },
   stats: { 1: emptyStats(), 2: emptyStats(), 4: emptyStats() }, saved: null })
+/** Opening replaces the board, not the abandoned game's per-difficulty result. */
+export function openSavedGame(stored: Stored, current: SpiderState, accounted: boolean): Stored | null {
+  if (!stored.saved) return null
+  if (accounted || current.moves === 0 || current.completed.length === 8) return stored
+  return { ...stored, stats: { ...stored.stats,
+    [current.difficulty]: recordResult(stored.stats[current.difficulty], false, current.score) } }
+}
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
 function boardGuard(v: unknown, difficulty: Difficulty): v is Board {
   if (!object(v) || !Array.isArray(v.piles) || v.piles.length !== 10 || !Array.isArray(v.stock) || !Array.isArray(v.completed)) return false
@@ -110,7 +139,7 @@ function boardGuard(v: unknown, difficulty: Difficulty): v is Board {
       seen.add(Number(c.id))
     }
   }
-  if (seen.size !== 104 || v.stock.some(c => c.faceUp) || v.piles.some(p => p.length && !p.at(-1).faceUp)) return false
+  if (seen.size !== 104 || v.stock.some(c => c.faceUp) || v.piles.some(p => p.length && !p[p.length - 1].faceUp)) return false
   return v.completed.every(p => p.length === 13 && completeRun(p))
 }
 export function stateGuard(v: unknown): v is SpiderState {

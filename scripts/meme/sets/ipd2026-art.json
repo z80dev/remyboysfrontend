@@ -1,0 +1,135 @@
+{
+  "provider": "codex",
+  "codexModel": "gpt-6-luna",
+  "model": "openai/gpt-image-2.5-flare",
+  "quality": "high",
+  "style": "Hand-painted gouache storybook illustration: visible brush strokes, soft textured watercolour-paper grain, confident dark ink linework, rich warm palette (terracotta, ochre, turquoise, cream, deep plum), painterly light and depth. The characters are 'Remy' chibi anime characters from the reference images: big round heads, large glossy anime eyes, thick dark eyebrows, small bodies. Every Remy is a boy, including the ones with long hair: dress them only in boys' clothes (t-shirts, sweatshirts, jerseys, trousers, jeans, shorts, sneakers) and never in skirts, dresses or other feminine clothing. Keep each referenced character's hair colour, hairstyle, skin tone and shirt recognisable, but paint them fully as illustrated characters with arms, hands and expressive natural poses (never pasted photos). Ignore the reference images' photo backgrounds and do not copy props like swords. Bald characters must stay completely bald. No text, letters, logos or watermarks anywhere unless the prompt asks for exact words. Respectful: no feathered headdresses, costumes or stereotypes of Native peoples.",
+  "jobs": [
+    {
+      "name": "nah-a",
+      "aspect": "1:1",
+      "refs": [42],
+      "prompt": "Reaction panel, chest-up, character centred. The red-haired Remy turns his head away in exaggerated disgust (eyes squeezed shut, mouth scrunched), raising one hand palm-out toward the viewer in a firm 'nope' gesture. Simple soft peach-to-terracotta painted background."
+    },
+    {
+      "name": "nah-b",
+      "aspect": "1:1",
+      "refs": [42],
+      "prompt": "Reaction panel, chest-up, character centred. The same red-haired Remy beams with delight, big open happy smile, eyes sparkling, pointing confidently to the right with an index finger. Glowing golden background with little painted sparkles."
+    },
+    {
+      "name": "discovered",
+      "aspect": "1:1",
+      "refs": [1217, 42, 127, 39, 143],
+      "prompt": "Wide painted beach scene. Left foreground: the completely bald Remy in a white martial-arts gi (first reference) proudly plants a tall wooden flagpole into the sand, chest puffed out, smug; the white flag reads exactly MINE in red letters. Right side: five hairy Remy boys (red hair, blond hair, blue hair, light-blue hair, red hair with a green frog shirt, from the references), all wearing t-shirts with jeans, cargo pants or shorts and sneakers, stand in front of their village of thatched-roof homes, gardens and palm trees, arms crossed, deadpan and unimpressed, staring at him. Turquoise sea, an old wooden sailing ship anchored offshore. Keep the top 25% of the image as calm open sky with nothing important in it."
+    },
+    {
+      "name": "fridge",
+      "aspect": "4:3",
+      "refs": [1217, 127],
+      "prompt": "Cozy home kitchen at night. Centre-left: the completely bald Remy in a white gi stands before an open refrigerator glowing with golden light and packed with food, gazing in awe like an explorer discovering a new world, planting a tiny white flag into a slice of pizza on a shelf. Right: in the kitchen doorway, the blond-haired Remy in a black t-shirt (the owner of the house) stares at him in disbelief, hands on hips. Keep the top 22% of the image as plain uncluttered wall."
+    },
+    {
+      "name": "brain-1",
+      "aspect": "16:9", "quality": "medium",
+      "refs": [1217],
+      "prompt": "The completely bald Remy in a white gi, chest-up and centred, with a dull, vacant, bored stare. Drab dim grey room, flat lifeless lighting. Leave generous empty margin above the head and keep the character within the middle half of the image height."
+    },
+    {
+      "name": "brain-2",
+      "aspect": "16:9", "quality": "medium",
+      "refs": [114],
+      "prompt": "The blue-haired Remy in a white t-shirt, chest-up and centred, chin on hand, thoughtful and slightly uneasy; a soft blue glow beginning to radiate around the head against a deep navy background. Keep the character within the middle half of the image height."
+    },
+    {
+      "name": "brain-3",
+      "aspect": "16:9", "quality": "medium",
+      "refs": [42],
+      "prompt": "The red-haired Remy, chest-up and centred, radiant and enlightened, eyes shining, head glowing brightly, with painted golden sunburst rays bursting behind on a terracotta-orange background. Keep the character within the middle half of the image height."
+    },
+    {
+      "name": "brain-4",
+      "aspect": "16:9", "quality": "medium",
+      "refs": [143],
+      "prompt": "The red-haired Remy in a green frog t-shirt, chest-up and centred, ascended to cosmic enlightenment: eyes glowing pure white, head blazing with light, floating among galaxies, aurora rainbow light and a luminous web of glowing land-map lines spreading across the cosmos. Keep the character within the middle half of the image height."
+    },
+    {
+      "name": "item-sisters",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [],
+      "prompt": "Single isolated object illustration on a plain pure white background, no shadow box: corn stalks with ripe cobs, climbing bean vines with pods twining up the stalks, and a big orange squash with broad leaves at their base (the Three Sisters)."
+    },
+    {
+      "name": "item-laptop",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [],
+      "prompt": "Single isolated object illustration on a plain pure white background: an open laptop whose screen shows a colourful painted map of North America divided into many soft overlapping coloured territory regions, with a search magnifying glass icon. No readable text."
+    },
+    {
+      "name": "item-calendar",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [],
+      "prompt": "Single isolated object illustration on a plain pure white background: a tear-off desk calendar page with a red header reading exactly OCTOBER and a big number 12. Below it the printed words Columbus Day are struck through with a thick red marker line, and underneath, handwritten in red marker: Indigenous Peoples' Day with a little heart."
+    },
+    {
+      "name": "item-pottery",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [],
+      "prompt": "Single isolated object illustration on a plain pure white background: a beautiful handmade clay pottery bowl with simple geometric painted bands, with a small kraft-paper tag tied on a string reading exactly NATIVE-MADE."
+    },
+    {
+      "name": "item-book",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [],
+      "prompt": "Single isolated object illustration on a plain pure white background: a worn old brown leather history book standing slightly angled; the cover title reads exactly 1492 in large gold letters, with the subtitle a guy gets very, very lost in smaller gold letters."
+    },
+    {
+      "name": "item-friend",
+      "aspect": "1:1", "quality": "medium",
+      "refs": [143],
+      "prompt": "Single isolated character on a plain pure white background: the red-haired Remy in a green frog t-shirt, waist-up, holding an open history book, glancing at the viewer with a knowing, slightly smug smile."
+    },
+    {
+      "name": "tomato-before",
+      "aspect": "2:3",
+      "refs": [131],
+      "prompt": "Gloomy, desaturated grey-blue old kitchen with rain on the window. The blue-haired Remy in a black-and-yellow jersey sits at a bare wooden table staring sadly at a single plain dry loaf of bread, one tear on the cheek. Keep the top 15% and bottom 18% of the image simple and dark (text goes there)."
+    },
+    {
+      "name": "tomato-after",
+      "aspect": "2:3",
+      "refs": [42],
+      "prompt": "Sunny, warm Italian trattoria with a red-and-white checkered tablecloth. The red-haired Remy is ecstatic, doing a chef's kiss gesture, the table loaded with pizza margherita, a bowl of spaghetti al pomodoro and a basket of ripe red tomatoes, steam rising. Keep the top 15% and bottom 18% of the image simple (text goes there)."
+    },
+    {
+      "name": "change",
+      "aspect": "1:1",
+      "refs": [42],
+      "prompt": "Sunny college campus lawn with trees. The red-haired Remy sits behind a folding table holding a coffee mug, smug confident grin, a stack of history books on the table. A large white poster board is taped to the front of the table, filling its width, hand-lettered in bold black capitals on two lines: COLUMBUS DIDN'T DISCOVER ANYTHING and, larger, below it: CHANGE MY MIND. Spell the words exactly."
+    },
+    {
+      "name": "party",
+      "aspect": "1:1",
+      "refs": [39, 127, 7, 114],
+      "prompt": "Dim house party with coloured spotlights and a disco ball. In the background right, a group of hairy Remys dance happily. In the bottom-left foreground, the blue-haired Remy in a black t-shirt stands alone against the wall wearing a small party hat, holding a cup, with a quiet, knowing half-smile. Keep the upper-left 40% of the image as darker, uncluttered wall."
+    },
+    {
+      "name": "buttons-top",
+      "aspect": "16:9", "quality": "medium",
+      "refs": [],
+      "prompt": "Close-up of a worn metal control panel with two big glossy red push buttons side by side in the lower half, and a chubby cartoon hand with one finger hovering hesitantly between them, little sweat drops flying. The upper 40% of the panel is plain brushed metal with nothing on it."
+    },
+    {
+      "name": "buttons-bottom",
+      "aspect": "16:9",
+      "refs": [1217],
+      "prompt": "The completely bald Remy in a white gi, chest-up and centred, sweating profusely and nervously, wiping his forehead with a small towel, big beads of sweat flying off his bald head. Warm orange painted background. Keep the bottom 18% of the image simple."
+    },
+    {
+      "name": "nobody",
+      "aspect": "4:3",
+      "refs": [42, 143, 127, 39, 114, 108],
+      "prompt": "Joyful crowd of six hairy Remys (red hair, red hair with frog tee, blond hair, blue hair, light-blue hair, blond hair — matching the references) celebrating outdoors at golden hour among autumn trees and a cornfield, confetti in the air, together holding up a long painted cloth banner across the lower part of the image that reads exactly HAPPY INDIGENOUS PEOPLES’ DAY, the banner decorated with simple geometric diamond borders. Every single character has a full head of hair: absolutely no bald characters anywhere. Spell the words exactly."
+    }
+  ]
+}

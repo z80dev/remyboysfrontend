@@ -1,5 +1,5 @@
 export const MAP_SIZE = 32
-export const TICK_MS = 200
+export const TICK_MS = 100
 export type Direction = 0 | 1 | 2 | 3 // north, east, south, west
 export enum Tile {
   Floor, Wall, Chip, Socket, Exit, Water, Fire, Ice, ForceN, ForceE, ForceS, ForceW, ForceRandom,
@@ -23,7 +23,7 @@ export interface Level {
   top: readonly ActorSpec[]
   traps: readonly Link[]
   cloners: readonly Link[]
-  solution: string // one 200 ms tick per N/E/S/W/. character
+  solution: string // one 100 ms physics tick per N/E/S/W/. character
   seed?: number
 }
 export interface Actor {
@@ -46,8 +46,8 @@ export interface State {
   death?: Death
   events: GameEvent[]
   thief: boolean
-  randomForce: Direction
   lastMoveForced: boolean
+  queuedInput?: Direction
 }
 export const index = (x: number, y: number) => y * MAP_SIZE + x
 export const opposite = (d: Direction) => ((d + 2) % 4) as Direction

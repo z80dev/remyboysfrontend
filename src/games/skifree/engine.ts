@@ -29,9 +29,10 @@ const VX = [-1, -0.94, -Math.SQRT1_2, 0, Math.SQRT1_2, 0.94, 1]
 const VY = [0, 0.342, Math.SQRT1_2, 1, Math.SQRT1_2, 0.342, 0]
 const ANGLE_CAP = [0, 0.3, 0.72, 1, 0.72, 0.3, 0]
 const KINDS: ObstacleKind[] = [
-  'tree', 'big-tree', 'dead-tree', 'stump', 'rock', 'mogul', 'ramp', 'rainbow', 'dog', 'skier', 'snowboarder', 'lift', 'hydrant',
+  'tree', 'big-tree', 'dead-tree', 'stump', 'rock', 'mogul', 'ramp', 'rainbow', 'dog', 'skier', 'snowboarder', 'hydrant',
 ]
-const RADII = [8, 14, 8, 7, 9, 9, 13, 18, 8, 7, 8, 0, 0]
+const KIND_WEIGHTS = [30, 42, 48, 54, 61, 73, 78, 80, 83, 86, 89, 90]
+const RADII = [8, 14, 8, 7, 9, 9, 13, 18, 8, 7, 8, 0]
 const EVENTS_CAPACITY = 32
 
 type Chunk = { cx: number; cy: number; objects: WorldObject[] }
@@ -72,7 +73,9 @@ function fillChunk(seed: number, cx: number, cy: number, objects: WorldObject[])
   const wy = wrap(cy)
   for (let i = 0; i < CHUNK_OBJECTS; i++) {
     const object = objects[i]
-    const choice = Math.floor(cellNoise(seed, wx, wy, i * 4) * KINDS.length)
+    const roll = cellNoise(seed, wx, wy, i * 4) * KIND_WEIGHTS[KIND_WEIGHTS.length - 1]
+    let choice = 0
+    while (roll >= KIND_WEIGHTS[choice]) choice++
     object.id = (wy * CHUNK_PERIOD + wx) * CHUNK_OBJECTS + i
     object.kind = KINDS[choice]
     object.radius = RADII[choice]
@@ -83,11 +86,7 @@ function fillChunk(seed: number, cx: number, cy: number, objects: WorldObject[])
     object.text = undefined
     object.side = object.kind === 'dog' || object.kind === 'skier' || object.kind === 'snowboarder'
       ? object.variant % 2 === 0 ? 1 : -1 : undefined
-    if (object.kind === 'lift') {
-      object.x = cx * CHUNK_SIZE + 310
-      object.variant = 1 + object.variant % 3
-    }
-    if (i >= CHUNK_OBJECTS - 2) {
+    if (wx === 0 && i >= CHUNK_OBJECTS - 2) {
       object.kind = 'lift'
       object.radius = 0
       object.variant = i === CHUNK_OBJECTS - 2 ? 0 : 1
@@ -148,11 +147,11 @@ function scenery(state: SkiState): void {
   const add = (kind: ObstacleKind, x: number, y: number, radius: number, variant: number, text?: string, side?: -1 | 1) => {
     state.objects.push({ id: id--, kind, x, y, radius, variant, text, side, active: true })
   }
-  add('sign', 0, -80, 0, 0, STRINGS.signs.mountain)
+  add('sign', 0, -66, 0, 0, STRINGS.signs.mountain)
   add('sign', -220, 0, 0, 0, STRINGS.signs.slalom)
   add('sign', 0, 38, 0, 0, STRINGS.signs.tree)
   add('sign', 220, 0, 0, 0, STRINGS.signs.freestyle)
-  add('sign', 0, -35, 0, 0, STRINGS.signs.numpad)
+  add('sign', 0, -28, 0, 0, STRINGS.signs.numpad)
   add('sign', 75, 2000, 0, 0, STRINGS.signs.nothing)
   const courses: Course[] = ['slalom', 'tree', 'freestyle']
   for (let c = 0; c < courses.length; c++) {
@@ -168,6 +167,7 @@ function scenery(state: SkiState): void {
         if (course === 'tree') {
           add(row % 2 === 0 ? 'tree' : 'big-tree', x - side * 85, y + 28, 9, row % 4)
           add('tree', x + side * 95, y - 32, 8, (row + 1) % 4)
+          add(row % 2 === 0 ? 'tree' : 'big-tree', x + side * 12, y + 50, row % 2 === 0 ? 8 : 14, row % 4)
         }
       } else {
         add(row % 3 === 2 ? 'rainbow' : 'ramp', x + (row % 2 === 0 ? -18 : 18), y, row % 3 === 2 ? 18 : 13, row % 4)
@@ -176,15 +176,17 @@ function scenery(state: SkiState): void {
   }
 }
 
-export function createGame(seed: number, course: Course = 'free'): SkiState {
+/** An explicit Free Ski choice starts in the open gap; an unspecified course opens the original starting area. */
+export function createGame(seed: number, course?: Course): SkiState {
+  const selectedCourse = course ?? 'free'
   const tracks = new Float32Array(TRACK_CAPACITY * 3)
   for (let i = 2; i < tracks.length; i += 3) tracks[i] = -1
   const events = new Array<GameEvent>(EVENTS_CAPACITY)
   events.length = 0
   const state: SkiState = {
-    seed: seed >>> 0, x: lane(course), y: 0, direction: 6, speed: 0, fast: false, time: 0, distance: 0, style: 0,
+    seed: seed >>> 0, x: course === 'free' ? 100 : lane(selectedCourse), y: 0, direction: 6, speed: 0, fast: false, time: 0, distance: 0, style: 0,
     air: 0, airDuration: 0, trick: 'none', trickProgress: 0, completedTricks: 0, crash: 0,
-    course, courseStarted: false, courseFinished: false, courseTime: 0, penalties: 0, gateIndex: 0, gameOver: false,
+    course: selectedCourse, courseStarted: false, courseFinished: false, courseTime: 0, penalties: 0, gateIndex: 0, gameOver: false,
     objects: [], monsters: [
       { x: 0, y: 0, phase: 'chase', timer: 0, active: false },
       { x: 0, y: 0, phase: 'chase', timer: 0, active: false },
@@ -192,7 +194,7 @@ export function createGame(seed: number, course: Course = 'free'): SkiState {
   }
   const runtime: Runtime = {
     chunks: [], cx: Infinity, cy: Infinity, queued: new Array<GameEvent>(EVENTS_CAPACITY), queuedCount: 0,
-    airPoints: 0, firstMonster: false, secondMonster: false, courseOrigin: lane(course), collisionObject: null,
+    airPoints: 0, firstMonster: false, secondMonster: false, courseOrigin: lane(selectedCourse), collisionObject: null,
   }
   for (let i = 0; i < CHUNK_COUNT; i++) {
     const objects: WorldObject[] = []
@@ -241,13 +243,13 @@ function walk(state: SkiState, runtime: Runtime, dx: number, dy: number): void {
   const y = state.y
   state.x += dx
   state.y += dy
-  state.distance += Math.hypot(dx, dy)
+  state.distance = Math.max(0, state.distance, state.y)
   collide(state, runtime, x, y, true)
   refreshChunks(state, runtime)
 }
 
 export function command(state: SkiState, action: SkiCommand): void {
-  if (state.gameOver) return
+  if (state.gameOver || beingEaten(state)) return
   const runtime = runtimes.get(state)
   if (!runtime) return
   if (action === 'fast') {
@@ -255,7 +257,7 @@ export function command(state: SkiState, action: SkiCommand): void {
     queue(runtime, 'fast')
     return
   }
-  if (state.crash > 0 || beingEaten(state)) return
+  if (state.crash > 0) return
   if (state.air > 0) {
     if (state.trick !== 'none') return
     if (action === 'left' || action === 'right') state.trick = 'spin'
@@ -277,7 +279,7 @@ export function command(state: SkiState, action: SkiCommand): void {
       if (state.direction === 0 || state.direction === 6) walk(state, runtime, 0, -4)
       else {
         state.speed *= 0.55
-        turn(state, (state.direction < 3 ? state.direction - 1 : state.direction + 1) as Direction)
+        if (state.direction !== 3) turn(state, (state.direction < 3 ? state.direction - 1 : state.direction + 1) as Direction)
       }
       break
     case 'down': turn(state, 3); break
@@ -300,7 +302,7 @@ export function steer(state: SkiState, dx: number, dy: number): void {
 function beingEaten(state: SkiState): boolean {
   for (let i = 0; i < state.monsters.length; i++) {
     const monster = state.monsters[i]
-    if (monster.active && monster.phase !== 'chase' && monster.phase !== 'away') return true
+    if (monster.active && monster.phase !== 'chase') return true
   }
   return false
 }
@@ -393,6 +395,7 @@ function startCourse(state: SkiState, runtime: Runtime, course: Course): void {
 }
 
 function courseRules(state: SkiState, runtime: Runtime, x: number, y: number, dt: number): void {
+  let startFraction = 0
   if (!state.courseStarted && y < COURSE_START && state.y >= COURSE_START) {
     const t = (COURSE_START - y) / (state.y - y)
     const crossingX = x + (state.x - x) * t
@@ -400,13 +403,21 @@ function courseRules(state: SkiState, runtime: Runtime, x: number, y: number, dt
       : Math.abs(crossingX - 220) <= 85 ? 'freestyle' : 'free'
     if (course !== 'free') {
       startCourse(state, runtime, course)
-      state.courseTime += dt * (1 - t)
+      startFraction = t
     }
-  } else if (state.courseStarted && !state.courseFinished) {
-    const fraction = y < COURSE_FINISH && state.y >= COURSE_FINISH ? (COURSE_FINISH - y) / (state.y - y) : 1
-    state.courseTime += dt * fraction
   }
   if (!state.courseStarted || state.courseFinished) return
+  let finishFraction = 1
+  let finished = false
+  if (y < COURSE_FINISH && state.y >= COURSE_FINISH) {
+    const t = (COURSE_FINISH - y) / (state.y - y)
+    const crossingX = x + (state.x - x) * t
+    if (Math.abs(crossingX - runtime.courseOrigin) <= 85) {
+      finishFraction = t
+      finished = true
+    }
+  }
+  state.courseTime += dt * (finishFraction - startFraction)
   if (state.course !== 'freestyle' && state.y > y) {
     while (state.gateIndex < GATE_COUNT) {
       const row = state.gateIndex
@@ -425,7 +436,7 @@ function courseRules(state: SkiState, runtime: Runtime, x: number, y: number, dt
       state.gateIndex++
     }
   }
-  if (y < COURSE_FINISH && state.y >= COURSE_FINISH) {
+  if (finished) {
     state.courseFinished = true
     emit(state, 'course-finish')
   }
@@ -433,8 +444,8 @@ function courseRules(state: SkiState, runtime: Runtime, x: number, y: number, dt
 
 function spawnMonster(state: SkiState, runtime: Runtime, index: number): void {
   const monster = state.monsters[index]
-  monster.x = state.x + (index === 0 ? -80 : 80)
-  monster.y = state.y - 150
+  monster.x = state.x + (index === 0 ? -80 : state.monsters[0].x <= state.x ? 120 : -120)
+  monster.y = state.y + (index === 0 ? -150 : 260)
   monster.active = true
   monster.phase = 'chase'
   monster.timer = 0
@@ -444,13 +455,13 @@ function spawnMonster(state: SkiState, runtime: Runtime, index: number): void {
 }
 
 function monsters(state: SkiState, runtime: Runtime, dt: number): void {
-  const courseRunout = state.courseFinished && state.y >= 1400
+  const courseRunout = state.courseStarted && state.y >= 1400
   if (!runtime.firstMonster && (state.y >= 2000 || Math.abs(state.x) > 1500 || state.y < -1500 || courseRunout)) spawnMonster(state, runtime, 0)
   if (!runtime.secondMonster && state.y >= 3000) spawnMonster(state, runtime, 1)
   let eater: Monster | null = null
   for (let i = 0; i < state.monsters.length; i++) {
     const monster = state.monsters[i]
-    if (monster.active && monster.phase !== 'chase' && monster.phase !== 'away') eater = monster
+    if (monster.active && monster.phase !== 'chase') eater = monster
   }
   for (let i = 0; i < state.monsters.length; i++) {
     const monster = state.monsters[i]
@@ -519,7 +530,7 @@ function advance(state: SkiState, runtime: Runtime, dt: number): void {
       }
       state.x += VX[state.direction] * state.speed * dt
       state.y += VY[state.direction] * state.speed * dt
-      state.distance += Math.hypot(state.x - x, state.y - y)
+      state.distance = Math.max(0, state.distance, state.y)
       if (state.air > 0) {
         const flightStep = Math.min(dt, state.air)
         if (state.trick !== 'none') {

@@ -10,7 +10,7 @@ export const LEFT = 3
 export type Direction = 0 | 1 | 2 | 3
 export type Phase = 'ready' | 'playing' | 'paused' | 'over'
 export type Options = { players: 1 | 2; skill: number; increaseSpeed: boolean; monochrome: boolean }
-export type Start = { row: number; col: number; direction: Direction }
+export type Start = { readonly row: number; readonly col: number; readonly direction: Direction }
 export type Snake = {
   cells: Uint16Array
   head: number
@@ -53,7 +53,7 @@ export function layoutLevel(level: number): number {
 }
 
 /** The bible's coordinates are 1-based half-block rows, not 25-row text coordinates. */
-export function buildWalls(level: number, walls = new Uint8Array(CELLS)): Uint8Array {
+function compileWalls(level: number, walls: Uint8Array = new Uint8Array(CELLS)): Uint8Array {
   walls.fill(0)
   const horizontal = (row: number, first: number, last: number) => {
     for (let col = first; col <= last; col++) walls[cell(row, col)] = 1
@@ -154,16 +154,29 @@ export function buildWalls(level: number, walls = new Uint8Array(CELLS)): Uint8A
   return walls
 }
 
+const WALL_LAYOUTS = Array.from({ length: 13 }, (_, index) => compileWalls(index + 1))
+const OPEN_STARTS: readonly Start[] = [{ row: 25, col: 50, direction: RIGHT }, { row: 25, col: 30, direction: LEFT }]
+const HORIZONTAL_STARTS: readonly Start[] = [{ row: 7, col: 60, direction: LEFT }, { row: 43, col: 20, direction: RIGHT }]
+const VERTICAL_STARTS: readonly Start[] = [{ row: 25, col: 50, direction: UP }, { row: 25, col: 30, direction: DOWN }]
+const DIAGONAL_STARTS: readonly Start[] = [{ row: 40, col: 75, direction: UP }, { row: 15, col: 5, direction: DOWN }]
+const DEFAULT_STARTS: readonly Start[] = [{ row: 7, col: 65, direction: DOWN }, { row: 43, col: 15, direction: UP }]
+
+/** Cached immutable layouts avoid allocations even on a level/death simulation step. */
+export function buildWalls(level: number, walls: Uint8Array = new Uint8Array(CELLS)): Uint8Array {
+  walls.set(WALL_LAYOUTS[layoutLevel(level) - 1])
+  return walls
+}
+
 export function startPosition(level: number, player: number): Start {
-  const jake = player === 1
+  const slot = player === 1 ? 1 : 0
   switch (layoutLevel(level)) {
-    case 1: return { row: 25, col: jake ? 30 : 50, direction: jake ? LEFT : RIGHT }
+    case 1: return OPEN_STARTS[slot]
     case 2:
-    case 4: return { row: jake ? 43 : 7, col: jake ? 20 : 60, direction: jake ? RIGHT : LEFT }
+    case 4: return HORIZONTAL_STARTS[slot]
     case 3:
-    case 5: return { row: 25, col: jake ? 30 : 50, direction: jake ? DOWN : UP }
-    case 9: return { row: jake ? 15 : 40, col: jake ? 5 : 75, direction: jake ? DOWN : UP }
-    default: return { row: jake ? 43 : 7, col: jake ? 15 : 65, direction: jake ? UP : DOWN }
+    case 5: return VERTICAL_STARTS[slot]
+    case 9: return DIAGONAL_STARTS[slot]
+    default: return DEFAULT_STARTS[slot]
   }
 }
 
@@ -195,7 +208,7 @@ export function createGame(seed: number, options: Options): Game {
 /** Choose uniformly from free two-half-cell number slots. A digit never hides a wall or snake. */
 export function placeNumber(game: Game): void {
   let free = 0
-  for (let row = 4; row <= 48; row++) {
+  for (let row = 5; row <= 47; row += 2) {
     for (let col = 2; col <= 79; col++) {
       const at = cell(row, col)
       if (!game.walls[at] && !game.walls[at + COLS] && !game.occupied[at] && !game.occupied[at + COLS]) free++
@@ -203,7 +216,7 @@ export function placeNumber(game: Game): void {
   }
   let choice = Math.floor(game.random() * free)
   game.numberCell = -1
-  for (let row = 4; row <= 48; row++) {
+  for (let row = 5; row <= 47; row += 2) {
     for (let col = 2; col <= 79; col++) {
       const at = cell(row, col)
       if (!game.walls[at] && !game.walls[at + COLS] && !game.occupied[at] && !game.occupied[at + COLS] && choice-- === 0) {
@@ -302,7 +315,7 @@ export function stepGame(game: Game): number {
   for (let player = 0; player < game.snakes.length; player++) {
     const snake = game.snakes[player]
     const next = game.next[player]
-    if (next === game.numberCell || next === game.numberCell + COLS) {
+    if (game.eater === -1 && (next === game.numberCell || next === game.numberCell + COLS)) {
       snake.score += game.number
       snake.length += 4 * game.number
       game.eaten = game.number
@@ -327,6 +340,7 @@ export function stepGame(game: Game): number {
 }
 
 export function formatScore(score: number): string {
-  const digits = String(Math.abs(score) * 100).padStart(7, '0')
-  return (score < 0 ? '-' : '') + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const digits = String(Math.abs(score) * 100)
+  const grouped = (score < 0 ? digits : digits.padStart(7, '0')).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return score < 0 ? `-${grouped}`.padStart(9, ' ') : grouped
 }

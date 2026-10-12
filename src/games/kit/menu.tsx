@@ -131,12 +131,12 @@ function letterOf(e: KeyboardEvent): string | undefined {
 
 function commandsOf(items: GameMenuItem[], out: { accel: Accel; cmd: GameMenuCommand }[] = []): { accel: Accel; cmd: GameMenuCommand }[] {
   for (const it of items) {
-    if (it === '-' || it.disabled) continue
+    if (it === '-') continue
     if (it.items) {
-      commandsOf(it.items, out)
+      if (!it.disabled) commandsOf(it.items, out)
       continue
     }
-    if (!it.onClick || it.accel === false) continue
+    if (it.accel === false || (it.accel === undefined && (it.disabled || !it.onClick))) continue
     const specs = it.accel === undefined ? (it.hotkey ? [it.hotkey] : []) : [it.accel].flat()
     for (const s of specs) {
       const accel = parseAccel(s)
@@ -213,18 +213,61 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
   const onOpenChangeRef = useRef(onOpenChange)
   onOpenChangeRef.current = onOpenChange
   const reported = useRef(false)
-  const go = useCallback((next: Nav | null) => {
-    navRef.current = next
-    const open = next !== null
-    if (reported.current !== open) {
-      reported.current = open
-      onOpenChangeRef.current?.(open)
-    }
-    setNav(next)
-  }, [])
+  const focusBefore = useRef<HTMLElement | null>(null)
+  const focusRestore = useRef<number | undefined>(undefined)
+  const isLive = useRef(live)
+  isLive.current = live
+  const go = useCallback(
+    (next: Nav | null) => {
+      if (focusRestore.current !== undefined) {
+        cancelAnimationFrame(focusRestore.current)
+        focusRestore.current = undefined
+      }
+      const opening = next !== null && !reported.current
+      if (opening) {
+        const focused = document.activeElement as HTMLElement | null
+        focusBefore.current =
+          focused && !rootRef.current?.contains(focused) && !focused.closest('[role=dialog]')
+            ? focused
+            : (rootRef.current?.closest('.window')?.querySelector<HTMLElement>('.window-body [role=application], .window-body [tabindex="0"]') ?? null)
+      }
+      navRef.current = next
+      const open = next !== null
+      if (reported.current !== open) {
+        reported.current = open
+        onOpenChangeRef.current?.(open)
+      }
+      setNav(next)
+      if (!open) {
+        const target = focusBefore.current
+        const focused = document.activeElement
+        if (target?.isConnected) {
+          focusRestore.current = requestAnimationFrame(() => {
+            focusRestore.current = undefined
+            const now = document.activeElement
+            const host = rootRef.current?.closest('.window') ?? document
+            if (
+              !isLive.current ||
+              navRef.current ||
+              !target.isConnected ||
+              now?.closest('[role=dialog],[role=alertdialog],[aria-modal=true]') ||
+              host.querySelector('.gk-modal') ||
+              (now !== focused && now !== document.body) ||
+              (now !== document.body && now !== target && !(now as Element | null)?.closest(`[data-gk-menu="${id}"]`))
+            )
+              return
+            target.focus({ preventScroll: true })
+          })
+        }
+        focusBefore.current = null
+      }
+    },
+    [id],
+  )
   useEffect(
     () => () => {
       if (reported.current) onOpenChangeRef.current?.(false)
+      if (focusRestore.current !== undefined) cancelAnimationFrame(focusRestore.current)
     },
     [],
   )
@@ -270,7 +313,11 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
 
       if (e.key === 'F10' && plain && !e.shiftKey && !e.altKey) {
         eat(e)
-        go(navRef.current ? null : { bar: 0, open: false, path: [] })
+        if (e.repeat) return
+        const command = ms.flatMap((m) => commandsOf(m.items)).find(({ accel }) => accelMatches(accel, e))
+        if (command) {
+          if (!command.cmd.disabled && !e.repeat) run(command.cmd)
+        } else go(navRef.current ? null : { bar: 0, open: false, path: [] })
         return
       }
       if (e.altKey && plain && !e.shiftKey) {
@@ -306,7 +353,7 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
         switch (e.key) {
           case 'Escape':
             if (n.open && depth > 0) go({ bar: n.bar, open: true, path: parents })
-            else go(n.open ? { bar: n.bar, open: false, path: [] } : null)
+            else go(null)
             return
           case 'Tab':
             go(null)
@@ -359,7 +406,7 @@ export function GameMenuBar({ menus, disabled, className, onOpenChange }: GameMe
         if (!accelMatches(accel, e)) continue
         if (typing && !accel.ctrl && !accel.alt && !/^f\d+$/.test(accel.key)) continue
         eat(e)
-        if (!e.repeat) run(cmd)
+        if (!cmd.disabled && !e.repeat) run(cmd)
         return
       }
     }
@@ -527,7 +574,9 @@ function Dropdown(p: {
               onPointerEnter={light}
               onClick={() => (cascade ? light() : p.onRun(it))}
             >
-              <span className="gk-mi-check">{it.checked ? (it.radio ? '●' : '✓') : ''}</span>
+              <span className="gk-mi-check" aria-hidden="true">
+                {it.checked ? (it.radio ? '●' : '✓') : ''}
+              </span>
               <span className="gk-mi-label">
                 <Caption label={it.label} />
               </span>

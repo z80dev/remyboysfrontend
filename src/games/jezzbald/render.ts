@@ -1,5 +1,6 @@
 import type { HeadRect, RemyHeads } from '../kit/remy'
 import { CELL, COLS, HEIGHT, ROWS, WIDTH, type Game, type Orientation } from './engine'
+import type { Cursor } from './input'
 
 export type Art = {
   portrait: HTMLImageElement | null
@@ -39,14 +40,12 @@ function cache(p: Painter, g: Game, pictures: boolean): void {
     const py = y * CELL
     if (g.cells[y * COLS + x]) {
       ctx.drawImage(p.reveal, px, py, CELL, CELL, px, py, CELL, CELL)
-      if (!pictures || !p.art.portrait) {
-        ctx.fillStyle = '#b0b0b0'
-        ctx.fillRect(px, py, CELL, 1)
-        ctx.fillRect(px, py, 1, CELL)
-        ctx.fillStyle = '#404040'
-        ctx.fillRect(px + CELL - 1, py, 1, CELL)
-        ctx.fillRect(px, py + CELL - 1, CELL, 1)
-      }
+      ctx.fillStyle = '#b0b0b0'
+      if (y === 0 || !g.cells[(y - 1) * COLS + x]) ctx.fillRect(px, py, CELL, 1)
+      if (x === 0 || !g.cells[y * COLS + x - 1]) ctx.fillRect(px, py, 1, CELL)
+      ctx.fillStyle = '#404040'
+      if (x === COLS - 1 || !g.cells[y * COLS + x + 1]) ctx.fillRect(px + CELL - 1, py, 1, CELL)
+      if (y === ROWS - 1 || !g.cells[(y + 1) * COLS + x]) ctx.fillRect(px, py + CELL - 1, CELL, 1)
     } else {
       ctx.fillStyle = '#202050'
       ctx.fillRect(px, py, CELL, 1)
@@ -57,8 +56,26 @@ function cache(p: Painter, g: Game, pictures: boolean): void {
   p.dirty = false
 }
 
-export function draw(ctx: CanvasRenderingContext2D, p: Painter, g: Game, cursorX: number, cursorY: number,
-  orientation: Orientation, pictures: boolean, fade = 0): void {
+const ARROW = ['0001000001000', '0011000001100', '0111000001110', '1111111111111', '0111000001110', '0011000001100', '0001000001000']
+
+/** A monochrome bitmap with a one-pixel black outline. Transpose pixels, never rotate/antialias a path. */
+export function drawPixelCursor(ctx: CanvasRenderingContext2D, px: number, py: number, orientation: Orientation): void {
+  const x = Math.round(px)
+  const y = Math.round(py)
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.fillStyle = pass === 0 ? '#000' : '#fff'
+    for (let row = 0; row < ARROW.length; row++) for (let column = 0; column < ARROW[row].length; column++) {
+      if (ARROW[row][column] !== '1') continue
+      const dx = orientation === 'horizontal' ? column - 6 : row - 3
+      const dy = orientation === 'horizontal' ? row - 3 : column - 6
+      const outline = pass === 0 ? 1 : 0
+      ctx.fillRect(x + dx - outline, y + dy - outline, outline * 2 + 1, outline * 2 + 1)
+    }
+  }
+}
+
+export function draw(ctx: CanvasRenderingContext2D, p: Painter, g: Game, cursor: Cursor,
+  pictures: boolean, fade = 0, showCursor = true): void {
   if (p.dirty || p.revision !== g.revision) cache(p, g, pictures)
   ctx.drawImage(p.field, 0, 0)
   const cx = g.wallX * CELL + CELL / 2
@@ -84,6 +101,20 @@ export function draw(ctx: CanvasRenderingContext2D, p: Painter, g: Game, cursorX
     const h = bounce && (g.bounceAxis[i] & 2) ? 14 : bounce ? 18 : 16
     const x = Math.round(g.x[i] - w / 2)
     const y = Math.round(g.y[i] - h / 2)
+    // A hard-pixel light rim keeps every skin tone visible against the navy field. The head itself is never mirrored.
+    ctx.fillStyle = bounce ? '#fff' : '#b0bed9'
+    ctx.fillRect(x + 3, y - 1, w - 6, 1)
+    ctx.fillRect(x + 3, y + h, w - 6, 1)
+    ctx.fillRect(x - 1, y + 3, 1, h - 6)
+    ctx.fillRect(x + w, y + 3, 1, h - 6)
+    ctx.fillRect(x + 1, y, 2, 1)
+    ctx.fillRect(x, y + 1, 1, 2)
+    ctx.fillRect(x + w - 3, y, 2, 1)
+    ctx.fillRect(x + w - 1, y + 1, 1, 2)
+    ctx.fillRect(x, y + h - 3, 1, 2)
+    ctx.fillRect(x + 1, y + h - 1, 2, 1)
+    ctx.fillRect(x + w - 1, y + h - 3, 1, 2)
+    ctx.fillRect(x + w - 3, y + h - 1, 2, 1)
     if (p.art.heads && rect) {
       const atlas = Math.floor(g.elapsed / 120) % 2 ? p.art.heads.side : p.art.heads.front
       ctx.drawImage(atlas, rect.sx, rect.sy, rect.sw, rect.sh, x, y, w, h)
@@ -102,27 +133,5 @@ export function draw(ctx: CanvasRenderingContext2D, p: Painter, g: Game, cursorX
     ctx.drawImage(p.reveal, 0, 0)
     ctx.globalAlpha = 1
   }
-  if (g.phase === 'playing') {
-    const x = cursorX * CELL + CELL / 2
-    const y = cursorY * CELL + CELL / 2
-    ctx.save()
-    ctx.translate(x, y)
-    if (orientation === 'vertical') ctx.rotate(Math.PI / 2)
-    ctx.strokeStyle = '#000'
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.moveTo(-6, 0)
-    ctx.lineTo(6, 0)
-    ctx.moveTo(-3, -3)
-    ctx.lineTo(-6, 0)
-    ctx.lineTo(-3, 3)
-    ctx.moveTo(3, -3)
-    ctx.lineTo(6, 0)
-    ctx.lineTo(3, 3)
-    ctx.stroke()
-    ctx.strokeStyle = '#fff'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    ctx.restore()
-  }
+  if (g.phase === 'playing' && showCursor && cursor.visible) drawPixelCursor(ctx, cursor.px, cursor.py, cursor.orientation)
 }

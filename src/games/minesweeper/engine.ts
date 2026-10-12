@@ -19,7 +19,7 @@ export type Game = {
   cells: Uint8Array
   status: 'ready' | 'playing' | 'won' | 'lost'
   seconds: number
-  exploded: number
+  exploded: ReadonlySet<number>
 }
 
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, Number.isFinite(value) ? Math.trunc(value) : low))
@@ -62,7 +62,7 @@ export function createGame(config: Config, seed: number): Game {
     order[j] = order[i]
     mines[pick] = 1
   }
-  return { config: { ...config }, seed, mines, numbers: calculateNumbers(config, mines), cells: new Uint8Array(count), status: 'ready', seconds: 0, exploded: -1 }
+  return { config: { ...config }, seed, mines, numbers: calculateNumbers(config, mines), cells: new Uint8Array(count), status: 'ready', seconds: 0, exploded: new Set() }
 }
 
 export function flagCount(game: Game): number {
@@ -92,13 +92,11 @@ function finish(game: Game): Game {
 }
 
 // A queue, not recursive calls: even an empty maximum-size board has bounded stack use.
-function openRegion(game: Game, start: number): void {
-  if (game.cells[start] === FLAG || game.cells[start] === REVEALED) return
+function openRegion(game: Game, start: number): boolean {
+  if (game.cells[start] === FLAG || game.cells[start] === REVEALED) return false
   if (game.mines[start]) {
-    game.status = 'lost'
-    game.exploded = start
     game.cells[start] = REVEALED
-    return
+    return true
   }
   const queue = new Int32Array(game.cells.length)
   let read = 0
@@ -114,6 +112,7 @@ function openRegion(game: Game, start: number): void {
       queue[write++] = n
     }
   }
+  return false
 }
 
 export function reveal(game: Game, index: number): Game {
@@ -130,22 +129,37 @@ export function reveal(game: Game, index: number): Game {
       next.numbers = calculateNumbers(next.config, next.mines)
     }
   }
-  openRegion(next, index)
+  if (openRegion(next, index)) {
+    next.exploded = new Set([index])
+    next.status = 'lost'
+  }
   return finish(next)
 }
 
 export function chordPreview(game: Game, index: number): number[] {
   if (index < 0 || index >= game.cells.length || game.status === 'won' || game.status === 'lost') return []
-  return neighbors(game.config, index).filter((i) => game.cells[i] !== FLAG && game.cells[i] !== REVEALED)
+  const around = neighbors(game.config, index).filter((i) => game.cells[i] !== FLAG && game.cells[i] !== REVEALED)
+  if (game.cells[index] === HIDDEN || game.cells[index] === QUESTION) around.unshift(index)
+  return around
 }
 export function chordCell(game: Game, index: number): Game {
   if (index < 0 || index >= game.cells.length || game.status !== 'playing' || game.cells[index] !== REVEALED || !game.numbers[index]) return game
   const around = neighbors(game.config, index)
   if (around.filter((i) => game.cells[i] === FLAG).length !== game.numbers[index]) return game
   const next = { ...game, cells: game.cells.slice() }
+  let exploded: Set<number> | undefined
   for (const n of around) {
-    openRegion(next, n)
-    if (next.status === 'lost') break
+    if (openRegion(next, n)) (exploded ??= new Set()).add(n)
+  }
+  if (exploded) {
+    next.exploded = exploded
+    next.status = 'lost'
   }
   return finish(next)
+}
+
+export function touchCell(game: Game, index: number, marking: boolean, marks: boolean): Game {
+  if (index < 0 || index >= game.cells.length) return game
+  if (game.cells[index] === REVEALED) return chordCell(game, index)
+  return marking ? cycleMark(game, index, marks) : reveal(game, index)
 }

@@ -23,8 +23,6 @@ export type Player = {
   /** Normal balls already consumed; extra balls do not advance this counter. */
   ballsPlayed: number
   extraBalls: number
-  /** A replay is a free new game credit, not an extra ball in this game. */
-  replays: number
   completedMissions: number
   promotionProgress: number
   wraps: number
@@ -32,6 +30,8 @@ export type Player = {
 
 export type Game = {
   players: Player[]
+  /** Shared free-game credits; replays are not extra balls and survive ball/player rotation. */
+  replays: number
   currentPlayer: number
   readonly player: Player
   readonly ball: number
@@ -69,6 +69,8 @@ export type Game = {
   postRaisedUntil: number
   extraBallLit: boolean
   wormholeColor: number
+  /** Independent cursor: collecting a replay extinguishes the light, not the next color. */
+  wormholeNextColor: number
   hyperspaceCount: number
   lastHyperspaceAt: number
   message: string
@@ -162,8 +164,9 @@ export function createGame(players = 1): Game {
   const count = Number.isFinite(players) ? Math.max(1, Math.min(4, Math.trunc(players))) : 1
   const game: Game = {
     players: Array.from({ length: count }, () => ({
-      score: 0, rank: 0, ballsPlayed: 0, extraBalls: 0, replays: 0, completedMissions: 0, promotionProgress: 0, wraps: 0
+      score: 0, rank: 0, ballsPlayed: 0, extraBalls: 0, completedMissions: 0, promotionProgress: 0, wraps: 0
     })),
+    replays: 0,
     currentPlayer: 0,
     get player() { return this.players[this.currentPlayer] },
     get ball() { return Math.max(1, Math.min(3, this.player.ballsPlayed + (this.extraBall ? 0 : 1))) },
@@ -196,7 +199,8 @@ export function createGame(players = 1): Game {
     pendingSave: false,
     postRaisedUntil: 0,
     extraBallLit: false,
-    wormholeColor: 0,
+    wormholeColor: -1,
+    wormholeNextColor: 0,
     hyperspaceCount: 0,
     lastHyperspaceAt: -Infinity,
     message: '',
@@ -208,6 +212,14 @@ export function createGame(players = 1): Game {
   }
   announce(game, 'awaiting')
   return game
+}
+
+/** Start a fresh game for the same pilots, spending one credit from the shared pool. */
+export function replayGame(game: Game): Game | null {
+  if (game.replays <= 0) return null
+  const replay = createGame(game.players.length)
+  replay.replays = game.replays - 1
+  return replay
 }
 
 export function selectMission(game: Game, index: number): boolean {
@@ -474,8 +486,9 @@ export function hit(game: Game, event: TableEvent, index = 0): void {
     case 'wormhole':
       award(game, POINTS.wormhole)
       if (index === game.wormholeColor) {
-        game.player.replays++
-        announce(game, 'replay', game.player.replays)
+        game.replays++
+        game.wormholeColor = -1
+        announce(game, 'replay', game.replays)
       }
       break
     case 'spinner':
@@ -503,7 +516,8 @@ export function hit(game: Game, event: TableEvent, index = 0): void {
     case 'rebound': award(game, POINTS.rebound); break
     case 'warp':
       award(game, POINTS.warp)
-      game.wormholeColor = (game.wormholeColor + 1) % 3
+      game.wormholeColor = game.wormholeNextColor
+      game.wormholeNextColor = (game.wormholeNextColor + 1) % 3
       break
     case 'bonus':
       award(game, POINTS.bonus)
@@ -539,7 +553,15 @@ export function launchRules(game: Game): boolean {
   if (game.phase !== 'ready') return false
   game.phase = 'playing'
   if (game.launchedAt < 0) game.launchedAt = game.time
-  announce(game, 'launched')
+  // Immediate automatic redeployment must not erase the saver announcement in the same frame.
+  if (game.messageId !== 'saved') announce(game, 'launched')
+  return true
+}
+
+/** A weak shot returning to the shooter is not a drain and does not restart the saver. */
+export function reseatBall(game: Game): boolean {
+  if (game.phase !== 'playing' || game.tilted) return false
+  game.phase = 'ready'
   return true
 }
 
@@ -596,7 +618,8 @@ function resetBall(game: Game) {
   game.pendingSave = false
   game.postRaisedUntil = 0
   game.extraBallLit = false
-  game.wormholeColor = 0
+  game.wormholeColor = -1
+  game.wormholeNextColor = 0
   game.hyperspaceCount = 0
   game.lastHyperspaceAt = -Infinity
   game.nudgeCount = 0
@@ -606,6 +629,18 @@ function resetBall(game: Game) {
 
 export function drainBall(game: Game): boolean {
   if (game.phase !== 'playing') return false
+  // Ball dragging must remain usable through every mission, not exhaust the three real balls.
+  if (game.testMode) {
+    if (game.tilted) {
+      game.lastBonus = 0
+      resetBall(game)
+    } else {
+      game.pendingSave = false
+      game.phase = 'ready'
+    }
+    announce(game, 'saved')
+    return true
+  }
   const earlySave = !game.ballSaveUsed && game.launchedAt >= 0 && game.time - game.launchedAt <= BALL_SAVE_SECONDS
   if (!game.tilted && (game.pendingSave || earlySave)) {
     if (!game.pendingSave) game.ballSaveUsed = true

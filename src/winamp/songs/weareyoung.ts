@@ -1,28 +1,31 @@
 import { DRUM, type Note, type Song } from "../../quest/music/song";
 
 /**
- * "We Are Young (16-Bit Remake)" — F major, 116 BPM, an imagined slow-burn anthem after fun.'s #3. A piano
- * fingerpicks the verses over a stomp-clap heartbeat; the pre holds its breath while claps double, and the
- * chorus is the whole stadium: brass, strings, choir "whoa"s and timpani under a trumpet lead reaching for the
- * last row. The bridge is the quiet before — a music box and held breath — one bell, then everyone back in.
- * Verse F C Dm B♭; chorus F Dm B♭ C; bridge B♭ C F F.
- * Intro (4 bars) → loop of 40 bars (≈83 s): verse (8) → build (4) → chorus (8) → verse′ (8) → chorus, doubled (8)
- * → held breath (4).
+ * "Light Up the Rooftops" — F major, 92 BPM, an original slow-burn stadium anthem in the style of fun.'s
+ * #3 (original melodies; only the genre, tempo, groove and arrangement arc are borrowed). The verse is a sparse
+ * piano ballad with a soft kick and rim. The pre-chorus climbs over floor toms. The chorus is the slow, enormous
+ * half-time stomp: kick on 1, a huge snare-clap on 3, piano pounding 8ths, brass, timpani and a crowd choir under
+ * a soaring trumpet. The bridge is a hand-clap chant before the last, doubled chorus.
+ * Verse F Am Dm B♭ F Am B♭ C; pre Dm C B♭ C; chorus F C Dm B♭ F C B♭ C; chant Dm B♭ F C.
+ * Intro (4 bars) → loop of 32 bars (≈83 s): verse (8) → pre (4) → chorus (8) → chant (4) → chorus, doubled (8).
  */
-type Chord = [bass: number, arp: number[], pad: number[]];
-const F: Chord = [41, [53, 57, 60, 65], [53, 57, 60]];
-const C: Chord = [36, [52, 55, 60, 64], [48, 52, 55]];
-const Dm: Chord = [38, [50, 53, 57, 62], [50, 53, 57]];
-const Bb: Chord = [34, [50, 53, 58, 62], [50, 53, 58]];
-const verse = [F, C, Dm, Bb, F, C, Dm, Bb];
-const chorus = [F, Dm, Bb, C, F, Dm, Bb, C];
+type Chord = [bass: number, triad: number[]];
+const F: Chord = [41, [53, 57, 60]];
+const Am: Chord = [45, [52, 57, 60]];
+const Dm: Chord = [38, [50, 53, 57]];
+const Bb: Chord = [34, [50, 53, 58]];
+const C: Chord = [36, [52, 55, 60]];
+const verse = [F, Am, Dm, Bb, F, Am, Bb, C];
+const pre = [Dm, C, Bb, C];
+const chorus = [F, C, Dm, Bb, F, C, Bb, C];
+const chant = [Dm, Bb, F, C];
 
-const lead: Note[] = [];
+const voice: Note[] = [];
+const trumpet: Note[] = [];
 const piano: Note[] = [];
-const stabs: Note[] = [];
+const brass: Note[] = [];
 const strings: Note[] = [];
 const choir: Note[] = [];
-const box: Note[] = [];
 const timpani: Note[] = [];
 const bass: Note[] = [];
 const drums: Note[] = [];
@@ -33,223 +36,273 @@ function phrase(target: Note[], bar: number, notes: Note[], strength = 1, transp
   }
 }
 
-// Piano fingerpicking: 8ths, warm, thumb-low.
-function pick(bar: number, chord: Chord, strength: number) {
-  const order = [0, 1, 2, 3, 2, 1, 2, 3];
-  for (let s = 0; s < 8; s++) piano.push([bar * 16 + s * 2, chord[1][order[s]], 2.4, (s % 2 ? 0.36 : 0.5) * strength]);
-}
-
-function subBass(bar: number, root: number, strength: number) {
-  bass.push([bar * 16, root, 8, 0.74 * strength]);
-  bass.push([bar * 16 + 10, root + 7, 5, 0.44 * strength]);
-}
-
-// Stomp-clap: kick + floor tom on 1 and 3, claps on 2 and 4, no hats — the crowd is the kit.
-function stomp(bar: number, opts: { fuller?: boolean } = {}) {
+// Ballad piano: low root, half-note chords, a quiet 8th pulse in the right hand.
+function balladPiano(bar: number, chord: Chord, strength: number) {
   const at = bar * 16;
-  drums.push(
-    [at, DRUM.kick, 1, 0.85],
-    [at, DRUM.tomLow, 1, 0.4],
-    [at + 8, DRUM.kick, 1, 0.7],
-    [at + 8, DRUM.tomLow, 1, 0.34],
-  );
-  for (const s of [4, 12]) {
-    drums.push([at + s, DRUM.clap, 1, 0.55]);
-    if (opts.fuller) drums.push([at + s, DRUM.snare, 1, 0.4]);
-  }
-  if (opts.fuller) for (let s = 2; s < 16; s += 2) drums.push([at + s, DRUM.hatClosed, 0.6, 0.14]);
+  piano.push([at, chord[0] + 12, 8, 0.5 * strength]);
+  for (const s of [0, 8]) for (const p of chord[1]) piano.push([at + s, p + 12, 7, 0.4 * strength]);
+  for (const s of [4, 6, 12, 14]) piano.push([at + s, chord[1][2] + 12, 1.6, 0.22 * strength]);
 }
 
-function powerStab(bar: number, chord: Chord, steps: number[], strength: number) {
-  for (const s of steps) {
-    for (const pitch of [chord[0] + 12, chord[0] + 19, chord[0] + 24])
-      stabs.push([bar * 16 + s, pitch, 1.8, 0.74 * strength]);
+// Anthem piano: pounding 8th-note block chords.
+function poundPiano(bar: number, chord: Chord, strength: number) {
+  const at = bar * 16;
+  for (let s = 0; s < 16; s += 2) {
+    for (const p of chord[1]) piano.push([at + s, p + 12, 1.8, (s % 4 ? 0.36 : 0.48) * strength]);
+    piano.push([at + s, chord[0] + 12, 1.8, 0.4 * strength]);
   }
 }
 
-const verseMelody: Note[][] = [
+// Half-time stomp: kick on 1 (and a pickup), giant snare + clap + floor tom on 3, tambourine 8ths.
+function stomp(bar: number, opts: { crash?: boolean; fill?: boolean } = {}) {
+  const at = bar * 16;
+  drums.push([at, DRUM.kick, 1, 0.95], [at + 6, DRUM.kick, 1, 0.6], [at + 14, DRUM.kick, 1, 0.5]);
+  drums.push([at + 8, DRUM.snare, 1.5, 0.86], [at + 8, DRUM.clap, 1, 0.56], [at + 8, DRUM.tomLow, 1, 0.42]);
+  for (let s = 0; s < 16; s += 2) drums.push([at + s, DRUM.tambourine, 0.6, s % 4 ? 0.14 : 0.22]);
+  if (opts.crash) drums.push([at, DRUM.crash, 8, 0.52]);
+  if (opts.fill)
+    drums.push(
+      [at + 12, DRUM.tomHigh, 0.5, 0.56],
+      [at + 13, DRUM.tomMid, 0.5, 0.6],
+      [at + 14, DRUM.tomLow, 0.5, 0.64],
+      [at + 15, DRUM.tomLow, 0.5, 0.7],
+    );
+}
+
+const VERSE: Note[][] = [
   [
-    [0, 65, 4, 0.72],
-    [6, 67, 2, 0.62],
-    [8, 69, 4, 0.74],
-    [12, 67, 2, 0.62],
-    [14, 65, 2, 0.6],
+    [0, 65, 2, 0.7],
+    [2, 65, 2, 0.64],
+    [4, 67, 2, 0.68],
+    [6, 69, 4, 0.74],
+    [12, 67, 2, 0.64],
+    [14, 65, 2, 0.62],
   ],
   [
     [0, 64, 4, 0.7],
-    [4, 65, 2, 0.62],
-    [6, 67, 2, 0.64],
-    [8, 72, 6, 0.76],
-    [14, 71, 2, 0.62],
+    [4, 64, 2, 0.62],
+    [6, 65, 2, 0.64],
+    [8, 64, 4, 0.68],
+    [12, 60, 4, 0.62],
   ],
   [
-    [0, 69, 4, 0.72],
-    [4, 70, 2, 0.64],
-    [6, 72, 2, 0.66],
-    [8, 74, 6, 0.76],
-    [14, 72, 2, 0.64],
+    [0, 62, 2, 0.66],
+    [2, 65, 2, 0.68],
+    [4, 69, 2, 0.74],
+    [6, 69, 4, 0.72],
+    [10, 67, 2, 0.66],
+    [12, 65, 4, 0.66],
   ],
   [
-    [0, 70, 4, 0.7],
-    [4, 69, 2, 0.64],
-    [6, 67, 2, 0.62],
-    [8, 65, 6, 0.7],
-    [14, 64, 2, 0.58],
+    [0, 65, 6, 0.7],
+    [6, 62, 2, 0.62],
+    [8, 62, 7, 0.64],
+  ],
+  [
+    [0, 65, 2, 0.7],
+    [2, 65, 2, 0.64],
+    [4, 67, 2, 0.68],
+    [6, 69, 4, 0.74],
+    [12, 67, 2, 0.64],
+    [14, 65, 2, 0.62],
+  ],
+  [
+    [0, 64, 2, 0.68],
+    [2, 67, 2, 0.7],
+    [4, 72, 4, 0.78],
+    [8, 69, 4, 0.72],
+    [12, 67, 4, 0.66],
+  ],
+  [
+    [0, 65, 4, 0.7],
+    [4, 67, 2, 0.68],
+    [6, 69, 2, 0.72],
+    [8, 70, 6, 0.76],
+    [14, 69, 2, 0.66],
+  ],
+  [
+    [0, 67, 8, 0.74],
+    [8, 64, 4, 0.66],
+    [12, 67, 4, 0.7],
   ],
 ];
-const chorusMelody: Note[][] = [
+
+const PRE: Note[][] = [
   [
-    [0, 72, 4, 0.88],
-    [4, 74, 2, 0.78],
-    [6, 77, 2, 0.82],
-    [8, 81, 6, 0.94],
-    [14, 79, 2, 0.76],
+    [0, 69, 4, 0.74],
+    [4, 69, 2, 0.68],
+    [6, 70, 2, 0.72],
+    [8, 72, 8, 0.78],
   ],
   [
-    [0, 77, 4, 0.84],
-    [4, 76, 2, 0.76],
+    [0, 72, 4, 0.76],
+    [4, 72, 2, 0.7],
     [6, 74, 2, 0.74],
-    [8, 72, 6, 0.86],
-    [14, 74, 2, 0.74],
+    [8, 76, 8, 0.82],
   ],
   [
-    [0, 74, 2, 0.78],
-    [2, 76, 2, 0.78],
-    [4, 79, 4, 0.86],
-    [8, 77, 2, 0.8],
-    [10, 74, 2, 0.76],
-    [12, 77, 4, 0.84],
+    [0, 74, 4, 0.78],
+    [4, 74, 2, 0.72],
+    [6, 72, 2, 0.72],
+    [8, 70, 8, 0.78],
   ],
   [
-    [0, 79, 4, 0.84],
-    [4, 79, 2, 0.76],
-    [6, 81, 2, 0.8],
-    [8, 84, 6, 0.92],
-    [14, 81, 2, 0.78],
+    [0, 72, 4, 0.8],
+    [4, 74, 4, 0.84],
+    [8, 76, 4, 0.88],
+    [12, 79, 4, 0.92],
   ],
 ];
-// The "whoa-oh": crowd answer under the chorus lead.
-function whoa(bar: number, chord: Chord) {
-  for (const pitch of chord[2]) {
-    choir.push([bar * 16 + 8, pitch + 12, 2, 0.5], [bar * 16 + 10, pitch + 12, 4.5, 0.56]);
+
+const CHORUS: Note[][] = [
+  [
+    [0, 77, 6, 0.94],
+    [6, 76, 2, 0.84],
+    [8, 77, 4, 0.9],
+    [12, 72, 4, 0.82],
+  ],
+  [
+    [0, 79, 6, 0.96],
+    [6, 77, 2, 0.86],
+    [8, 76, 8, 0.9],
+  ],
+  [
+    [0, 74, 4, 0.88],
+    [4, 77, 4, 0.92],
+    [8, 81, 6, 1],
+    [14, 79, 2, 0.86],
+  ],
+  [
+    [0, 77, 8, 0.94],
+    [8, 74, 4, 0.86],
+    [12, 72, 4, 0.84],
+  ],
+  [
+    [0, 77, 6, 0.94],
+    [6, 76, 2, 0.84],
+    [8, 77, 4, 0.9],
+    [12, 72, 4, 0.82],
+  ],
+  [
+    [0, 79, 4, 0.94],
+    [4, 81, 4, 0.98],
+    [8, 79, 4, 0.92],
+    [12, 76, 4, 0.86],
+  ],
+  [
+    [0, 74, 4, 0.88],
+    [4, 77, 4, 0.92],
+    [8, 79, 8, 0.96],
+  ],
+  [
+    [0, 77, 6, 0.94],
+    [6, 76, 2, 0.86],
+    [8, 72, 8, 0.9],
+  ],
+];
+
+// Crowd "oh" answering the end of each chorus line.
+function crowd(bar: number, chord: Chord, strength: number) {
+  for (const p of chord[1]) {
+    choir.push([bar * 16, p + 12, 15.5, 0.24 * strength]);
+    choir.push([bar * 16 + 12, p + 12, 4, 0.5 * strength]);
   }
 }
 
-// Intro: the piano and a hum, the hall filling up.
-for (let i = 0; i < 4; i++) {
-  pick(i, verse[i], 0.9);
-  choir.push([i * 16, verse[i][2][0], 15.5, 0.2], [i * 16, verse[i][2][2], 15.5, 0.18]);
-  drums.push([i * 16, DRUM.kick, 1, 0.5]);
+// Chant: a three-note gang shout on the chord's top tone, claps on every beat.
+function chantBar(bar: number, chord: Chord, strength: number) {
+  const at = bar * 16;
+  const top = chord[1][2] + 12;
+  for (const p of [top, top - 12]) {
+    choir.push([at, p, 3, 0.56 * strength], [at + 4, p, 3, 0.56 * strength], [at + 8, p + 2, 6, 0.62 * strength]);
+  }
+  for (const s of [0, 4, 8, 12]) drums.push([at + s, DRUM.clap, 1, 0.5 * strength]);
+  drums.push([at, DRUM.kick, 1, 0.8 * strength], [at + 8, DRUM.kick, 1, 0.7 * strength]);
+  bass.push([at, chord[0], 15, 0.6 * strength]);
 }
+
+// Intro: the piano alone in an empty hall.
+[F, Am, Dm, C].forEach((chord, i) => {
+  balladPiano(i, chord, 0.85);
+  if (i === 3) timpani.push([i * 16 + 12, 36, 4, 0.5]);
+});
 
 const LOOP = 4;
 let bar = LOOP;
 
-function verseBars(second: boolean) {
-  verse.forEach((chord, i) => {
-    stomp(bar, { fuller: second && i >= 4 });
-    pick(bar, chord, 1);
-    subBass(bar, chord[0], 1);
-    phrase(lead, bar, verseMelody[i % 4], second ? 0.9 : 1);
-    if (second) strings.push(...chord[2].map((pitch): Note => [bar * 16, pitch, 15.5, 0.2]));
-    if (i % 2 === 1) whoa(bar, chord);
-    bar++;
-  });
-}
-
-function chorusBars(big: boolean) {
-  chorus.forEach((chord, i) => {
-    stomp(bar, { fuller: true });
-    pick(bar, chord, 1);
-    subBass(bar, chord[0], 1);
-    powerStab(bar, chord, [0, 8], 1);
-    phrase(lead, bar, chorusMelody[i % 4]);
-    strings.push(...chord[2].map((pitch): Note => [bar * 16, pitch, 15.5, 0.3]));
-    whoa(bar, chord);
-    timpani.push([bar * 16, chord[0], 3, 0.6]);
-    if (big) phrase(lead, bar, chorusMelody[i % 4], 0.5, 12);
-    if (i === 0) drums.push([bar * 16, DRUM.crash, 5, 0.5]);
-    if (i === 7)
-      drums.push(
-        [bar * 16 + 12, DRUM.tomHigh, 0.5, 0.5],
-        [bar * 16 + 13, DRUM.tomMid, 0.5, 0.52],
-        [bar * 16 + 14, DRUM.tomLow, 0.5, 0.56],
-        [bar * 16 + 15, DRUM.crash, 4, 0.4],
-      );
-    bar++;
-  });
-}
-
-verseBars(false);
-// build
-for (let i = 0; i < 4; i++) {
-  const chord = [Bb, C, F, F][i] ?? F;
-  stomp(bar, { fuller: true });
-  pick(bar, chord, 0.9);
-  subBass(bar, chord[0], 0.9);
-  const spacing = i < 2 ? 4 : i < 3 ? 2 : 1;
-  for (let s = 0; s < 16; s += spacing) drums.push([bar * 16 + s, DRUM.clap, 0.8, Math.min(0.8, 0.4 + i * 0.1)]);
-  if (i === 3) timpani.push([bar * 16 + 12, 41, 4, 0.7]);
-  const climb: Note[][] = [
-    [
-      [0, 69, 4, 0.7],
-      [6, 72, 2, 0.68],
-      [8, 74, 6, 0.74],
-    ],
-    [
-      [0, 72, 4, 0.72],
-      [6, 74, 2, 0.7],
-      [8, 77, 6, 0.78],
-    ],
-    [
-      [0, 74, 4, 0.74],
-      [4, 77, 4, 0.78],
-      [8, 79, 4, 0.8],
-      [12, 81, 4, 0.82],
-    ],
-    [
-      [0, 81, 6, 0.86],
-      [8, 84, 8, 0.9],
-    ],
-  ];
-  phrase(lead, bar, climb[i]);
-  bar++;
-}
-chorusBars(false);
-verseBars(true);
-chorusBars(true);
-
-// Held breath: a music box and one bell; the crowd hums; then the loop runs it all back.
-const heldBreath = [Bb, C, F, F];
-heldBreath.forEach((chord, i) => {
+// Verse: piano ballad, a soft heartbeat kick and rim.
+verse.forEach((chord, i) => {
   const at = bar * 16;
-  box.push([at, chord[2][0] + 12, 3, 0.4], [at + 4, chord[2][1] + 12, 3, 0.36], [at + 8, chord[2][2] + 12, 4, 0.38]);
-  choir.push([at, chord[2][0], 15.5, 0.22], [at, chord[2][2], 15.5, 0.2]);
-  bass.push([at, chord[0], 15.5, 0.4]);
-  drums.push([at, DRUM.kick, 1, 0.4]);
-  if (i === 3) for (const s of [12, 13, 14, 15]) drums.push([at + s, DRUM.shaker, 0.5, 0.08 + (s - 12) * 0.04]);
+  balladPiano(bar, chord, 1);
+  drums.push([at, DRUM.kick, 1, 0.56], [at + 8, DRUM.rim, 1, 0.34]);
+  if (i >= 4) {
+    bass.push([at, chord[0], 15, 0.56]);
+    strings.push(...chord[1].map((pitch): Note => [at, pitch + 12, 15.5, 0.16]));
+  }
+  phrase(voice, bar, VERSE[i]);
   bar++;
 });
 
+// Pre: floor toms in 8ths, building; strings rise.
+pre.forEach((chord, i) => {
+  const at = bar * 16;
+  balladPiano(bar, chord, 1);
+  for (let s = 0; s < 16; s += 2) drums.push([at + s, DRUM.tomLow, 0.6, 0.3 + i * 0.06 + (s % 4 ? 0 : 0.08)]);
+  drums.push([at, DRUM.kick, 1, 0.7]);
+  bass.push([at, chord[0], 15, 0.6]);
+  strings.push(...chord[1].map((pitch): Note => [at, pitch + 12, 15.5, 0.22 + i * 0.05]));
+  phrase(voice, bar, PRE[i]);
+  if (i === 3) {
+    for (let s = 8; s < 16; s++) drums.push([at + s, DRUM.snare, 0.5, 0.36 + (s - 8) * 0.07]);
+    timpani.push([at + 8, 36, 8, 0.7]);
+  }
+  bar++;
+});
+
+function chorusBars(doubled: boolean) {
+  chorus.forEach((chord, i) => {
+    const at = bar * 16;
+    stomp(bar, { crash: i === 0 || i === 4, fill: i === 7 });
+    poundPiano(bar, chord, 1);
+    bass.push([at, chord[0], 7, 0.8], [at + 8, chord[0], 7, 0.74]);
+    for (const s of [0, 8]) for (const p of chord[1]) brass.push([at + s, p + 12, 6, 0.6]);
+    strings.push(...chord[1].map((pitch): Note => [at, pitch + 24, 15.5, doubled ? 0.36 : 0.28]));
+    timpani.push([at, chord[0], 4, 0.7], [at + 8, chord[0], 4, 0.56]);
+    crowd(bar, chord, doubled ? 1 : 0.8);
+    phrase(trumpet, bar, CHORUS[i]);
+    phrase(voice, bar, CHORUS[i], doubled ? 0.7 : 0.55, -12);
+    if (doubled) phrase(trumpet, bar, CHORUS[i], 0.45, 12);
+    bar++;
+  });
+}
+
+chorusBars(false);
+chant.forEach((chord, i) => {
+  chantBar(bar, chord, 0.8 + i * 0.06);
+  if (i === 3) for (let s = 12; s < 16; s++) drums.push([bar * 16 + s, DRUM.snare, 0.5, 0.5 + (s - 12) * 0.1]);
+  bar++;
+});
+chorusBars(true);
+
 export default {
-  title: "We Are Young (16-Bit Remake)",
-  bpm: 116,
+  title: "Light Up the Rooftops",
+  bpm: 92,
   stepsPerBeat: 4,
   beatsPerBar: 4,
   length: bar * 16,
   loopStart: LOOP * 16,
-  room: 0.6,
+  room: 0.7,
   echoBeats: 0.75,
-  echoFeedback: 0.25,
+  echoFeedback: 0.22,
   parts: [
-    { inst: "trumpet", notes: lead, vol: 0.6, pan: 0.05, reverb: 0.25, echo: 0.15 },
-    { inst: "piano", notes: piano, vol: 0.5, pan: -0.2, reverb: 0.25 },
-    { inst: "brass", notes: stabs, vol: 0.24, pan: -0.15, reverb: 0.22 },
-    { inst: "strings", notes: strings, vol: 0.2, pan: 0.3, reverb: 0.42 },
-    { inst: "choir", notes: choir, vol: 0.24, pan: 0.25, reverb: 0.45 },
-    { inst: "music_box", notes: box, vol: 0.3, pan: 0.35, reverb: 0.4, echo: 0.25 },
-    { inst: "timpani", notes: timpani, vol: 0.6, pan: 0.15, reverb: 0.3 },
-    { inst: "bass_finger", notes: bass, vol: 0.54, pan: 0, reverb: 0.05 },
-    { inst: "drums", notes: drums, vol: 0.66, pan: 0, reverb: 0.12 },
+    { inst: "ocarina", notes: voice, vol: 0.6, pan: -0.06, reverb: 0.3, echo: 0.12 },
+    { inst: "trumpet", notes: trumpet, vol: 0.58, pan: 0.06, reverb: 0.32, echo: 0.14 },
+    { inst: "piano", notes: piano, vol: 0.5, pan: -0.2, reverb: 0.28 },
+    { inst: "brass", notes: brass, vol: 0.22, pan: 0.2, reverb: 0.3 },
+    { inst: "strings", notes: strings, vol: 0.2, pan: 0.3, reverb: 0.45 },
+    { inst: "choir", notes: choir, vol: 0.26, pan: -0.25, reverb: 0.5 },
+    { inst: "timpani", notes: timpani, vol: 0.58, pan: 0.12, reverb: 0.35 },
+    { inst: "bass_finger", notes: bass, vol: 0.56, pan: 0, reverb: 0.04 },
+    { inst: "drums", notes: drums, vol: 0.7, pan: 0, reverb: 0.22 },
   ],
 } satisfies Song;

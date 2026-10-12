@@ -51,4 +51,6 @@ export type SkiArt = {
   cabald: number
   shirt: string
   snowboard: boolean
+  /** CSS pixels per world pixel; HUD remains native CSS size on Pocket. */
+  displayScale?: number
 }

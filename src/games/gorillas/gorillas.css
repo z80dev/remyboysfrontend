@@ -1,0 +1,104 @@
+.gorillas-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.gorillas-body > .qbasic-letterbox {
+  flex: 1;
+}
+.gorillas-controls.qbasic-touch-controls {
+  flex: 0 0 232px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 4px;
+}
+.gorillas-body--side {
+  flex-direction: row;
+}
+.gorillas-body--side > .gorillas-controls {
+  flex-basis: 196px;
+  width: 196px;
+}
+.gorillas-keypad {
+  position: relative;
+  display: grid;
+  width: 188px;
+  grid-template-columns: repeat(4, 44px);
+  grid-template-rows: 28px repeat(4, 44px);
+  gap: 4px;
+}
+.gorillas-keypad-value {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #ffff55;
+  font: 16px var(--font);
+  line-height: 28px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.gorillas-keypad button:nth-of-type(1) { grid-area: 2 / 1; }
+.gorillas-keypad button:nth-of-type(2) { grid-area: 2 / 2; }
+.gorillas-keypad button:nth-of-type(3) { grid-area: 2 / 3; }
+.gorillas-keypad button:nth-of-type(4) { grid-area: 3 / 1; }
+.gorillas-keypad button:nth-of-type(5) { grid-area: 3 / 2; }
+.gorillas-keypad button:nth-of-type(6) { grid-area: 3 / 3; }
+.gorillas-keypad button:nth-of-type(7) { grid-area: 4 / 1; }
+.gorillas-keypad button:nth-of-type(8) { grid-area: 4 / 2; }
+.gorillas-keypad button:nth-of-type(9) { grid-area: 4 / 3; }
+.gorillas-keypad button:nth-of-type(10) { grid-area: 3 / 4; }
+.gorillas-keypad button:nth-of-type(11) { grid-area: 5 / 1 / 6 / 4; }
+.gorillas-keypad button:nth-of-type(12) { grid-area: 2 / 4; }
+.gorillas-keypad button:nth-of-type(13) { grid-area: 4 / 4 / 6 / 5; }
+.gorillas-keypad--disabled > button:disabled {
+  opacity: 0.35;
+}
+.gorillas-keypad .gorillas-resume {
+  position: absolute;
+  inset: 32px 0 auto;
+  z-index: 1;
+  min-height: 44px;
+}
+.gorillas-setup {
+  width: min(100%, 420px);
+  color: #aaaaaa;
+}
+.gorillas-setup label {
+  display: block;
+  margin-bottom: 8px;
+  font: 12px var(--font);
+}
+.gorillas-setup > div {
+  display: flex;
+  gap: 6px;
+}
+.gorillas-body--side .gorillas-setup > div {
+  flex-direction: column;
+}
+.gorillas-setup input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid #aaa;
+  border-radius: 0;
+  background: #000;
+  color: #aaaaaa;
+  font: 16px var(--font);
+}
+.gorillas-touch-menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.gorillas-body--side .gorillas-touch-menu {
+  flex-direction: column;
+  width: 100%;
+}
+.gorillas-client .qbasic-touch-controls button:focus-visible,
+.gorillas-setup input:focus-visible {
+  outline: 2px solid #ffff55;
+  outline-offset: -3px;
+}

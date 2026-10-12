@@ -1,5 +1,5 @@
 /**
- * Canvas hooks for classic games: a pixel-crisp canvas that tracks its CSS size at an integer device-pixel scale,
+ * Canvas hooks for classic games: a pixel-crisp canvas that tracks its displayed device-pixel size,
  * and a requestAnimationFrame loop that pauses while the game's window is inactive or minimized.
  */
 import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react'
@@ -9,7 +9,9 @@ import { useWindowState } from './window'
 export interface CrispCanvasOptions {
   /** Smooth scaling (photos, vector-ish art). Default `false`: nearest-neighbour pixels. */
   smoothing?: boolean
-  /** Upper bound for the integer backing-store scale, default 8. */
+  /** Lower bound for full-size integer backing, default 1; an explicit value also bounds shrunk backing. */
+  minScale?: number
+  /** Upper bound for backing pixels per logical pixel, default 8, raised to minScale if necessary. */
   maxScale?: number
   /** Called after every backing-store resize (which clears the canvas): redraw here. */
   onResize?: (scale: number) => void
@@ -21,15 +23,16 @@ export interface CrispCanvas {
   ref: RefObject<HTMLCanvasElement>
   /** 2D context, pre-scaled so you draw in logical `width × height` units. `null` until mounted. */
   ctx: { readonly current: CanvasRenderingContext2D | null }
-  /** Current integer backing-store pixels per logical pixel (≥ 1). */
+  /** Horizontal backing pixels per logical pixel; fractional on CSS-shrunk boards. The context handles Y independently. */
   scale: { readonly current: number }
 }
 
 /**
- * Pixel-crisp canvas. The logical size is `width × height`; the backing store is that times an integer `scale` =
- * `floor(cssWidth × devicePixelRatio / width)` (clamped to `1 … maxScale`), so every logical pixel covers a whole
- * number of device pixels. The context transform is set to `scale`, so draw in logical coordinates. Resizing the
- * element re-runs this (a resize clears the canvas, see `onResize`). The canvas MUST get its on-screen size from CSS.
+ * Pixel-crisp canvas. Full-size boards use `ceil(cssWidth × devicePixelRatio / width)` integer backing.
+ * CSS-shrunk boards use their actual rounded device-pixel dimensions instead, avoiding a second nearest-neighbour
+ * resampling pass. An explicit `minScale` still permits oversampling; `maxScale` limits both modes.
+ * Draw in logical coordinates; the context handles each axis's rounded backing ratio. Resizing clears the canvas,
+ * so redraw in `onResize`. The canvas MUST get its on-screen size from CSS.
  * @param width logical width in game pixels.
  * @param height logical height in game pixels.
  */
@@ -40,7 +43,9 @@ export function useCrispCanvas(width: number, height: number, opts: CrispCanvasO
   const onResize = useRef(opts.onResize)
   onResize.current = opts.onResize
   const smoothing = opts.smoothing ?? false
-  const maxScale = opts.maxScale ?? 8
+  const minScale = Math.max(1, Math.ceil(opts.minScale ?? 1))
+  const maxScale = Math.max(minScale, Math.floor(opts.maxScale ?? 8))
+  const shrinkMinScale = opts.minScale === undefined ? 0 : minScale
 
   useLayoutEffect(() => {
     const canvas = ref.current
@@ -51,30 +56,45 @@ export function useCrispCanvas(width: number, height: number, opts: CrispCanvasO
     ctx.current = context
     let ready = false
     const fit = () => {
-      const css = canvas.getBoundingClientRect().width
-      const s = Math.min(maxScale, Math.max(1, Math.floor((css * (window.devicePixelRatio || 1)) / width)))
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+      const dpr = window.devicePixelRatio || 1
+      const shrunk = rect.width < width
+      const raw = (rect.width * dpr) / width
+      const s = shrunk ? Math.min(maxScale, Math.max(shrinkMinScale, raw)) : Math.min(maxScale, Math.max(minScale, Math.ceil(raw)))
+      const pixelW = Math.max(1, Math.round(width * s))
+      const pixelH = Math.max(1, Math.round(shrunk ? height * Math.min(maxScale, Math.max(shrinkMinScale, (rect.height * dpr) / height)) : height * s))
       // Assigning width/height clears the canvas and resets context state even when unchanged: only touch on change.
-      if (ready && canvas.width === width * s && canvas.height === height * s) return
+      if (ready && canvas.width === pixelW && canvas.height === pixelH) return
       ready = true
-      canvas.width = width * s
-      canvas.height = height * s
-      scale.current = s
+      canvas.width = pixelW
+      canvas.height = pixelH
+      scale.current = pixelW / width
       if (!context) return
-      context.setTransform(s, 0, 0, s, 0, 0)
+      context.setTransform(pixelW / width, 0, 0, pixelH / height, 0, 0)
       context.imageSmoothingEnabled = smoothing
       if (smoothing) context.imageSmoothingQuality = 'high'
-      onResize.current?.(s)
+      onResize.current?.(scale.current)
     }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(canvas)
     window.addEventListener('resize', fit) // devicePixelRatio changes (zoom, monitor move) do not resize the element
+    let resolution: MediaQueryList
+    const watchResolution = () => {
+      resolution?.removeEventListener('change', watchResolution)
+      resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+      resolution.addEventListener('change', watchResolution)
+      fit()
+    }
+    watchResolution()
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', fit)
+      resolution.removeEventListener('change', watchResolution)
       ctx.current = null
     }
-  }, [width, height, smoothing, maxScale])
+  }, [width, height, smoothing, minScale, maxScale, shrinkMinScale])
 
   return { ref, ctx, scale }
 }

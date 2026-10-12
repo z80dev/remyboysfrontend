@@ -1,15 +1,28 @@
+import type { Card } from '../cards/model'
+
 /** Fixed 60 Hz XP cascade. The caller never clears its trail surface between steps.
  * Mutable numeric state avoids per-frame allocations and survives hidden-window pauses. */
-export type Cascade = { index: number; x: number; y: number; vx: number; vy: number; elapsed: number; done: boolean }
-export const CASCADE_SUITS = [3, 0, 1, 2] as const
+export type Cascade = {
+  index: number
+  homes: readonly number[]
+  x: number
+  y: number
+  vx: number
+  vy: number
+  elapsed: number
+  done: boolean
+}
+/** Start at the actual spade home, then cycle through the physical slots. */
 export function launchCascade(s: Cascade, width: number, random: () => number) {
-  s.x = Math.max(11, (width - 563) / 2) + (CASCADE_SUITS[s.index % 4] + 3) * 82
+  s.x = Math.max(11, (width - 563) / 2) + (s.homes[s.index % 4] + 3) * 82
   s.y = 11
   s.vx = (random() < .5 ? -1 : 1) * (2 + random() * 4)
   s.vy = -2 - random() * 4
 }
-export function createCascade(width: number, random = Math.random): Cascade {
-  const s = { index: 0, x: 0, y: 0, vx: 0, vy: 0, elapsed: 0, done: false }
+export function createCascade(width: number, homes: readonly (readonly Card[])[], random = Math.random): Cascade {
+  const first = homes.findIndex(home => home[0]?.suit === 'spades')
+  const s: Cascade = { index: 0, homes: Array.from({ length: 4 }, (_, i) => (first + i) % 4),
+    x: 0, y: 0, vx: 0, vy: 0, elapsed: 0, done: false }
   launchCascade(s, width, random)
   return s
 }

@@ -1,4 +1,4 @@
-import { mulberry32 } from '../kit'
+import { mulberry32 } from '../kit/remy'
 
 export const COLS = 10
 export const ROWS = 7
@@ -6,6 +6,9 @@ export const CELLS = COLS * ROWS
 export type Direction = 0 | 1 | 2 | 3
 export type Piece = 'empty' | 'horizontal' | 'vertical' | 'ne' | 'se' | 'sw' | 'nw' | 'cross' | 'source' | 'block' | 'reservoir-h' | 'reservoir-v' | 'valve-n' | 'valve-e' | 'valve-s' | 'valve-w' | 'drain'
 export const PIECES: readonly Piece[] = ['horizontal', 'vertical', 'ne', 'se', 'sw', 'nw', 'cross']
+export const VALVE_OUTLETS: Record<string, Direction> = { 'valve-n': 0, 'valve-e': 1, 'valve-s': 2, 'valve-w': 3 }
+const VALVES: readonly Piece[] = ['valve-n', 'valve-e', 'valve-s', 'valve-w']
+const NEIGHBOR_OFFSET = [-COLS, 1, COLS, -1]
 export const CONNECTIONS: Record<Piece, readonly Direction[]> = {
   empty: [], horizontal: [1, 3], vertical: [0, 2], ne: [0, 1], se: [1, 2], sw: [2, 3], nw: [0, 3], cross: [0, 1, 2, 3],
   source: [], block: [], 'reservoir-h': [1, 3], 'reservoir-v': [0, 2], 'valve-n': [0, 2], 'valve-e': [1, 3],
@@ -13,7 +16,11 @@ export const CONNECTIONS: Record<Piece, readonly Direction[]> = {
 }
 export type Phase = 'countdown' | 'flow' | 'passed' | 'failed' | 'bonus-end'
 export type Event = 'place' | 'replace' | 'slide' | 'section' | 'cross' | 'reservoir' | 'distance' | 'pass' | 'fail' | 'bonus'
-export interface Portal { a: number; direction: Direction; b: number }
+export interface Portal {
+  a: number
+  direction: Direction
+  b: number
+}
 export interface PipeGame {
   seed: number
   random: number
@@ -39,7 +46,7 @@ export interface PipeGame {
   started: number
   deadline: number
   duration: number
-  replacement: { index: number; piece: Piece; until: number } | null
+  replacement: { index: number, piece: Piece, until: number } | null
   gap: number
   events: Event[]
 }
@@ -56,7 +63,7 @@ export function pipeExit(piece: Piece, entry: Direction): Direction | null {
   if (piece === 'drain') return entry
   if (piece === 'cross') return opposite(entry)
   if (piece.startsWith('valve-')) {
-    const outlet = ({ 'valve-n': 0, 'valve-e': 1, 'valve-s': 2, 'valve-w': 3 } as Record<string, Direction>)[piece]
+    const outlet = VALVE_OUTLETS[piece]
     return entry === opposite(outlet) ? outlet : null
   }
   return ports[0] === entry ? ports[1] ?? null : ports[0] ?? null
@@ -77,16 +84,28 @@ export function createGame(seed: number, level = 1, score = 0, bonus = false): P
     phase: 'countdown', score, length: 0, crosses: 0, fast: false, clock: 0, started: 0,
     deadline: bonus ? 15000 : params.countdown, duration: bonus ? 15000 : params.countdown, replacement: null, gap: -1, events: []
   }
-  game.source = 10 + Math.floor(random(game) * 5) * COLS + 1 + Math.floor(random(game) * 3)
+  game.outlet = Math.floor(random(game) * 4) as Direction
+  const minX = game.outlet === 3 ? 3 : 0
+  const minY = game.outlet === 0 ? 3 : 0
+  const columns = game.outlet % 2 === 1 ? COLS - 3 : COLS
+  const rows = game.outlet % 2 === 0 ? ROWS - 3 : ROWS
+  game.source = (minY + Math.floor(random(game) * rows)) * COLS + minX + Math.floor(random(game) * columns)
   game.head = game.source
+  game.entry = opposite(game.outlet)
+  game.exit = game.outlet
+  game.axis = game.outlet % 2 === 1 ? 1 : 2
   game.board[game.source] = 'source'
-  const reserve = new Set([game.source, game.source + 1, game.source + 2, game.source + 3])
+  const reserve = new Set<number>()
+  for (let step = 0; step <= 3; step++) reserve.add(game.source + NEIGHBOR_OFFSET[game.outlet] * step)
   const addFixed = (piece: Piece) => {
     const free = game.board.map((value, index) => value === 'empty' && !reserve.has(index) ? index : -1).filter(index => index >= 0)
     if (free.length) game.board[free[Math.floor(random(game) * free.length)]] = piece
   }
   if (bonus) {
-    for (let i = 0; i < CELLS; i++) if (i !== game.source) { game.board[i] = nextPiece(game); game.placed[i] = true }
+    for (let i = 0; i < CELLS; i++) if (i !== game.source) {
+      game.board[i] = nextPiece(game)
+      game.placed[i] = true
+    }
     game.gap = (game.source + 13) % CELLS
     game.board[game.gap] = 'empty'
     game.placed[game.gap] = false
@@ -95,10 +114,19 @@ export function createGame(seed: number, level = 1, score = 0, bonus = false): P
       const row = Math.floor(random(game) * ROWS)
       const col = Math.floor(random(game) * COLS)
       game.portals = [{ a: row * COLS + COLS - 1, direction: 1, b: row * COLS }, { a: col, direction: 0, b: (ROWS - 1) * COLS + col }]
-      for (const portal of game.portals) { reserve.add(portal.a); reserve.add(portal.b) }
+      for (const portal of game.portals) {
+        reserve.add(portal.a)
+        reserve.add(portal.b)
+      }
     }
-    if (level >= 5) { addFixed('reservoir-h'); addFixed('reservoir-v') }
-    if (level >= 7) { addFixed('valve-e'); addFixed('valve-n') }
+    if (level >= 5) {
+      addFixed('reservoir-h')
+      addFixed('reservoir-v')
+    }
+    if (level >= 7) {
+      addFixed(VALVES[Math.floor(random(game) * VALVES.length)])
+      addFixed(VALVES[Math.floor(random(game) * VALVES.length)])
+    }
     if (level >= 9) addFixed('drain')
     for (let i = 0; i < Math.min(CELLS, params.obstacles); i++) addFixed('block')
   }
@@ -109,7 +137,7 @@ export function nextCell(game: PipeGame, index: number, direction: Direction): n
   const x = index % COLS
   const y = Math.floor(index / COLS)
   const outside = direction === 0 ? y === 0 : direction === 1 ? x === COLS - 1 : direction === 2 ? y === ROWS - 1 : x === 0
-  if (!outside) return index + [-COLS, 1, COLS, -1][direction]
+  if (!outside) return index + NEIGHBOR_OFFSET[direction]
   for (const portal of game.portals) {
     if (portal.a === index && portal.direction === direction) return portal.b
     if (portal.b === index && opposite(portal.direction) === direction) return portal.a
@@ -121,16 +149,22 @@ function end(game: PipeGame, drain = false) {
     for (let i = 0; i < CELLS; i++) if (game.placed[i] && game.filled[i] === 0) game.score -= 100
     if (drain) game.score += 1000
   }
-  game.phase = game.bonus ? 'bonus-end' : drain || game.length >= levelParameters(game.level).distance ? 'passed' : 'failed'
+  game.phase = game.bonus ? 'bonus-end' : game.length >= levelParameters(game.level).distance ? 'passed' : 'failed'
   game.events.push(game.bonus ? 'bonus' : game.phase === 'passed' ? 'pass' : 'fail')
 }
 function enterNext(game: PipeGame, time: number) {
   const next = nextCell(game, game.head, game.exit)
-  if (next < 0) { end(game); return }
+  if (next < 0) {
+    end(game)
+    return
+  }
   const entry = opposite(game.exit)
   const exit = pipeExit(game.board[next], entry)
   const axis = entry % 2 === 1 ? 1 : 2
-  if (exit === null || (game.filled[next] & axis) !== 0 || (game.board[next] !== 'cross' && game.filled[next] !== 0) || game.replacement?.index === next) { end(game); return }
+  if (exit === null || (game.filled[next] & axis) !== 0 || (game.board[next] !== 'cross' && game.filled[next] !== 0) || game.replacement?.index === next) {
+    end(game)
+    return
+  }
   game.head = next
   game.entry = entry
   game.exit = exit
@@ -177,8 +211,14 @@ export function advanceTo(game: PipeGame, time: number): PipeGame {
       if (next.crosses === 5) next.score += 10000
       next.events.push('cross')
     }
-    if (!next.bonus && piece.startsWith('reservoir')) { next.score += 200; next.events.push('reservoir') }
-    if (piece === 'drain') { end(next, true); break }
+    if (!next.bonus && piece.startsWith('reservoir')) {
+      next.score += 200
+      next.events.push('reservoir')
+    }
+    if (piece === 'drain') {
+      end(next, true)
+      break
+    }
     enterNext(next, at)
   }
   return next
@@ -244,29 +284,66 @@ export function followingLevel(game: PipeGame): PipeGame {
   return game
 }
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+const PASSWORD_KEYS = [7, 19, 3, 23, 11, 17, 5, 13]
+function passwordMix(b: number, c: number, key: number): number {
+  return (b * b + c * (b + key) + key) % 26
+}
+function passwordCheck(a: number, b: number, c: number): string {
+  return ALPHABET[(a * 3 + b * 5 + c * 7 + 11) % 26]
+}
+/** A keyed radix-26 Feistel permutation; the fourth letter detects every single-letter typo. */
 export function passwordForLevel(level: number): string | null {
-  if (level < 5 || level > 10001 || (level - 1) % 4 !== 0 || !Number.isInteger(level)) return null
-  const value = ((level - 1) / 4 * 137 + 9137) % (26 ** 3)
-  const a = Math.floor(value / 676)
-  const b = Math.floor(value / 26) % 26
-  const c = value % 26
-  return ALPHABET[a] + ALPHABET[b] + ALPHABET[c] + ALPHABET[(a * 3 + b * 5 + c * 7) % 26]
+  if (!Number.isInteger(level) || level < 5 || level > 70301 || (level - 1) % 4 !== 0) return null
+  const round = (level - 1) / 4
+  let a = Math.floor(round / 676)
+  let b = Math.floor(round / 26) % 26
+  let c = round % 26
+  for (const key of PASSWORD_KEYS) {
+    const mixed = (a + passwordMix(b, c, key)) % 26
+    a = b
+    b = c
+    c = mixed
+  }
+  return ALPHABET[a] + ALPHABET[b] + ALPHABET[c] + passwordCheck(a, b, c)
 }
 export function levelForPassword(password: string): number | null {
   const text = password.trim().toUpperCase()
   if (!/^[A-Z]{4}$/.test(text)) return null
-  for (let level = 5; level <= 10001; level += 4) if (passwordForLevel(level) === text) return level
-  return null
+  let a = text.charCodeAt(0) - 65
+  let b = text.charCodeAt(1) - 65
+  let c = text.charCodeAt(2) - 65
+  if (text[3] !== passwordCheck(a, b, c)) return null
+  for (let index = PASSWORD_KEYS.length - 1; index >= 0; index--) {
+    const original = (c - passwordMix(a, b, PASSWORD_KEYS[index]) + 26) % 26
+    c = b
+    b = a
+    a = original
+  }
+  const round = a * 676 + b * 26 + c
+  return round > 0 ? round * 4 + 1 : null
 }
-export interface HighScore { name: string; score: number; level: number }
-export interface Preferences { grid: boolean; scores: HighScore[]; passwords: string[] }
+export interface HighScore {
+  name: string
+  score: number
+  level: number
+}
+export interface Preferences {
+  grid: boolean
+  scores: HighScore[]
+  passwords: string[]
+}
 export const DEFAULT_PREFERENCES: Preferences = { grid: false, scores: [], passwords: [] }
 export function validPreferences(value: unknown): value is Preferences {
   if (!value || typeof value !== 'object') return false
   const data = value as Preferences
   return typeof data.grid === 'boolean' && Array.isArray(data.scores) && data.scores.length <= 10 && data.scores.every(row =>
     row !== null && typeof row === 'object' && typeof row.name === 'string' && row.name.length <= 32 && Number.isFinite(row.score) && Number.isInteger(row.level) && row.level >= 1
-  ) && Array.isArray(data.passwords) && data.passwords.every(word => typeof word === 'string' && levelForPassword(word) !== null)
+  ) && Array.isArray(data.passwords) && data.passwords.every(word => typeof word === 'string')
+}
+/** Password revisions discard obsolete codes without discarding a player's options or high scores. */
+export function sanitizePreferences(value: Preferences): Preferences {
+  if (value.passwords.every(word => levelForPassword(word) !== null)) return value
+  return { ...value, passwords: value.passwords.filter(word => levelForPassword(word) !== null) }
 }
 export function addHighScore(scores: HighScore[], name: string, score: number, level: number): HighScore[] {
   return [...scores, { name: name.trim().slice(0, 32), score, level }].sort((a, b) => b.score - a.score).slice(0, 10)

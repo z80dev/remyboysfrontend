@@ -18,14 +18,18 @@ export const lost: Song = {
   ]
 }
 export const moon: Song = {
-  title: 'To the Moon', bpm: 96, stepsPerBeat: 4, beatsPerBar: 4, length: 16, loopStart: 16, room: .4,
-  parts: [{ inst: 'brass', vol: .45, notes: [[0,60,2,.5],[2,64,2,.55],[4,67,4,.6],[8,72,4,.65],[12,76,4,.6],[12,79,4,.55]] }]
+  title: 'To the Moon', bpm: 120, stepsPerBeat: 4, beatsPerBar: 4, length: 20, loopStart: 20, room: .55,
+  parts: [
+    { inst: 'brass', vol: .55, notes: [[0,60,2,.6],[2,67,2,.65],[4,72,2,.7],[6,79,2,.75],[8,84,8,.85],[8,76,8,.75],[8,79,8,.75]] },
+    { inst: 'timpani', vol: .55, notes: [[6,43,1,.6],[7,43,1,.7],[8,48,8,.9]] },
+    { inst: 'orch_hit', vol: .35, notes: [[8,72,2,.7]] }
+  ]
 }
 export const broken: Song = {
   title: 'Hearts Broken', bpm: 120, stepsPerBeat: 4, beatsPerBar: 4, length: 4, loopStart: 4,
   parts: [{ inst: 'epiano', vol: .35, notes: [[0,76,2,.45],[2,72,2,.4]] }]
 }
 export const rugged: Song = {
-  title: 'Rug Lord', bpm: 120, stepsPerBeat: 4, beatsPerBar: 4, length: 4, loopStart: 4,
-  parts: [{ inst: 'strings', vol: .35, notes: [[0,36,4,.5],[0,43,4,.35]] }]
+  title: 'Rug Lord', bpm: 120, stepsPerBeat: 4, beatsPerBar: 4, length: 5, loopStart: 5,
+  parts: [{ inst: 'strings', vol: .35, notes: [[0,40,5,.55],[0,46,5,.55]] }]
 }

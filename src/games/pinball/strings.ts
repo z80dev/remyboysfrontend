@@ -26,9 +26,11 @@ const HELP_RULES = [
   'Press and hold Space to pull the plunger, then release it to launch the ball. The longer you hold, the harder the launch.',
   'To start a mission, hit the three mission targets on the left wall to choose one, then shoot the launch ramp to accept it. The panel shows the mission name, its goal and how much remains.',
   'Each completed mission counts toward promotion: two at Cadet, then three for each rank after that. There are nine ranks.',
-  'The fuel lights drain while you play. When the tank is empty the launch ramp will not accept missions. Shoot the fuel chute on the right to refuel.',
-  'Shoot the hyperspace chute three times quickly to raise the centre post. A fourth quick shot lights Extra Ball.',
-  'Light all three hazard targets on a side to close that out-lane gate once.',
+  'The fuel tank holds 100 units and burns one unit per second while the ball is in play. Gas Low flashes at 20. When the tank is empty the launch ramp will not accept missions. Shoot the fuel chute on the right to refuel.',
+  'Shoot the hyperspace chute three times within 10 seconds of each other to raise the center post for 20 seconds. A fourth quick shot lights Extra Ball; collect it at the bonus lane or an out-lane.',
+  'Every 25 spins of the flags upgrades them. Upgrading bumpers and engines needs all three re-entry lanes or engine targets lit.',
+  'Light all three hazard targets on a side to close that out-lane gate. It saves one ball.',
+  'An Extra Ball gives you another ball in this game. A Replay is a free game. Each pass over the space warp lights the next wormhole color in turn: yellow, red, then green. Enter the matching wormhole to earn a replay; the light then goes out. Replays are shared by all players and are offered when the game ends.',
   'If a ball drains within 10 seconds of launch, it is saved once and launched again.',
   'Nudging is allowed. Nudging too often in a short time causes a TILT: the ball is lost and its bonus is forfeited.',
   'You have three balls. Up to four players may take turns.',
@@ -38,10 +40,10 @@ const HELP_RULES = [
 const HELP_SCORING = [
   'Attack bumpers: 500 points times the bumper level (1 to 4).',
   'Spot targets: 1,000 points. Drop targets: 2,500 points, plus 25,000 for clearing the bank.',
-  'Ramps: 5,000 points. Wormholes: 10,000 points. Matching the lit wormhole colour awards a replay.',
+  'Ramps: 5,000 points. Wormholes: 10,000 points. Matching the lit wormhole color awards a replay credit.',
   'Mission completed: 50,000 points times your rank. Promotion: 100,000 points.',
   'Clearing the booster drop bank raises the field multiplier, up to ×5.',
-  'End-of-ball bonus: lanes and missions counted, times the field multiplier and your rank. The tally is shown when the ball drains.',
+  'End-of-ball bonus: 1,000 points per lane passed plus 10,000 per mission completed, times the field multiplier, times your rank number (Cadet is 1). The tally is shown when the ball drains.',
   'Scores past 999,999,999 go round the clock. The Federation still counts it.'
 ].join('\n\n')
 
@@ -112,10 +114,15 @@ export const STRINGS = {
   about: '&About 3D Pinball...',
 
   paused: 'Paused',
-  resume: 'Press F3 or click to resume',
+  resume: 'Resume',
   testMode: 'Test Mode',
   demoMode: 'Demo. Press any key.',
   gameOver: 'Game Over',
+  replayTitle: 'Replay',
+  replayMessage: 'You have earned a free game. The Federation would like you to deploy again.',
+  replayCredits: 'Replays remaining:',
+  playReplay: '&Play Replay',
+  notNow: 'Not Now',
   highScoresTitle: 'High Scores',
   highScoresHeading: 'Fleet Records',
   rankHeader: 'Rank',
@@ -228,9 +235,9 @@ export const MISSION_NAMES: Record<MissionId, string> = {
 const times = (n: number) => (n === 1 ? '1 more time' : `${n} more times`)
 const WORMHOLES = ['Yellow', 'Red', 'Green']
 const CABALD_STAGES = [
-  (n: number) => `Hit ${n} more Drop Targets`,
-  (n: number) => `Hit ${n} more Spot Targets`,
-  (n: number) => `Pass ${n} more Lanes`,
+  (n: number) => `Hit ${n} more Drop Target${n === 1 ? '' : 's'}`,
+  (n: number) => `Hit ${n} more Spot Target${n === 1 ? '' : 's'}`,
+  (n: number) => `Pass ${n} more Lane${n === 1 ? '' : 's'}`,
   () => 'Shoot the Fuel Chute',
   () => 'Shoot the Launch Ramp',
   () => 'Spin the Flags',
@@ -248,19 +255,19 @@ export function missionGoal(id: MissionId | string, stage: number, remaining: nu
     case 'gas':
       return `Hit Attack Bumpers ${times(remaining)}`
     case 'mint':
-      return `Hit ${remaining} more Drop Targets`
+      return `Hit ${remaining} more Drop Target${remaining === 1 ? '' : 's'}`
     case 'bug':
-      return `Hit ${remaining} more Targets`
+      return `Hit ${remaining} more Target${remaining === 1 ? '' : 's'}`
     case 'recovery':
-      return stage === 0 ? 'Upgrade the Flags: spin them' : 'Enter the Hyperspace Kicker'
+      return stage === 0 ? `Upgrade the Flags: ${remaining} ${remaining === 1 ? 'spin' : 'spins'} left` : 'Enter the Hyperspace Kicker'
     case 'menace':
       return stage === 0 ? 'Upgrade the Attack Bumpers' : `Hit Attack Bumpers ${times(remaining)}`
     case 'secret':
       return `Enter the ${WORMHOLES[Math.min(2, Math.max(0, stage))]} Wormhole`
     case 'airdrop':
-      return stage === 0 ? `Light ${remaining} more Right Hazard Lights` : 'Enter the Hyperspace Kicker'
+      return stage === 0 ? `Light ${remaining} more Right Hazard Light${remaining === 1 ? '' : 's'}` : 'Enter the Hyperspace Kicker'
     case 'spike':
-      return stage === 0 ? `Light ${remaining} more Left Hazard Lights` : 'Enter any Wormhole'
+      return stage === 0 ? `Light ${remaining} more Left Hazard Light${remaining === 1 ? '' : 's'}` : 'Enter any Wormhole'
     case 'rug':
       return stage === 0 ? 'Upgrade the Engines' : 'Enter the Black Hole'
     case 'plague':
@@ -268,7 +275,7 @@ export function missionGoal(id: MissionId | string, stage: number, remaining: nu
     case 'ledger':
       return `Hit the Satellite ${times(remaining)}`
     case 'recon':
-      return `Pass ${remaining} more Lanes`
+      return `Pass ${remaining} more Lane${remaining === 1 ? '' : 's'}`
     case 'tower':
       return `Drain an Out-lane ${times(remaining)}`
     case 'reorg':
@@ -357,7 +364,7 @@ export function ruleMessage(id: MessageId, detail?: string | number): string {
     case 'clock':
       return 'You have gone round the clock'
     case 'postRaised':
-      return 'Centre Post Raised'
+      return 'Center Post Raised'
     case 'testMode':
       return 'Test Mode'
     case 'bumperUpgrade':

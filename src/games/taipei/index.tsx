@@ -1,19 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { AppProps } from '../../os/apps'
 import {
-  AboutDialog, BestScoresDialog, GameDialog, GameMenuBar, NameEntryDialog, cabaldRemy, civRemy, loadGame, loadRemy,
-  mulberry32, saveGame, unlockAudio, useAnimationFrame, useCrispCanvas, useGamesMuted, useWindowFit, useWindowState, type GameMenu
+  AboutDialog, BestScoresDialog, GameDialog, GameHelpTabs, GameMenuBar, NameEntryDialog, cabaldRemy, civRemy, loadGame, loadRemy,
+  mulberry32, saveGame, unlockAudio, useAnimationFrame, useCrispCanvas, useGamesMuted, useWindowFit, useWindowState
 } from '../kit'
+import type { GameMenu } from '../kit'
 import { createSounds } from './audio'
-import { LAYOUT_IDS, availablePairs, backup, createDeal, freeTiles, nearestFree, noMoves, parseGameNumber, remaining, selectTile, startGame, type LayoutId, type Pair } from './engine'
+import { LAYOUT_IDS, availablePairs, backup, clockRuns, clockSeconds, createDeal, freeTiles, nearestFree, noMoves, parseGameNumber, remaining, selectTile, startGame } from './engine'
+import type { LayoutId, Pair } from './engine'
 import { icon } from './icon'
-import { defaults, isPreferences, type Preferences } from './preferences'
-import { HEIGHT, WIDTH, boardGeometry, drawBoard, drawTile, hitTile, type Portraits, type View } from './render'
-import { faceLabel, strings, type HelpTab } from './strings'
+import { defaults, isPreferences } from './preferences'
+import type { Preferences } from './preferences'
+import { HEIGHT, WIDTH, boardGeometry, clampView, createTileAtlas, drawBoard, hitTile } from './render'
+import type { Portraits, View } from './render'
+import { faceLabel, strings } from './strings'
+import type { HelpTab } from './strings'
 import './taipei.css'
 
 type Dialog = 'help' | 'about' | 'best' | 'select' | 'no-moves' | 'win' | 'name' | null
-type Gesture = { id: number; x: number; y: number; base: View; tile: number | null; moved: boolean; peek: boolean; touch: boolean; right: boolean }
+type Gesture = { id: number; x: number; y: number; base: View; tile: number | null; moved: boolean; peek: boolean; touch: boolean; right: boolean; doubleTap: boolean }
 const initialView: View = { zoom: 1, panX: 0, panY: 0 }
 const civilianSeeds = [16, 9, 13, 54, 29, 35, 2005, 46, 2084, 2069, 420, 777, 42]
 const cabaldSeeds = [67, 1010, 57, 2086]
@@ -29,22 +35,28 @@ export default function Taipei({ param, close }: AppProps) {
   const [numberText, setNumberText] = useState('')
   const [numberError, setNumberError] = useState(false)
   const [hint, setHint] = useState<Pair | null>(null)
+  const [hintAnimating, setHintAnimating] = useState(false)
+  const [hintInverted, setHintInverted] = useState(false)
   const [focus, setFocus] = useState<number | null>(null)
+  const [keyboardFocus, setKeyboardFocus] = useState(false)
+  const [clockStarted, setClockStarted] = useState(false)
   const [peek, setPeek] = useState<number | null>(null)
   const [view, setView] = useState<View>(initialView)
+  const [viewport, setViewport] = useState({ height: HEIGHT, padding: 8 })
   const [art, setArt] = useState<Portraits>({})
   const [announcement, setAnnouncement] = useState(strings.start)
   const [celebrating, setCelebrating] = useState(false)
   const [record, setRecord] = useState(false)
   const [hold, setHold] = useState<{ x: number; y: number } | null>(null)
-  const { active, hidden } = useWindowState()
+  const { active, hidden, pocket } = useWindowState()
   const { muted, toggleMuted } = useGamesMuted()
   const fit = useWindowFit()
   const surface = useRef<HTMLDivElement>(null)
   const sounds = useMemo(createSounds, [])
-  const geometry = useMemo(() => boardGeometry(game.deal.positions), [game.deal.positions])
+  const geometry = useMemo(() => boardGeometry(game.deal.positions, viewport.height, viewport.padding), [game.deal.positions, viewport])
   const gesture = useRef<Gesture | null>(null)
   const holdTimer = useRef<number | undefined>(undefined)
+  const hintElapsed = useRef(0)
   const lastTap = useRef({ time: -Infinity, x: 0, y: 0 })
   const hintIndex = useRef(0)
   const clock = useRef({ milliseconds: 0, since: null as number | null, revision: 0 })
@@ -52,10 +64,30 @@ export default function Taipei({ param, close }: AppProps) {
   const matchStreak = useRef({ time: -Infinity, count: 0 })
   const celebrationTime = useRef(0)
   const particles = useMemo(() => new Float32Array(144 * 6), [])
+  const fireworksAtlas = useRef<HTMLCanvasElement | null>(null)
   const redraw = useRef(() => {})
   const reducedMotion = useRef(typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches)
-  const canvas = useCrispCanvas(WIDTH, HEIGHT, { onResize: () => redraw.current() })
+  const canvas = useCrispCanvas(WIDTH, viewport.height, { smoothing: true, minScale: 2, onResize: () => redraw.current() })
   const count = remaining(game)
+
+  useLayoutEffect(() => {
+    const element = surface.current
+    if (!element) return
+    const measure = () => {
+      const { width, height } = element.getBoundingClientRect()
+      if (width <= 0 || height <= 0) return
+      const next = { height: Math.max(1, Math.round(height * WIDTH / width)), padding: 8 * WIDTH / width }
+      setViewport((previous) => previous.height === next.height && previous.padding === next.padding ? previous : next)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  useEffect(() => { setView((current) => clampView(geometry, current)) }, [geometry])
+  useEffect(() => {
+    if (hint === null) { setHintAnimating(false); setHintInverted(false) }
+  }, [hint])
 
   function clearGesture() {
     window.clearTimeout(holdTimer.current)
@@ -69,6 +101,7 @@ export default function Taipei({ param, close }: AppProps) {
     sounds.stop()
     setGame(startGame(createDeal(number, layout, solvable)))
     setElapsed(0)
+    setClockStarted(false)
     clock.current = { milliseconds: 0, since: null, revision: clock.current.revision + 1 }
     setClockRevision(clock.current.revision)
     setHint(null)
@@ -87,6 +120,7 @@ export default function Taipei({ param, close }: AppProps) {
     sounds.stop()
     setGame(startGame(game.deal))
     setElapsed(0)
+    setClockStarted(false)
     clock.current = { milliseconds: 0, since: null, revision: clock.current.revision + 1 }
     setClockRevision(clock.current.revision)
     setHint(null)
@@ -104,6 +138,7 @@ export default function Taipei({ param, close }: AppProps) {
     newDeal(game.deal.number, layout)
   }
   function backupMove() {
+    clearGesture()
     const next = backup(game)
     if (next === game) return
     sounds.stop()
@@ -118,10 +153,14 @@ export default function Taipei({ param, close }: AppProps) {
     surface.current?.focus()
   }
   function showHint() {
+    clearGesture()
     const pairs = availablePairs(game)
     if (!pairs.length) { setAnnouncement(strings.noHint); sounds.play('invalid'); return }
     const pair = pairs[hintIndex.current++ % pairs.length]
     setHint(pair)
+    hintElapsed.current = 0
+    setHintInverted(true)
+    setHintAnimating(true)
     setFocus(pair[0])
     sounds.play('hint')
     setAnnouncement(strings.hintPair(faceLabel(game.deal.faces[pair[0]], prefs.set === 'classic'), faceLabel(game.deal.faces[pair[1]], prefs.set === 'classic')))
@@ -129,6 +168,7 @@ export default function Taipei({ param, close }: AppProps) {
   }
   function finishCelebration() {
     sounds.stop()
+    fireworksAtlas.current = null
     setCelebrating(false)
     setDialog('win')
   }
@@ -137,6 +177,7 @@ export default function Taipei({ param, close }: AppProps) {
     if (celebrating) { finishCelebration(); return }
     const next = selectTile(game, index)
     if (next === game) { sounds.play('invalid'); return }
+    if (!clockStarted) setClockStarted(true)
     setHint(null)
     hintIndex.current = 0
     setFocus(index)
@@ -145,45 +186,53 @@ export default function Taipei({ param, close }: AppProps) {
       const now = performance.now()
       if (remaining(next) === 0) {
         const current = clock.current
-        setElapsed(Math.floor((current.milliseconds + (current.since === null ? 0 : now - current.since)) / 1000))
+        current.milliseconds += current.since === null ? 0 : now - current.since
+        current.since = null
+        setElapsed(Math.floor(current.milliseconds / 1000))
       }
       matchStreak.current = { time: now, count: now - matchStreak.current.time < 4000 ? matchStreak.current.count + 1 : 0 }
       sounds.play('match', matchStreak.current.count)
-      setFocus(freeTiles(next.deal.positions, next.removed)[0] ?? null)
+      const nextFocus = nearestFree(next, index)
+      setFocus(nextFocus)
+      if (keyboardFocus) revealFocus(nextFocus)
       setAnnouncement(strings.match(remaining(next)))
     } else {
       sounds.play('select')
       setAnnouncement(strings.tile(faceLabel(game.deal.faces[index], prefs.set === 'classic'), next.selected === index ? strings.selectedLabel : strings.freeLabel))
     }
   }
-  function toggleZoom(x = WIDTH / 2, y = HEIGHT / 2) {
-    setView((v) => v.zoom === 2 ? initialView : {
+  function toggleZoom(x = geometry.width / 2, y = geometry.height / 2) {
+    clearGesture()
+    lastTap.current.time = -Infinity
+    setView((v) => v.zoom === 2 ? initialView : clampView(geometry, {
       zoom: 2,
-      panX: Math.max(-WIDTH / 2, Math.min(WIDTH / 2, WIDTH / 2 - x)),
-      panY: Math.max(-HEIGHT / 2, Math.min(HEIGHT / 2, HEIGHT / 2 - y))
-    })
+      panX: geometry.width / 2 - x,
+      panY: geometry.height / 2 - y
+    }))
   }
   function revealFocus(index: number | null) {
     if (index === null || view.zoom === 1) return
     const p = game.deal.positions[index]
     const x = geometry.x + (p.x * 40 - p.z * 4 + 20) * geometry.scale
     const y = geometry.y + (p.y * 52 - p.z * 4 + 26) * geometry.scale
-    setView((v) => ({ ...v, panX: Math.max(-WIDTH / 2, Math.min(WIDTH / 2, (WIDTH / 2 - x) * 2)), panY: Math.max(-HEIGHT / 2, Math.min(HEIGHT / 2, (HEIGHT / 2 - y) * 2)) }))
+    setView((v) => clampView(geometry, { ...v, panX: (geometry.width / 2 - x) * 2, panY: (geometry.height / 2 - y) * 2 }))
   }
   function point(event: PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect()
-    return { x: (event.clientX - rect.left) * WIDTH / rect.width, y: (event.clientY - rect.top) * HEIGHT / rect.height }
+    return { x: (event.clientX - rect.left) * geometry.width / rect.width, y: (event.clientY - rect.top) * geometry.height / rect.height }
   }
   function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
     unlockAudio()
     if (!active || hidden || dialog) return
     event.preventDefault()
+    setKeyboardFocus(false)
     surface.current?.focus()
     if (celebrating) { finishCelebration(); return }
     if (event.button !== 0 && event.button !== 2 || gesture.current) return
     const p = point(event)
     const tile = hitTile(game, geometry, view, p.x, p.y)
-    const g: Gesture = { id: event.pointerId, x: p.x, y: p.y, base: view, tile, moved: false, peek: event.button === 2, touch: event.pointerType === 'touch', right: event.button === 2 }
+    const doubleTap = event.pointerType === 'touch' && tile === null && performance.now() - lastTap.current.time < 320 && Math.hypot(p.x - lastTap.current.x, p.y - lastTap.current.y) < 36
+    const g: Gesture = { id: event.pointerId, x: p.x, y: p.y, base: view, tile, moved: false, peek: event.button === 2, touch: event.pointerType === 'touch', right: event.button === 2, doubleTap }
     gesture.current = g
     event.currentTarget.setPointerCapture(event.pointerId)
     if (g.right) setPeek(tile)
@@ -212,9 +261,9 @@ export default function Taipei({ param, close }: AppProps) {
       setHold(null)
     }
     if (g.peek) setPeek(hitTile(game, geometry, view, p.x, p.y))
-    else if (g.moved && g.base.zoom === 2) setView({ zoom: 2,
-      panX: Math.max(-WIDTH / 2, Math.min(WIDTH / 2, g.base.panX + p.x - g.x)),
-      panY: Math.max(-HEIGHT / 2, Math.min(HEIGHT / 2, g.base.panY + p.y - g.y)) })
+    else if (g.moved && g.base.zoom === 2) setView(clampView(geometry, { zoom: 2,
+      panX: g.base.panX + p.x - g.x,
+      panY: g.base.panY + p.y - g.y }))
   }
   function pointerUp(event: PointerEvent<HTMLCanvasElement>) {
     const g = gesture.current
@@ -224,17 +273,18 @@ export default function Taipei({ param, close }: AppProps) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (!active || hidden || dialog || g.peek || g.moved || g.right) return
     const now = performance.now()
-    if (g.touch && now - lastTap.current.time < 320 && Math.hypot(p.x - lastTap.current.x, p.y - lastTap.current.y) < 36) {
+    if (g.touch && g.tile === null && g.doubleTap) {
       toggleZoom(p.x, p.y)
       lastTap.current.time = -Infinity
       return
     }
-    lastTap.current = { time: now, ...p }
+    lastTap.current = g.touch && g.tile === null ? { time: now, ...p } : { time: -Infinity, x: 0, y: 0 }
     if (g.tile !== null) select(g.tile)
   }
   function keyDown(event: KeyboardEvent<HTMLDivElement>) {
     unlockAudio()
     if (!active || hidden || dialog || (event.target instanceof HTMLElement && event.target.closest('button,input,[role="menubar"]'))) return
+    setKeyboardFocus(true)
     if (celebrating) { event.preventDefault(); finishCelebration(); return }
     const dirs: Record<string, readonly [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
     if (dirs[event.key]) {
@@ -268,27 +318,27 @@ export default function Taipei({ param, close }: AppProps) {
     if (number !== null) newDeal(number)
   }, [param])
   useEffect(() => {
-    if (hidden || count === 0) return
+    if (!clockRuns(clockStarted, hidden, !!dialog, count)) return
     const current = clock.current
     current.since = performance.now()
     const timer = window.setInterval(() => {
-      setElapsed(Math.floor((current.milliseconds + performance.now() - (current.since ?? performance.now())) / 1000))
+      setElapsed(clockSeconds(current.milliseconds, current.since, performance.now()))
     }, 1000)
     return () => {
       window.clearInterval(timer)
       if (clock.current !== current) return
-      current.milliseconds += performance.now() - (current.since ?? performance.now())
+      current.milliseconds += current.since === null ? 0 : performance.now() - current.since
       current.since = null
       setElapsed(Math.floor(current.milliseconds / 1000))
     }
-  }, [hidden, count === 0, clockRevision])
+  }, [hidden, dialog, count === 0, clockStarted, clockRevision])
   useEffect(() => {
     if (hidden || !active || dialog) clearGesture()
     if (hidden || !active) sounds.stop()
   }, [hidden, active, dialog, sounds])
   useEffect(() => {
     let live = true
-    const width = 44 * view.zoom * (window.devicePixelRatio || 1)
+    const width = 44 * geometry.scale * 8 / viewport.padding * view.zoom * (window.devicePixelRatio || 1)
     const variant = width <= 128 ? 128 : width <= 320 ? 320 : 600
     if (prefs.set === 'remy') {
       civilianSeeds.forEach((seed, i) => {
@@ -300,11 +350,12 @@ export default function Taipei({ param, close }: AppProps) {
       })
     }
     return () => { live = false }
-  }, [prefs.set, view.zoom])
+  }, [prefs.set, view.zoom, geometry.scale, viewport.padding])
   useEffect(() => () => {
     window.clearTimeout(holdTimer.current)
     sounds.stop()
     gesture.current = null
+    fireworksAtlas.current = null
   }, [sounds])
   useEffect(() => {
     if (count === 0) {
@@ -312,6 +363,7 @@ export default function Taipei({ param, close }: AppProps) {
       setRecord(!best || elapsed < best.seconds)
       setAnnouncement(strings.win)
       celebrationTime.current = 0
+      fireworksAtlas.current = createTileAtlas(prefs.set, art)
       const random = mulberry32(game.deal.number ^ 0x544149)
       const pool = particles
       for (let i = 0; i < 144; i++) {
@@ -335,16 +387,24 @@ export default function Taipei({ param, close }: AppProps) {
   }, [game.removed])
 
   redraw.current = () => {
-    if (canvas.ctx.current && !celebrating && !hidden) drawBoard(canvas.ctx.current, game, geometry, view, prefs.set, art, { highlight: prefs.highlight, hint, peek, focus })
+    if (canvas.ctx.current && !celebrating && !hidden) drawBoard(canvas.ctx.current, game, geometry, view, prefs.set, art, { highlight: prefs.highlight, hint, hintInverted, peek, focus: keyboardFocus ? focus : null })
   }
-  useEffect(() => { redraw.current() }, [game, geometry, view, prefs.set, prefs.highlight, art, hint, peek, focus, hidden, celebrating])
+  useEffect(() => { redraw.current() }, [game, geometry, view, prefs.set, prefs.highlight, art, hint, hintInverted, peek, focus, keyboardFocus, hidden, celebrating])
   useAnimationFrame((dt) => {
+    if (!celebrating) {
+      hintElapsed.current += dt
+      const time = hintElapsed.current
+      setHintInverted(time < 0.2 || time >= 0.4 && time < 0.6)
+      if (time >= 0.8) { setHintAnimating(false); setHintInverted(false) }
+      return
+    }
     const ctx = canvas.ctx.current
-    if (!ctx) return
+    const atlas = fireworksAtlas.current
+    if (!ctx || !atlas) return
     celebrationTime.current += dt
     const time = celebrationTime.current
     const duration = reducedMotion.current ? 1.2 : 2.5
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
+    ctx.clearRect(0, 0, geometry.width, geometry.height)
     const pool = particles
     for (let i = 0; i < 144; i++) {
       const offset = i * 6
@@ -352,14 +412,15 @@ export default function Taipei({ param, close }: AppProps) {
       if (t < 0) continue
       ctx.save()
       ctx.globalAlpha = Math.max(0, Math.min(1, (duration - time) * 2))
-      ctx.translate(WIDTH / 2 + pool[offset] * t, HEIGHT / 2 + pool[offset + 1] * t + 80 * t * t)
+      ctx.translate(geometry.width / 2 + pool[offset] * t, geometry.height / 2 + pool[offset + 1] * t + 80 * t * t)
       ctx.rotate(pool[offset + 4] + pool[offset + 3] * t)
       ctx.scale(0.25, 0.25)
-      drawTile(ctx, game.deal.faces[pool[offset + 5]], prefs.set, art)
+      const face = game.deal.faces[pool[offset + 5]]
+      ctx.drawImage(atlas, face % 7 * 44, Math.floor(face / 7) * 56, 44, 56, 0, 0, 44, 56)
       ctx.restore()
     }
     if (time >= duration) finishCelebration()
-  }, { paused: !celebrating })
+  }, { paused: !celebrating && !hintAnimating || !!dialog, activeOnly: false })
 
   const menus: GameMenu[] = [
     { label: strings.menu.game, items: [
@@ -393,30 +454,32 @@ export default function Taipei({ param, close }: AppProps) {
   }
   function dismissWin() { setDialog(record ? 'name' : null) }
 
-  return <div className='taipei'
-    onKeyDownCapture={(event) => { unlockAudio(); if (celebrating && active && !hidden) { event.preventDefault(); event.stopPropagation(); finishCelebration() } }}
-    onPointerDownCapture={(event) => { unlockAudio(); if (celebrating && active && !hidden) { event.preventDefault(); event.stopPropagation(); finishCelebration() } }}>
+  return <div className={`taipei${pocket ? ' taipei-pocket' : ''}`}
+    onKeyDownCapture={(event) => { unlockAudio(); setKeyboardFocus(true); if (celebrating && active && !hidden) { event.preventDefault(); event.stopPropagation(); finishCelebration() } }}
+    onPointerDownCapture={(event) => { unlockAudio(); setKeyboardFocus(false); if (celebrating && active && !hidden) { event.preventDefault(); event.stopPropagation(); finishCelebration() } }}>
     <GameMenuBar menus={menus} disabled={celebrating} />
     <div className='taipei-surface' ref={surface} tabIndex={0} role='application' aria-label={strings.title} onKeyDown={keyDown}
       onKeyUp={(event) => { if (event.key.toLowerCase() === 'p') setPeek(null) }}
       onBlur={() => { if (!gesture.current) setPeek(null) }} onContextMenu={(event) => event.preventDefault()}>
       <canvas ref={canvas.ref} className='taipei-board' onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
-        onPointerCancel={clearGesture} onLostPointerCapture={clearGesture} />
-      <button className='taipei-zoom' title={strings.zoomLabel} aria-label={strings.zoomLabel} aria-pressed={view.zoom === 2} onClick={() => toggleZoom()}>{view.zoom === 2 ? strings.zoomOut : strings.zoomIn}</button>
+        onPointerCancel={clearGesture} onLostPointerCapture={() => { if (gesture.current) clearGesture() }} />
       {hold && <span className='taipei-hold' style={{ left: hold.x, top: hold.y }} />}
       <div className='taipei-accessible' aria-live='polite' aria-atomic='true'>{announcement}</div>
     </div>
-    <div className='taipei-status'><span>{strings.tilesLeft(count)}</span><span>{strings.gameNumber(game.deal.number)}</span><span>{strings.layouts[game.deal.layout]}</span>{prefs.timer && <span>{strings.time(formatTime(elapsed))}</span>}</div>
+    <div className='taipei-status'><span>{strings.tilesLeft(count)}</span><span>{strings.gameNumber(game.deal.number)}</span><span>{strings.layouts[game.deal.layout]}</span>{prefs.timer && <span>{strings.time(formatTime(elapsed))}</span>}
+      <button className='taipei-zoom' title={strings.zoomLabel} aria-label={strings.zoomLabel} aria-pressed={view.zoom === 2} onClick={() => toggleZoom()}>{view.zoom === 2 ? strings.zoomOut : strings.zoomIn}</button>
+    </div>
     {dialog === 'select' && <GameDialog title={strings.selectTitle} onClose={closeDialog} buttons={[
       { label: strings.ok, onClick: acceptNumber, default: true }, { label: strings.cancel, onClick: closeDialog, cancel: true }
-    ]}><label className='taipei-number'>{strings.selectPrompt}<input type='text' inputMode='numeric' value={numberText} maxLength={5}
-      onChange={(event) => { setNumberText(event.target.value); setNumberError(false) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); acceptNumber() } }} aria-invalid={numberError} /></label>
+    ]}><label className='taipei-number'>{strings.selectPrompt}<input data-autofocus type='text' inputMode='numeric' value={numberText} maxLength={5}
+      onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setNumberText(event.target.value); setNumberError(false) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); acceptNumber() } }} aria-invalid={numberError} /></label>
       {numberError && <p role='alert'>{strings.invalidNumber}</p>}
     </GameDialog>}
     {dialog === 'help' && <GameDialog title={strings.helpTitle} onClose={closeDialog} width={490}>
-      <div className='taipei-tabs' role='tablist'>{(Object.keys(strings.help) as HelpTab[]).map((tab) => <button key={tab} role='tab' aria-selected={helpTab === tab}
-        id={`taipei-tab-${tab}`} aria-controls={`taipei-panel-${tab}`} onClick={() => setHelpTab(tab)}>{tab}</button>)}</div>
-      <p role='tabpanel' id={`taipei-panel-${helpTab}`} aria-labelledby={`taipei-tab-${helpTab}`}>{strings.help[helpTab]}</p>
+      <GameHelpTabs tabs={Object.keys(strings.help)} selected={Object.keys(strings.help).indexOf(helpTab)}
+        onChange={(index) => setHelpTab((Object.keys(strings.help) as HelpTab[])[index])}>
+        <p>{strings.help[helpTab]}</p>
+      </GameHelpTabs>
     </GameDialog>}
     {dialog === 'about' && <AboutDialog game={strings.title} icon={icon} version={strings.version} flavour={strings.flavour} lines={strings.about} onClose={closeDialog} />}
     {dialog === 'best' && <BestScoresDialog title={strings.bestTitle} heading={strings.bestHeading} format={formatTime}
@@ -426,7 +489,7 @@ export default function Taipei({ param, close }: AppProps) {
       { label: strings.backup, onClick: backupMove, disabled: !game.history.length }, { label: strings.startOver, onClick: startOver }, { label: strings.newGame, onClick: () => newDeal(), default: true }
     ]}><p>{strings.noMoves}</p></GameDialog>}
     {dialog === 'win' && <GameDialog title={strings.title} onClose={dismissWin} buttons={[{ label: strings.ok, onClick: dismissWin, default: true }]}>
-      <p>{strings.win}</p><p>{strings.time(formatTime(elapsed))}</p>{record && <p>{strings.record}</p>}
+      <p>{strings.win}</p><p>{strings.time(formatTime(elapsed))}</p>
     </GameDialog>}
     {dialog === 'name' && <NameEntryDialog level={strings.layouts[game.deal.layout]} message={strings.record} onSubmit={recordName} />}
   </div>

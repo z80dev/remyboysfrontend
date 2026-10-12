@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { counts, chooseMove, DIRECTIONS, flipsFor, initialBoard, legalMoves, passTurn, playMove, SKILLS, turnState, type Board, type Side } from '../../src/games/reversi/engine'
+import { strings } from '../../src/games/reversi/strings'
+import { hintPhase } from '../../src/games/reversi/animation'
 
 describe('Reversi rules', () => {
   test('standard opening gives the player the first four legal moves', () => {
@@ -96,11 +98,31 @@ describe('Reversi AI', () => {
     }
   })
 
-  test('Beginner chooses only maximum-flip moves with deterministic seeded ties', () => {
-    const board = initialBoard()
-    const result = chooseMove(board, 1, 'beginner', { seed: 3 })
-    expect(result.move).toBe(44)
-    expect(result.score).toBe(1)
+  test('Beginner chooses maximum flips with reproducible per-move seeded randomness', () => {
+    const selected = new Set<number | null>()
+    for (let seed = 0; seed < 64; seed++) {
+      const board = initialBoard()
+      const legal = legalMoves(board, 1)
+      const maximum = Math.max(...legal.map((move) => flipsFor(board, move, 1).length))
+      const result = chooseMove(board, 1, 'beginner', { seed })
+      expect(legal).toContain(result.move)
+      expect(flipsFor(board, result.move!, 1)).toHaveLength(maximum)
+      expect(chooseMove(board, 1, 'beginner', { seed })).toEqual(result)
+      selected.add(result.move)
+    }
+    expect(selected.size).toBe(4)
+  })
+
+  test('Beginner mixes move state into the seed instead of retaining the same tie index', () => {
+    const opening = initialBoard()
+    const later = opening.slice()
+    later[0] = 1
+    expect(legalMoves(later, 1)).toEqual(legalMoves(opening, 1))
+    let changed = 0
+    for (let seed = 0; seed < 64; seed++) {
+      if (chooseMove(opening, 1, 'beginner', { seed }).move !== chooseMove(later, 1, 'beginner', { seed }).move) changed++
+    }
+    expect(changed).toBeGreaterThan(0)
   })
 
   test('Master completes at least six plies even when its injected time expires', () => {
@@ -163,4 +185,15 @@ describe('Reversi AI', () => {
       for (const side of [1, -1] as const) expect(chooseMove(board, side, 'master').score).toBe(oracle(board, side))
     }
   })
+})
+
+test('move announcements use player wording and singular/plural disc grammar', () => {
+  expect(strings.placed(1, 18, 1)).toBe('You placed at C3; 1 disc flipped.')
+  expect(strings.placed(-1, 20, 2)).toBe('The Cabald placed at E3; 2 discs flipped.')
+})
+
+test('hint outline blinks three times for 250ms after a completed search, then leaves the cursor', () => {
+  expect([0, 249, 250, 499, 500, 749, 750, 999, 1000, 1249, 1250, 1499, 1500].map(hintPhase)).toEqual([
+    'on', 'on', 'off', 'off', 'on', 'on', 'off', 'off', 'on', 'on', 'off', 'off', 'done',
+  ])
 })

@@ -45,8 +45,8 @@ type Lights = number | ArrayLike<boolean | number>
 /** Fields the renderer reads from the physics state. */
 export interface PhysicsView {
   ball: { x: number; y: number; radius: number; height: number; layer: number; active: boolean }
-  leftAngle: number
-  rightAngle: number
+  visualLeftAngle: number
+  visualRightAngle: number
   plunger: number
   time: number
   postRaised: boolean
@@ -101,6 +101,11 @@ const C = {
 } as const
 const WORMHOLE_COLORS = [C.yellow, C.red, C.green] as const
 const BALL_SAVE_SECONDS = 10
+// Visual travel keeps the knob and ready ball above the apron; launch strength remains the physics fraction.
+const VISIBLE_PLUNGER_TRAVEL = Math.min(PLUNGER.travel, TABLE_HEIGHT - 6 - PLUNGER.top)
+const PLUNGER_METER_X = LANE_WALL + 3
+const PLUNGER_METER_BOTTOM = 390
+const PLUNGER_METER_SEGMENTS = 5
 
 interface Sprites {
   scale: number
@@ -551,15 +556,15 @@ export function createTableLayer(scale: number): HTMLCanvasElement {
   for (const [x, y] of RIGHT_HAZARD_LIGHTS) lamp(ctx, x, y, 3.2, C.orange, 'arrow', Math.PI / 2)
   label(ctx, TABLE_LABELS.hazard, 288, 189, 5, '#ffc890', -Math.PI / 2)
   for (const [x, y] of FUEL_LIGHTS) lamp(ctx, x, y, 3.5, C.fuel)
-  label(ctx, TABLE_LABELS.fuel, 325, 112, 5.5, '#b0ffd8')
+  label(ctx, TABLE_LABELS.fuel, 325, 181, 5.5, '#b0ffd8')
   for (const [x, y] of FLAG_LEVEL_LIGHTS) lamp(ctx, x, y, 2.6, C.magenta)
   label(ctx, TABLE_LABELS.flags, 325, 226, 5, '#ffc0f2')
   for (const [x, y] of ENGINE_LIGHTS) lamp(ctx, x, y, 3.2, C.orange)
   for (const [x, y] of ENGINE_LEVEL_LIGHTS) lamp(ctx, x, y, 2, C.orange)
   label(ctx, TABLE_LABELS.engine, 171, 191, 5, '#ffd0a0')
   for (const [x, y] of BUMPER_LEVEL_LIGHTS) lamp(ctx, x, y, 2.8, C.violet)
-  label(ctx, TABLE_LABELS.attack, 226, 168, 5.5, '#e0c0ff')
-  label(ctx, TABLE_LABELS.satellite, 285, 106, 5, '#d8e6ff')
+  label(ctx, TABLE_LABELS.attack, 201, 150, 5, '#e0c0ff')
+  label(ctx, TABLE_LABELS.satellite, CIRCLES[3].x, CIRCLES[3].y - CIRCLES[3].radius - 5, 5, '#d8e6ff')
   MULTIPLIER_LIGHTS.forEach(([x, y], i) => {
     lamp(ctx, x, y, 4.5, C.yellow)
     label(ctx, TABLE_LABELS.multipliers[i], x, y + 0.5, 4.5, '#1a1200')
@@ -578,7 +583,7 @@ export function createTableLayer(scale: number): HTMLCanvasElement {
     if (s.kind !== 'kicker') continue
     if (s.event === EventType.Wormhole) {
       hole(ctx, s.x, s.y, s.radius, WORMHOLE_COLORS[s.index])
-      label(ctx, TABLE_LABELS.wormhole, s.x, s.index === 1 ? s.y - 14 : s.y + (s.index === 0 ? -12 : 14), 4.5, WORMHOLE_COLORS[s.index])
+      label(ctx, TABLE_LABELS.wormhole, s.x, s.index === 1 ? s.y - 14 : s.y + 14, 4.5, WORMHOLE_COLORS[s.index])
     } else if (s.event === EventType.BlackHole) {
       const g = ctx.createRadialGradient(s.x, s.y, 2, s.x, s.y, 20)
       g.addColorStop(0, 'rgba(160,60,255,0.5)')
@@ -901,7 +906,8 @@ export function drawTable(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElemen
   }
 
   // --- plunger ---
-  const py = PLUNGER.top + p.plunger * PLUNGER.travel
+  const pull = p.plunger * VISIBLE_PLUNGER_TRAVEL
+  const py = PLUNGER.top + pull
   ctx.strokeStyle = '#9aa8c8'
   ctx.lineWidth = 1
   ctx.beginPath()
@@ -921,12 +927,18 @@ export function drawTable(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElemen
   ctx.fillRect(PLUNGER.x - PLUNGER.width / 2, py, PLUNGER.width, 4)
   ctx.fillStyle = '#ff8a96'
   ctx.fillRect(PLUNGER.x - PLUNGER.width / 2, py, PLUNGER.width, 1)
+  // Five amber inserts rise with real pull strength, even though the visible knob travel is capped.
+  const strengthSegments = Math.ceil(p.plunger * PLUNGER_METER_SEGMENTS)
+  for (let i = 0; i < PLUNGER_METER_SEGMENTS; i++) {
+    ctx.fillStyle = i < strengthSegments ? C.gold : '#3a2a08'
+    ctx.fillRect(PLUNGER_METER_X, PLUNGER_METER_BOTTOM - i * 10 - 8, 4, 8)
+  }
 
   // --- ball (under the ramp unless riding it) ---
   const ball = p.ball
   const onRamp = ball.layer === 1
   if (ball.active && !onRamp) drawBall(ctx, sp, ball.x, ball.y, ball.radius, ball.height)
-  else if (!ball.active && game.phase === 'ready') drawBall(ctx, sp, LAUNCH.x, LAUNCH.y + p.plunger * PLUNGER.travel, BALL_RADIUS, 0)
+  else if (!ball.active && game.phase === 'ready') drawBall(ctx, sp, LAUNCH.x, LAUNCH.y + pull, BALL_RADIUS, 0)
   ctx.drawImage(sp.ramp, 0, 0, TABLE_WIDTH, TABLE_HEIGHT)
   if (hit) {
     const dr = t - hit[slotOf(EventType.Ramp)]
@@ -934,8 +946,8 @@ export function drawTable(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElemen
   }
 
   // --- flippers ---
-  drawFlipper(ctx, sp.flipperL, FLIPPERS[0].x, FLIPPERS[0].y, p.leftAngle)
-  drawFlipper(ctx, sp.flipperR, FLIPPERS[1].x, FLIPPERS[1].y, p.rightAngle)
+  drawFlipper(ctx, sp.flipperL, FLIPPERS[0].x, FLIPPERS[0].y, p.visualLeftAngle)
+  drawFlipper(ctx, sp.flipperR, FLIPPERS[1].x, FLIPPERS[1].y, p.visualRightAngle)
 
   if (ball.active && onRamp) drawBall(ctx, sp, ball.x, ball.y, ball.radius, ball.height)
 
@@ -944,6 +956,13 @@ export function drawTable(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElemen
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.globalAlpha = pulse
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 4
+    ctx.strokeStyle = 'rgba(0,0,12,0.6)'
+    ctx.strokeText(TABLE_LABELS.tilt, PLAYFIELD_CENTRE + 2, 232)
+    ctx.lineWidth = 2
+    ctx.strokeStyle = '#ffffff'
+    ctx.strokeText(TABLE_LABELS.tilt, PLAYFIELD_CENTRE, 230)
     ctx.fillStyle = '#ff2a2a'
     ctx.fillText(TABLE_LABELS.tilt, PLAYFIELD_CENTRE, 230)
     ctx.globalAlpha = 1

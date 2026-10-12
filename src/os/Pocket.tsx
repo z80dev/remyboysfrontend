@@ -22,7 +22,7 @@ type Props = {
   onClose: (id: string) => void
   onToday: () => void
   onLogOff: () => void
-  /** Open windows: the active one, plus hidden persistent ones that must stay mounted. */
+  /** Attachment point for the active and hidden background window frames. */
   children: ReactNode
 }
 

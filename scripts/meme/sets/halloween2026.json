@@ -1,0 +1,99 @@
+{
+  "provider": "codex",
+  "codexModel": "gpt-6-luna",
+  "model": "openai/gpt-image-2.5-flare",
+  "quality": "high",
+  "style": "Cozy stop-motion claymation diorama style exactly like the Halloween reference images: sculpted clay faces, felted-wool and fabric costumes, tiny handmade props, warm jack-o'-lantern glow, purple-orange Halloween night with a big moon, bats, autumn leaves, shallow depth of field, cinematic miniature lighting; comedic, expressive staging like a great meme panel. The characters are 'Remy' chibi characters copied from the references: big round heads, VERY LARGE glossy anime eyes with big white highlights, thick straight black eyebrows angled down, tiny nose, small mouth, small bodies; keep each referenced character's hair colour, skin tone and costume recognisable, with arms, hands and big expressive poses. Every Remy is a boy, including the long-haired ones: never skirts or dresses. Bald Remys are the Cabald (villains) and must stay completely bald. No text, letters, logos or watermarks unless the prompt asks for exact words.",
+  "jobs": [
+    {
+      "name": "hw-cabald-door",
+      "aspect": "1:1",
+      "refs": ["h175", "h98"],
+      "prompt": "Front porch at night lined with jack-o'-lanterns. On the doorstep stands the completely bald Remy (first reference) in a plain dark hoodie with NO costume at all, holding out an empty pillowcase, totally deadpan. In the open doorway, the Remy in the pumpkin costume (second reference) holds a candy bowl and squints at him with deep suspicion. Keep the top 25% of the image simple and dark."
+    },
+    {
+      "name": "hw-buttons",
+      "aspect": "1:1",
+      "refs": ["h98"],
+      "prompt": "The Remy in the pumpkin costume stands behind a wooden table in a spooky decorated living room, sweating buckets, one trembling finger hovering between two big glossy red push buttons on the table, a bowl of full-size candy bars beside him. Keep the top 30% of the image simple (labels go there)."
+    },
+    {
+      "name": "hw-raccoon",
+      "aspect": "1:1",
+      "refs": ["h143"],
+      "prompt": "On a dark porch, an unattended candy bowl sits on a stool with a hand-lettered cardboard sign reading exactly PLEASE TAKE ONE. The Remy in the raccoon costume (reference) is tipping the ENTIRE bowl into his trick-or-treat bag, glancing over his shoulder with sneaky guilty eyes."
+    },
+    {
+      "name": "hw-group",
+      "aspect": "1:1",
+      "refs": ["h7", "h103", "h72", "h64"],
+      "prompt": "Four Remys pose proudly together for a group photo on a Halloween porch, each in a completely different costume: green dinosaur onesie, hot dog costume, bumblebee, shiny knight armour (matching the references). Big confident grins, zero coordination. Keep the top 25% simple."
+    },
+    {
+      "name": "hw-teen",
+      "aspect": "1:1",
+      "refs": [127, "h155"],
+      "prompt": "Late at night on a porch. A lanky older teenage blond Remy (first reference) in a plain grey hoodie with absolutely no costume holds an empty pillowcase and stands awkwardly; a tiny Remy in a starry wizard costume (second reference) has answered the door holding the candy bowl, deeply unimpressed. Keep the top 25% simple."
+    },
+    {
+      "name": "hw-candy-market",
+      "aspect": "1:1",
+      "refs": ["h103", "h122", "h139", "h170"],
+      "prompt": "A living room floor on the morning of November 1st turned into a frantic stock-exchange trading pit: four Remys in costumes (hot dog, raccoon, bumblebee, dinosaur) amid huge sorted piles of candy, shouting, waving fistfuls of candy bars and making trading hand signals, one wearing a loosened necktie over his costume. Chaotic Wall Street energy. Keep the top 22% simple."
+    },
+    {
+      "name": "hw-split-up",
+      "aspect": "1:1",
+      "refs": ["h31", "h17", "h4"],
+      "prompt": "A pitch-dark creepy basement lit only by one flashlight. Three Remys in costumes (detective with deerstalker, Frankenstein's monster, penguin) huddle tightly together, terrified; the detective points the flashlight; pairs of glowing eyes lurk in the darkness behind them. Keep the top 25% dark and simple."
+    },
+    {
+      "name": "hw-pumpkin-exp",
+      "aspect": "2:3",
+      "refs": [],
+      "prompt": "An incredibly intricate, museum-quality carved jack-o'-lantern masterpiece (a detailed haunted castle with bats carved into it) glowing warmly on a porch step at night. No characters."
+    },
+    {
+      "name": "hw-pumpkin-real",
+      "aspect": "2:3",
+      "refs": ["h98"],
+      "prompt": "In a messy kitchen, the Remy in the pumpkin costume proudly holds up a horribly lopsided carved pumpkin with a derpy, crooked, one-tooth face; pumpkin guts and seeds are splattered all over him, the counter and the floor."
+    },
+    {
+      "name": "hw-bedsheet",
+      "aspect": "1:1",
+      "refs": ["h2"],
+      "prompt": "A costume-contest stage under a spotlight. A judge hands a giant gold trophy to a kid wearing nothing but a plain white bedsheet with two cut-out eyeholes. At the side of the stage, the Remy in an elaborate, gleaming handmade knight armour costume with sunglasses (reference) glares in pure fury, one eye twitching, fists clenched. Keep the top 25% simple."
+    },
+    {
+      "name": "hw-fullsize",
+      "aspect": "1:1",
+      "refs": ["h7", "h53", "h97", "h162"],
+      "prompt": "Suburban street at night: a stampede of Remys in costumes (green dinosaur, fox, bumblebee, red gummy bear) sprinting flat-out with dust clouds and flying candy toward one glowing house whose yard sign reads exactly FULL SIZE BARS. Epic action shot, low angle. Keep the top 22% simple."
+    },
+    {
+      "name": "hw-nov1-a",
+      "aspect": "2:3",
+      "refs": ["h133"],
+      "prompt": "The Remy in the vampire costume (reference) slumped against a wall at a Halloween house party late at night, bored and exhausted, holding a cup, dead-eyed."
+    },
+    {
+      "name": "hw-nov1-b",
+      "aspect": "2:3",
+      "refs": ["h133"],
+      "prompt": "The same Remy in the vampire costume at 7am in a bright grocery store aisle, wild-eyed and ecstatic, sprinting with a shopping cart overflowing with bags of Halloween candy, discount stickers everywhere (no readable text)."
+    },
+    {
+      "name": "hw-cabald-wig",
+      "aspect": "1:1",
+      "refs": ["h175", "h7", "h53", "h133"],
+      "prompt": "A cozy Halloween house party full of hairy Remys in costumes (dinosaur, fox, vampire). In the middle, the completely bald Remy (first reference) wears an obviously fake, crooked, cheap bright-yellow wig as a 'disguise', sweating and smiling way too hard; all the other Remys side-eye him. Keep the top 22% simple."
+    },
+    {
+      "name": "hw-portfolio",
+      "aspect": "1:1",
+      "refs": ["h196"],
+      "prompt": "A dark bedroom at night. The Remy in the skeleton costume (reference) sits at a laptop screaming in horror, hands pressed to his cheeks; the screen glows red with a crashing candlestick price chart; through the window, a full moon and bats. Keep the top 22% simple."
+    }
+  ]
+}

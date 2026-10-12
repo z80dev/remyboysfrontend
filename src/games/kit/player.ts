@@ -63,7 +63,7 @@ function current(): GamesPlayer {
 }
 
 function persist(): void {
-  if (state) saveGame<Saved>(STORE_ID, { remy: fixed ? state.remy : savedChoice ?? BASELINE_REMY, name: state.name })
+  if (state) saveGame<Saved>(STORE_ID, { remy: fixed ? state.remy : (savedChoice ?? BASELINE_REMY), name: state.name })
 }
 
 function emit(): void {

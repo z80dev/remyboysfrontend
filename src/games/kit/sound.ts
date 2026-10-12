@@ -28,6 +28,7 @@ let jingles: MusicEngine | undefined
 let current: MusicVoice | undefined
 let jingleDucks = 0
 let wanted: Song | undefined
+let wantedFadeMs = 400
 let muted = loadGame(MUTE_ID, false, (v): v is boolean => typeof v === 'boolean')
 const listeners = new Set<() => void>()
 const duty = new Map<number, PeriodicWave>()
@@ -81,7 +82,10 @@ function release(v: MusicVoice): void {
 /** Fade a song out over `fadeMs`, then tear its engine down. */
 function retire(v: MusicVoice, fadeMs: number): void {
   v.engine.stop(fadeMs)
-  retiring.set(v, window.setTimeout(() => release(v), Math.max(0, fadeMs) + 120))
+  retiring.set(
+    v,
+    window.setTimeout(() => release(v), Math.max(0, fadeMs) + 120),
+  )
 }
 
 /**
@@ -91,7 +95,7 @@ function retire(v: MusicVoice, fadeMs: number): void {
  * fade-in is a fixed 0.4 s linear ramp) goes through a bus gain held at `0.4 / fade` for 0.4 s and then ramped
  * linearly to 1 at `fade`, so the product is one exactly linear `fadeMs` fade-in.
  */
-function syncMusic(fadeMs = 400): void {
+function syncMusic(fadeMs = wantedFadeMs): void {
   if (muted) {
     for (const v of [...retiring.keys()]) release(v)
     if (current) {
@@ -124,7 +128,10 @@ const voices = new Map<string, Set<() => void>>()
 function track(owner: string | undefined, kill: () => void): () => void {
   const key = owner ?? ''
   let set = voices.get(key)
-  if (!set) voices.set(key, (set = new Set()))
+  if (!set) {
+    set = new Set()
+    voices.set(key, set)
+  }
   set.add(kill)
   return () => {
     const s = voices.get(key)
@@ -290,6 +297,8 @@ export interface ToneOptions {
    * defaults to `'sine'` unless `type` / `duty` is set.
    */
   fmDepth?: number
+  /** FM depth decays linearly to zero over these seconds; omitted or <= 0 keeps the depth constant. */
+  fmDecay?: number
   /** Cleanup tag: {@link stopSounds}(`owner`) cuts this note off. Passed through by {@link sweep}, {@link chord}, {@link sequence}. */
   owner?: string
 }
@@ -344,7 +353,8 @@ export function tone(freq: number, dur: number, opts: ToneOptions = {}): void {
     mod.type = 'sine'
     mod.frequency.setValueAtTime(freq * ratio, at)
     if (opts.to !== undefined) mod.frequency.exponentialRampToValueAtTime(Math.max(1, opts.to * ratio), at + dur)
-    modDepth.gain.value = opts.fmDepth ?? 0
+    modDepth.gain.setValueAtTime(opts.fmDepth ?? 0, at)
+    if (opts.fmDecay !== undefined && opts.fmDecay > 0) modDepth.gain.linearRampToValueAtTime(0, at + opts.fmDecay)
     mod.connect(modDepth).connect(osc.frequency)
     mod.start(at)
     mod.stop(at + dur + 0.02)
@@ -491,6 +501,7 @@ export function sequence(notes: readonly SequenceNote[], opts: SequenceOptions =
  */
 export function playMusic(song: Song, fadeMs = 400): void {
   wanted = song
+  wantedFadeMs = fadeMs
   syncMusic(fadeMs)
 }
 
@@ -512,7 +523,11 @@ export function stopMusic(fadeMs = 400): void {
 export function playJingle(song: Song, owner?: string): Promise<void> {
   const a = live()
   if (!a) return Promise.resolve()
-  if (owner === undefined) return (current?.engine ?? (jingles ??= new MusicEngine(a.ctx, a.out))).playOnce(song)
+  if (owner === undefined) {
+    if (current) return current.engine.playOnce(song)
+    jingles ??= new MusicEngine(a.ctx, a.out)
+    return jingles.playOnce(song)
+  }
   const { ctx, out } = a
   const bus = ctx.createGain()
   bus.connect(out)

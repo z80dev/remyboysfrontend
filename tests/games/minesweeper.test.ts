@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   FLAG, HIDDEN, LEVELS, QUESTION, REVEALED, calculateNumbers, chordCell, chordPreview, clampCustom, createGame, cycleMark,
-  flagCount, mineCounter, neighbors, reveal, tick,
+  flagCount, mineCounter, neighbors, reveal, tick, touchCell,
 } from '../../src/games/minesweeper/engine'
 import type { Config, Game } from '../../src/games/minesweeper/engine'
 
@@ -27,6 +27,7 @@ describe('Minesweeper field generation', () => {
       expect(a.numbers).toEqual(b.numbers)
       expect(a.cells.every((cell) => cell === HIDDEN)).toBe(true)
       expect(a.seconds).toBe(0)
+      expect(a.exploded.size).toBe(0)
     }
     expect(createGame(LEVELS.expert, 1).mines).not.toEqual(createGame(LEVELS.expert, 2).mines)
   })
@@ -74,7 +75,8 @@ describe('Minesweeper first reveal and flood fill', () => {
     expect(after.status).toBe('playing')
     const loss = reveal(after, 0)
     expect(loss.status).toBe('lost')
-    expect(loss.exploded).toBe(0)
+    expect([...loss.exploded]).toEqual([0])
+    expect(after.exploded.size).toBe(0)
   })
 
   test('flags before the first reveal do not start the clock or bypass first-click safety', () => {
@@ -153,6 +155,16 @@ describe('Minesweeper marks and chording', () => {
     expect(chordPreview(g, -1)).toEqual([])
   })
 
+  test('held chord preview includes a hidden or questioned centre but never a flagged centre', () => {
+    const hidden = field(3, 3, [0])
+    expect(chordPreview(hidden, 4)).toEqual([4, 0, 1, 2, 3, 5, 6, 7, 8])
+    const flagged = cycleMark(hidden, 4, true)
+    expect(chordPreview(flagged, 4)).toEqual([0, 1, 2, 3, 5, 6, 7, 8])
+    const question = cycleMark(flagged, 4, true)
+    expect(chordPreview(question, 4)).toEqual([4, 0, 1, 2, 3, 5, 6, 7, 8])
+    expect(chordPreview(hidden, 0)).toEqual([0, 1, 3, 4])
+  })
+
   test('a correctly flagged satisfied number chords and auto-flags all mines on victory', () => {
     let g = reveal(field(3, 3, [0]), 4)
     g = cycleMark(g, 0, true)
@@ -164,14 +176,44 @@ describe('Minesweeper marks and chording', () => {
     expect(g.cells[1]).toBe(HIDDEN)
   })
 
-  test('a satisfied number with an incorrect flag uncovers a mine and loses', () => {
-    let g = reveal(field(3, 3, [0]), 4)
-    g = cycleMark(g, 8, true)
+  test('an incorrect-flag chord steps every neighbour, including safe cells after every exploded mine', () => {
+    let g = reveal(field(3, 3, [0, 2, 6]), 4)
+    g = cycleMark(cycleMark(cycleMark(g, 1, true), 3, true), 6, true)
+    g = cycleMark(cycleMark(g, 2, true), 2, true)
+    const before = [...g.cells]
     const after = chordCell(g, 4)
     expect(after.status).toBe('lost')
-    expect(after.exploded).toBe(0)
-    expect(after.cells[8]).toBe(FLAG)
-    expect(after.cells[0]).toBe(REVEALED)
+    expect([...after.exploded]).toEqual([0, 2])
+    expect([...after.cells]).toEqual([REVEALED, FLAG, REVEALED, FLAG, REVEALED, REVEALED, FLAG, REVEALED, REVEALED])
+    expect(after.cells[6]).toBe(FLAG)
+    expect(after.exploded.has(6)).toBe(false)
+    expect([...g.cells]).toEqual(before)
+    expect(g.exploded.size).toBe(0)
+    expect(tick(after)).toBe(after)
+  })
+
+  test('touching a satisfied number chords in either mode and with either hold action', () => {
+    const g = cycleMark(reveal(field(3, 3, [0]), 4), 0, true)
+    for (const marking of [false, true]) {
+      for (const marks of [false, true]) {
+        const after = touchCell(g, 4, marking, marks)
+        expect(after.status).toBe('won')
+        expect(after.cells[0]).toBe(FLAG)
+        expect(after.cells.slice(1).every((cell) => cell === REVEALED)).toBe(true)
+      }
+    }
+    expect(g.status).toBe('playing')
+  })
+
+  test('touch mode only exchanges reveal and marking on covered cells', () => {
+    const g = field(3, 3, [0])
+    expect(touchCell(g, 4, true, true).cells[4]).toBe(FLAG)
+    expect(touchCell(g, 4, false, true).cells[4]).toBe(REVEALED)
+    const flagged = touchCell(g, 4, true, true)
+    expect(touchCell(flagged, 4, true, true).cells[4]).toBe(QUESTION)
+    expect(touchCell(flagged, 4, true, false).cells[4]).toBe(HIDDEN)
+    expect(touchCell(g, -1, true, true)).toBe(g)
+    expect(touchCell(g, 9, false, true)).toBe(g)
   })
 
   test('unsatisfied, hidden, and zero-cell chords do nothing', () => {
@@ -181,6 +223,11 @@ describe('Minesweeper marks and chording', () => {
     expect(chordCell(number, 4)).toBe(number)
     const flaggedTwice = cycleMark(cycleMark(number, 0, true), 8, true)
     expect(chordCell(flaggedTwice, 4)).toBe(flaggedTwice)
+    const zero = reveal(field(3, 3, [0, 8]), 2)
+    expect(zero.status).toBe('playing')
+    expect(zero.numbers[2]).toBe(0)
+    expect(chordCell(zero, 2)).toBe(zero)
+    expect(cycleMark(number, 4, true)).toBe(number)
   })
 })
 

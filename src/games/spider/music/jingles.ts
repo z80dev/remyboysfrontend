@@ -1,4 +1,4 @@
-import type { Song } from '../../kit'
+import { midiHz, tone, type Song } from '../../kit'
 
 export const winJingle: Song = {
   title: 'Eight Legs Home', bpm: 140, stepsPerBeat: 4, beatsPerBar: 4, length: 24, loopStart: 24, room: .45,
@@ -9,7 +9,12 @@ export const winJingle: Song = {
     { inst: 'strings', vol: .35, notes: [[16,57,8,.5],[16,61,8,.5],[16,64,8,.5]] }
   ]
 }
-export const runJingle: Song = {
-  title: 'Thirteen Steps Home', bpm: 150, stepsPerBeat: 8, beatsPerBar: 4, length: 20, loopStart: 20, room: .3,
-  parts: [{ inst: 'bell', vol: .35, notes: [74,76,78,79,81,83,85,86,88,90,91,93,95].map((midi, step) => [step, midi, step === 12 ? 6 : 2, .35 + step / 12 * .25]) }]
+const RUN_NOTES = [74, 76, 78, 79, 81, 83, 85, 86, 88, 90, 91, 93, 95]
+
+/** Called by each K→A tween's actual start, including its 60ms stagger. */
+export function runNote(index: number) {
+  const frequency = midiHz(RUN_NOTES[index])
+  const volume = .07 + .05 * index / 12
+  tone(frequency, .05, { type: 'sine', fmRatio: 3.5, fmDepth: frequency * 1.2, vol: volume * .5, owner: 'spider' })
+  tone(frequency, index === 12 ? .5 : .18, { type: 'sine', vol: volume, owner: 'spider' })
 }

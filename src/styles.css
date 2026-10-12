@@ -887,10 +887,10 @@ dialog {
   font-weight: bold;
 }
 
-/* Halloween Remys free-mint flyer: bottom-right of the desktop, above windows, below the taskbar and menus. */
+/* Halloween Remys free-mint flyer: bottom-right of the desktop, below application windows and their dialogs. */
 .spooky {
   position: absolute;
-  z-index: 7000;
+  z-index: 5;
   right: 16px;
   bottom: 64px;
   display: flex;

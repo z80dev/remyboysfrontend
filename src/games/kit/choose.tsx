@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { remySrc } from '../../lib/media'
 import './choose.css'
 import { GameDialog } from './dialogs'
@@ -36,27 +36,39 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
   const { player, setRemy } = useGamesPlayer()
   const { active, hidden } = useWindowState()
   const [roster, setRoster] = useState<Roster>({ status: 'loading' })
-  const [attempt, setAttempt] = useState(0)
   const [text, setText] = useState(String(player.remy))
   const [anchor, setAnchor] = useState(player.remy)
   const [length, setLength] = useState(STRIP_STEP)
   const [submitted, setSubmitted] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (roster.status === 'ready' && active && !hidden) { inputRef.current?.focus(); inputRef.current?.select() }
+    if (roster.status === 'ready' && active && !hidden) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
   }, [roster.status, active, hidden])
 
-  useEffect(() => {
-    let live = true
+  const mounted = useRef(false)
+  const requestId = useRef(0)
+  const loadRoster = useCallback(() => {
+    const request = ++requestId.current
     setRoster({ status: 'loading' })
     loadCabald().then(
-      (list) => live && setRoster({ status: 'ready', bald: new Set(list) }),
-      () => live && setRoster({ status: 'error' }),
+      (list) => {
+        if (mounted.current && request === requestId.current) setRoster({ status: 'ready', bald: new Set(list) })
+      },
+      () => {
+        if (mounted.current && request === requestId.current) setRoster({ status: 'error' })
+      },
     )
+  }, [])
+  useEffect(() => {
+    mounted.current = true
+    loadRoster()
     return () => {
-      live = false
+      mounted.current = false
     }
-  }, [attempt])
+  }, [loadRoster])
 
   const bald = roster.status === 'ready' ? roster.bald : undefined
   const idx = parseIndex(text)
@@ -150,7 +162,7 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
         {roster.status === 'error' && (
           <p className="gk-choose-note" role="alert">
             The Remy roster could not be loaded.{' '}
-            <button type="button" className="btn" onClick={() => setAttempt((a) => a + 1)}>
+            <button type="button" className="btn" onClick={loadRoster}>
               Retry
             </button>
           </p>
@@ -160,9 +172,8 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
             {error}
           </p>
         )}
-        <div
+        <fieldset
           className="gk-choose-strip"
-          role="listbox"
           aria-label="Remys"
           onScroll={(e) => {
             const el = e.currentTarget
@@ -173,8 +184,7 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
             <button
               key={n}
               type="button"
-              role="option"
-              aria-selected={n === idx}
+              aria-pressed={n === idx}
               aria-label={`Remy ${n}`}
               className={n === idx ? 'gk-choose-thumb sel' : 'gk-choose-thumb'}
               onClick={() => pick(n)}
@@ -183,7 +193,7 @@ export function ChooseRemyDialog({ onClose, onChoose }: ChooseRemyDialogProps) {
               <img src={remySrc(n, 128)} alt="" width={48} height={48} loading="lazy" decoding="async" />
             </button>
           ))}
-        </div>
+        </fieldset>
       </div>
     </GameDialog>
   )

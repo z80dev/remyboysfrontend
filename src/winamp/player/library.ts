@@ -46,7 +46,7 @@ const ENTRIES: Entry[] = [
   { id: 'remy:hatethat', artist: 'Remy Boys', load: async () => (await import('../songs/hatethat')).default },
   { id: 'remy:stupidsong', artist: 'Remy Boys', load: async () => (await import('../songs/stupidsong')).default },
   { id: 'remy:dracula', artist: 'Remy Boys', load: async () => (await import('../songs/dracula')).default },
-  // The year-end top 5 of the Billboard Hot 100 for 2012, as 16-bit remakes in chart order.
+  // Originals after the 2012 Billboard year-end top 5, in chart order (the top 3 under their own titles).
   { id: 'remy:somebody', artist: 'Remy Boys', load: async () => (await import('../songs/somebody')).default },
   { id: 'remy:callmemaybe', artist: 'Remy Boys', load: async () => (await import('../songs/callmemaybe')).default },
   { id: 'remy:weareyoung', artist: 'Remy Boys', load: async () => (await import('../songs/weareyoung')).default },

@@ -66,7 +66,7 @@ export const SLOT_COUNT = SLOT_BASE[SLOT_BASE.length - 1] + EVENT_COUNTS[EVENT_C
 export const slotOf = (event: number, index = 0) => SLOT_BASE[event] + index
 
 export type Layer = -1 | 0 | 1
-export type ColliderKind = 'post' | 'drop' | 'gate'
+export type ColliderKind = 'post' | 'drop' | 'gate' | 'plunger'
 
 // event -1 = plain wall. impulse = extra outward speed (px/s) added on contact (slings, bumpers).
 export interface Segment {
@@ -196,10 +196,19 @@ export const RAMP = {
   ] as readonly (readonly [number, number])[]
 } as const
 
+// Keep at least 19 px between each sling back and the tangent-welded in-lane guide (ball diameter 15 px).
 export const SLINGS = [
-  { a: [60, 284], b: [60, 322], c: [100, 346] },
-  { a: [290, 284], b: [290, 322], c: [250, 346] }
+  { a: [60, 284], b: [60, 311], c: [100, 335] },
+  { a: [290, 284], b: [290, 311], c: [250, 335] }
 ] as const
+
+// Upper tangent from the existing in-lane endpoint to the fixed pivot circle.
+// This joins the pivot without a V-notch and preserves clearance to the slingshot back.
+const INLANE_START_Y = 330
+const INLANE_ANGLE = Math.atan2(FLIPPERS[0].y - INLANE_START_Y, FLIPPERS[0].x - 40) -
+  Math.asin(FLIPPERS[0].radius / Math.hypot(FLIPPERS[0].x - 40, FLIPPERS[0].y - INLANE_START_Y))
+const INLANE_JOIN_X = FLIPPERS[0].x + Math.sin(INLANE_ANGLE) * FLIPPERS[0].radius
+const INLANE_JOIN_Y = FLIPPERS[0].y - Math.cos(INLANE_ANGLE) * FLIPPERS[0].radius
 
 export const SEGMENTS: readonly Segment[] = [
   // cabinet
@@ -208,13 +217,13 @@ export const SEGMENTS: readonly Segment[] = [
   W(LANE_WALL, LANE_WALL_TOP, LANE_WALL, 430, 0.3),
   W(LANE_WALL + 2, LANE_WALL_TOP, LANE_WALL + 2, 430, 0.3),
   // left in/out-lane guide and flipper apron
-  W(40, 290, 40, 330),
-  W(40, 330, 113, 368, 0.2),
+  W(40, 290, 40, INLANE_START_Y),
+  W(40, INLANE_START_Y, INLANE_JOIN_X, INLANE_JOIN_Y, 0.2),
   W(12, 384, 40, 400, 0.2),
   W(40, 400, 108, 416, 0.2),
   // right
-  W(310, 290, 310, 330),
-  W(310, 330, 237, 368, 0.2),
+  W(310, 290, 310, INLANE_START_Y),
+  W(310, INLANE_START_Y, PLAYFIELD_CENTRE * 2 - INLANE_JOIN_X, INLANE_JOIN_Y, 0.2),
   W(338, 384, 310, 400, 0.2),
   W(310, 400, 242, 416, 0.2),
   // slingshot backs (kicking faces are below with impulse)
@@ -264,14 +273,18 @@ export const SEGMENTS: readonly Segment[] = [
   T(182, 250, 196, 250, EventType.Drop, 2, 'drop'),
   // out-lane ball-save gates (kind 'gate': solid only while Physics.gates bit index is set)
   { ...T(LEFT_WALL, 288, 40, 288, -1, 0, 'gate'), restitution: 0.9, impulse: 500 },
-  { ...T(310, 288, LANE_WALL, 288, -1, 1, 'gate'), restitution: 0.9, impulse: 500 }
+  { ...T(310, 288, LANE_WALL, 288, -1, 1, 'gate'), restitution: 0.9, impulse: 500 },
+  // shooter lane floor at the plunger tip (kind 'plunger': solid only while not tilted, so a tilted ball drains)
+  { ...W(LANE_WALL + 2, PLUNGER.top, RIGHT_WALL, PLUNGER.top, 0.18), kind: 'plunger' }
 ]
 
 export const CIRCLES: readonly Circle[] = [
   { x: 205, y: 112, radius: 14, layer: 0, event: EventType.Bumper, index: 0, restitution: 0.7, impulse: 380 },
   { x: 247, y: 112, radius: 14, layer: 0, event: EventType.Bumper, index: 1, restitution: 0.7, impulse: 380 },
-  { x: 226, y: 146, radius: 14, layer: 0, event: EventType.Bumper, index: 2, restitution: 0.7, impulse: 380 },
-  { x: 285, y: 88, radius: 11, layer: 0, event: EventType.Satellite, index: 0, restitution: 0.7, impulse: 320 },
+  // Keep the lower bumper clear of both upper expanded circles: otherwise their union encloses a ball-sized island.
+  { x: 226, y: 158, radius: 14, layer: 0, event: EventType.Bumper, index: 2, restitution: 0.7, impulse: 380 },
+  // At least 19 px raw clearance beneath the launch guide, not a sub-diameter pocket above the Satellite.
+  { x: 297, y: 119, radius: 11, layer: 0, event: EventType.Satellite, index: 0, restitution: 0.7, impulse: 320 },
   // lane posts
   { x: 40, y: 290, radius: 3, layer: 0, event: -1, index: 0, restitution: 0.5, impulse: 0 },
   { x: 310, y: 290, radius: 3, layer: 0, event: -1, index: 1, restitution: 0.5, impulse: 0 },
@@ -282,7 +295,12 @@ export const CIRCLES: readonly Circle[] = [
 ]
 
 export const ARCS: readonly Arc[] = [
-  { x: ARCH.x, y: ARCH.y, radius: ARCH.radius, start: Math.PI, end: Math.PI * 2, layer: -1, event: -1, index: 0, restitution: 0.4, impulse: 0 },
+  // outer arch, split so the launch-orbit stretch rolls (restitution 0) instead of bouncing inward
+  { x: ARCH.x, y: ARCH.y, radius: ARCH.radius, start: Math.PI, end: Math.PI * 2 - 1.1, layer: -1, event: -1, index: 0, restitution: 0.4, impulse: 0 },
+  { x: ARCH.x, y: ARCH.y, radius: ARCH.radius, start: Math.PI * 2 - 1.1, end: Math.PI * 2 - 0.25, layer: -1, event: -1, index: 0, restitution: 0, impulse: 0 },
+  { x: ARCH.x, y: ARCH.y, radius: ARCH.radius, start: Math.PI * 2 - 0.25, end: Math.PI * 2, layer: -1, event: -1, index: 0, restitution: 0.4, impulse: 0 },
+  // launch inner guide: with the arch it forms the shooter orbit from the plunger lane lip to the re-entry lanes
+  { x: ARCH.x, y: ARCH.y, radius: 159.5, start: -1.1, end: -0.25, layer: 0, event: -1, index: 0, restitution: 0, impulse: 0 },
   // ramp U-turn outer rail
   { x: RAMP.turn.x, y: RAMP.turn.y, radius: RAMP.turn.outer, start: Math.PI, end: Math.PI * 2, layer: 1, event: -1, index: 0, restitution: 0.3, impulse: 0 }
 ]

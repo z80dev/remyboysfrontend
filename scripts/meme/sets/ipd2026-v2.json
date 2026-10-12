@@ -1,0 +1,75 @@
+{
+  "provider": "codex",
+  "codexModel": "gpt-6-luna",
+  "model": "openai/gpt-image-2.5-flare",
+  "quality": "high",
+  "style": "Hand-painted gouache storybook illustration with visible brush strokes, textured watercolour-paper grain, confident dark ink linework, rich warm colour and painterly light; comedic, expressive staging like a great meme panel. The characters are 'Remy' chibi anime characters copied from the reference images: big round heads, VERY LARGE glossy anime eyes (each eye about a fifth of the face width, dark irises with big white catch-light highlights), thick straight black eyebrows angled down, tiny nose, small mouth, small bodies. Keep each character's hair colour, hairstyle, skin tone and shirt recognisable, and paint them with arms, hands and big expressive poses. Every Remy is a boy, including the long-haired ones: only boys' clothes (t-shirts, sweatshirts, jeans, cargo pants, shorts, sneakers), never skirts or dresses. The bald Remy in the white martial-arts gi plays Columbus: completely bald, smug or pathetic. Ignore the references' photo backgrounds and props like swords. No text, letters, logos or watermarks unless the prompt asks for exact words. Never depict Native people in feathered headdresses, costumes or stereotypes.",
+  "jobs": [
+    {
+      "name": "v2-gps",
+      "aspect": "1:1",
+      "refs": [1217],
+      "prompt": "On the deck of an old wooden sailing ship on open sea, the bald Remy in the white gi squints at a glowing smartphone held at arm's length, deeply confused, a paper map tucked upside down under his other arm, a seagull sitting on his bald head. Leave the top 35% of the image as open sky (a navigation banner is overlaid there)."
+    },
+    {
+      "name": "v2-uber",
+      "aspect": "1:1",
+      "refs": [42, 1217],
+      "prompt": "Inside a modern car at night, seen from the dashboard. The red-haired Remy is the driver, turned around in his seat with a dead-eyed, completely done expression. In the back seat the bald Remy in the white gi smugly pushes a tiny white flag into the cupholder, as if claiming the car. Keep the bottom 35% of the image simple and dark (a review card is overlaid there)."
+    },
+    {
+      "name": "v2-ring",
+      "aspect": "1:1",
+      "refs": [1217],
+      "prompt": "Painted as a fisheye doorbell security camera view at night with a green-grey night-vision tint and slight glow: a cozy wooden house's front porch and lawn. The bald Remy in the white gi is caught mid-sneak, planting a little white flag in the doormat, staring straight up into the camera with glowing night-vision eyes, frozen like a raccoon."
+    },
+    {
+      "name": "v2-mugshot",
+      "aspect": "1:1",
+      "refs": [1217],
+      "prompt": "Sepia old-west style portrait of the bald Remy in the white gi, head and shoulders, centred, smug shifty expression with one eyebrow raised, plain warm parchment background (it goes inside a wanted poster)."
+    },
+    {
+      "name": "v2-dating",
+      "aspect": "2:3",
+      "refs": [1217],
+      "prompt": "Cringe dating-profile photo: the bald Remy in the white gi strikes a try-hard pose on the bow of an old sailing ship at sunset, one foot up on a barrel, flexing, wearing small rectangular sunglasses, holding a compass like it's impressive. Keep the bottom 40% of the image simple (profile text is overlaid there)."
+    },
+    {
+      "name": "v2-landlord",
+      "aspect": "1:1",
+      "refs": [1217, 127],
+      "prompt": "Front door of a well-built wooden house with a garden. The bald Remy in the white gi stands on the step holding a blank clipboard and pen, smugly tapping it like a landlord collecting rent. The blond-haired Remy in a black t-shirt has just opened the door, holding a bowl of cereal, staring at him with absolute disbelief. Keep the top 25% simple (speech bubbles go there)."
+    },
+    {
+      "name": "v2-bouncer",
+      "aspect": "1:1",
+      "refs": [42, 1217],
+      "prompt": "Nightclub entrance at night with a velvet rope and neon glow. The red-haired Remy, as the bouncer in a black t-shirt with an earpiece and a clipboard, blocks the door with one hand up, stone-faced. The bald Remy in the white gi is in front of the rope, pointing at himself indignantly like 'do you know who I am'. Keep the top 25% simple (speech bubbles go there)."
+    },
+    {
+      "name": "v2-calendar",
+      "aspect": "1:1",
+      "refs": [1217],
+      "prompt": "At night in bed, the bald Remy in the white gi is lit only by the cold glow of his phone, which he holds up to his face; his huge anime eyes are wide with horror and welling with tears, mouth trembling, a single dramatic tear running down. Keep the right 40% of the image dark and simple (a phone notification is overlaid there)."
+    },
+    {
+      "name": "v2-chad",
+      "aspect": "2:3",
+      "refs": [42],
+      "prompt": "Heroic low-angle shot: the red-haired Remy stands supremely confident and buff for a chibi, arms crossed, cool sunglasses, golden sunlight, in front of a magnificent ancient city of great stepped pyramids, canals with boats, causeways and lush floating farm plots stretching to the mountains. Epic and glorious."
+    },
+    {
+      "name": "v2-virgin",
+      "aspect": "2:3",
+      "refs": [1217],
+      "prompt": "The bald Remy in the white gi sits hunched in a tiny leaking rowboat in grey drizzle, holding a map upside down, utterly lost and pathetic, a seagull pecking his bald head, one sock floating in the water. Gloomy and miserable."
+    },
+    {
+      "name": "v2-sad",
+      "aspect": "1:1",
+      "refs": [1217, 127, 39, 143],
+      "prompt": "Rainy night street. The bald Remy in the white gi sits alone on the curb in the pouring rain, soaked, holding a single deflated party balloon, staring at the ground in total despair. Behind him, through a big warm glowing window, a crowd of hairy Remy boys throws an amazing party with confetti and food, having the time of their lives. Keep the top 22% simple."
+    }
+  ]
+}

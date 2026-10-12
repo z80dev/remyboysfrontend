@@ -1,4 +1,4 @@
-import { MAP_SIZE, Tile, index, opposite, turnLeft, turnRight, type Actor, type Direction, type Level, type State } from './types'
+import { Tile, index, opposite, turnLeft, turnRight, type Actor, type Direction, type Level, type State } from './types'
 export { Tile, MAP_SIZE, TICK_MS, index } from './types'
 export type { State, Level, Direction, Actor, MonsterKind } from './types'
 
@@ -20,7 +20,7 @@ export function createState(level: Level): State {
   return {
     level, tiles: Array.from(level.bottom), actors, player, keys: [0, 0, 0, 0], boots: [false, false, false, false],
     chipsLeft: level.chips, timeLeft: level.time, tick: 0, rng: (level.seed ?? level.number * 7919) >>> 0,
-    status: 'playing', events: [], thief: false, randomForce: 0, lastMoveForced: false
+    status: 'playing', events: [], thief: false, lastMoveForced: false
   }
 }
 
@@ -62,8 +62,9 @@ function allowed(s: State, a: Actor, dir: Direction, pos = a.pos, reveal = false
   if (tile === Tile.Clone) return false
   if (a.kind !== 'player') {
     if (tile === Tile.Dirt || tile === Tile.Gravel || tile === Tile.Chip || tile === Tile.Socket || tile === Tile.Exit ||
-      tile === Tile.Hint || tile === Tile.FakeBlueWall || tile === Tile.RecessedWall || tile >= Tile.BlueDoor && tile <= Tile.YellowDoor) return false
+      tile === Tile.Hint || tile === Tile.FakeBlueWall || tile === Tile.Popup || tile === Tile.RecessedWall || tile >= Tile.BlueDoor && tile <= Tile.YellowDoor) return false
     if (tile === Tile.Fire && a.kind !== 'fireball' && a.kind !== 'block') return false
+    if (tile === Tile.ForceRandom && a.kind !== 'block') return false
   } else {
     if (tile === Tile.Socket && s.chipsLeft > 0) return false
     if (tile >= Tile.BlueDoor && tile <= Tile.YellowDoor && !s.keys[tile - Tile.BlueDoor]) return false
@@ -166,10 +167,8 @@ function arrive(s: State, a: Actor, teleport = true) {
       s.status = 'won'
       s.events.push('exit')
     }
-  } else if (tile >= Tile.BlueKey && tile <= Tile.YellowKey) {
-    // MS monsters destroy blue keys, but leave other keys and boots intact.
-    if (tile === Tile.BlueKey && a.kind !== 'block') s.tiles[a.pos] = Tile.Floor
   }
+  if (tile === Tile.ForceRandom && (!isPlayer || !s.boots[3])) a.dir = random(s) as Direction
   if (tile === Tile.Trap) a.trapped = !trapOpen(s, a.pos)
   press(s, tile, a.pos)
   if (tile === Tile.Teleport && teleport && a.alive && s.status === 'playing') {
@@ -226,37 +225,40 @@ function forced(s: State, a: Actor): Direction | undefined {
     return dir
   }
   if (tile >= Tile.ForceN && tile <= Tile.ForceRandom && !(a.kind === 'player' && s.boots[3])) {
-    return tile === Tile.ForceRandom ? s.randomForce : (tile - Tile.ForceN) as Direction
+    return tile === Tile.ForceRandom ? a.dir : (tile - Tile.ForceN) as Direction
   }
   return undefined
 }
 
-/** Exactly one deterministic 200ms game tick. No wall clock, DOM or audio dependencies. */
+/** Exactly one deterministic 100ms physics tick; ordinary movement is every other tick. */
 export function step(s: State, input?: Direction): State {
   s.events.length = 0
   if (s.status !== 'playing') return s
   s.tick++
-  s.randomForce = random(s) as Direction
-  if (s.level.time > 0 && s.tick % 5 === 0) {
+  if (input !== undefined) s.queuedInput = input
+  if (s.level.time > 0 && s.tick % 10 === 0) {
     s.timeLeft--
     if (s.timeLeft <= 0) { kill(s, 'time'); return s }
     if (s.timeLeft < 15) s.events.push('tick')
   }
   const player = s.player
   const push = forced(s, player)
+  const direction = s.queuedInput
   if (push !== undefined) {
     const onIce = iceTiles.has(s.tiles[player.pos])
     // In MS, any legal direction may override a force floor after an involuntary move.
-    if (!onIce && s.lastMoveForced && input !== undefined && allowed(s, player, input)) {
-      move(s, player, input)
+    if (!onIce && s.lastMoveForced && direction !== undefined && allowed(s, player, direction)) {
+      move(s, player, direction)
       s.lastMoveForced = false
     } else {
       if (!move(s, player, push) && onIce) move(s, player, opposite(push))
       s.lastMoveForced = true
     }
-  } else if (input !== undefined) {
-    move(s, player, input)
+    s.queuedInput = undefined
+  } else if (s.tick % 2 === 0 && direction !== undefined) {
+    move(s, player, direction)
     s.lastMoveForced = false
+    s.queuedInput = undefined
   }
   if (s.status !== 'playing') return s
   for (const a of s.actors) {
@@ -266,7 +268,7 @@ export function step(s: State, input?: Direction): State {
       if (!move(s, a, slide) && iceTiles.has(s.tiles[a.pos])) move(s, a, opposite(slide))
       continue
     }
-    if (a.kind === 'block' || (a.kind === 'blob' || a.kind === 'teeth') && s.tick % 2 !== 0) continue
+    if (a.kind === 'block' || s.tick % 2 !== 0 || (a.kind === 'blob' || a.kind === 'teeth') && s.tick % 4 !== 0) continue
     let first: Direction = a.dir
     let second: Direction = a.dir
     let third: Direction = a.dir

@@ -33,3 +33,7 @@ export const CARD_BACKS = [
   { id: 11, name: 'Haunted Remys', animated: false },
   { id: 12, name: 'My Remy…', animated: false },
 ] as const
+
+export const CARD_HELP_TABS = ['Rules', 'Scoring', 'Keyboard', 'Tips'] as const
+export const CARD_HELP_LABEL = 'Help sections'
+export const CARD_HELP_SUFFIX = ' Help'

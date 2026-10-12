@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  ARCH, BALL_RADIUS, CIRCLES, EventType, FLIPPERS, KICKER_HOLD, LANE_WALL_TOP, LAUNCH, LEFT_WALL,
-  RAMP, RIGHT_WALL, SEGMENTS, SENSORS, TABLE_HEIGHT, slotOf
+  ARCH, ARCS, BALL_RADIUS, CIRCLES, EventType, FLIPPERS, KICKER_HOLD, LANE_WALL_TOP, LAUNCH, LEFT_WALL,
+  RAMP, RIGHT_WALL, SEGMENTS, SENSORS, SLINGS, TABLE_HEIGHT, slotOf
 } from '../../src/games/pinball/geometry'
 import {
-  createPhysics, GRAVITY, launchBall, MAX_BALL_SPEED, nudgePhysics, PHYSICS_STEP,
+  advanceDrag, applyFlipperInput, createPhysics, dragBall, GRAVITY, launchBall, MAX_BALL_SPEED, nudgePhysics, PHYSICS_STEP,
   resetBall, stepPhysics, sweepArc, sweepCircle, sweepSegment,
   type Collision, type Physics
 } from '../../src/games/pinball/physics'
@@ -69,6 +69,22 @@ describe('continuous collision primitives', () => {
     expect(overlap.time).toBe(0)
     expect(overlap.penetration).toBeCloseTo(3.5)
     expect(overlap.normalY).toBe(-1)
+  })
+
+  test('zero-time separating and tangential contacts are ignored unless penetration needs correction', () => {
+    const separating = collision(PHYSICS_STEP)
+    sweepSegment(separating, 50, -BALL_RADIUS, 20, -10, 0, 0, 100, 0, BALL_RADIUS)
+    expect(separating.time).toBe(PHYSICS_STEP)
+    const tangent = collision(PHYSICS_STEP)
+    sweepSegment(tangent, 50, -BALL_RADIUS, 20, 0, 0, 0, 100, 0, BALL_RADIUS)
+    expect(tangent.time).toBe(PHYSICS_STEP)
+    const overlapping = collision(PHYSICS_STEP)
+    sweepSegment(overlapping, 50, -4, 20, -10, 0, 0, 100, 0, BALL_RADIUS)
+    expect(overlapping.time).toBe(0)
+    expect(overlapping.penetration).toBeCloseTo(3.5)
+    const circleTangent = collision(PHYSICS_STEP)
+    sweepCircle(circleTangent, -20, 0, 0, 2000, 0, 0, 20)
+    expect(circleTangent.time).toBe(PHYSICS_STEP)
   })
 
   test('circle detects maximum speed contact and ignores motion away', () => {
@@ -141,6 +157,262 @@ describe('pooled deterministic table simulation', () => {
     expect(full.ball.y).toBe(y)
   })
 
+  test('weak plunger shots return to the shooter floor without draining or charging a ball', () => {
+    const p = createPhysics()
+    launchBall(p, 0.08)
+    stepPhysics(p, 3, false, false)
+    expect(events(p, EventType.Drain)).toBe(0)
+    expect(p.reseated).toBe(true)
+    expect(p.ball.active).toBe(false)
+    expect(p.ball.x).toBe(LAUNCH.x)
+    expect(p.ball.y).toBe(LAUNCH.y)
+    launchBall(p, 1)
+    expect(p.reseated).toBe(false)
+    expect(p.ball.active).toBe(true)
+    expect(p.ball.vy).toBe(-MAX_BALL_SPEED)
+  })
+
+  test('a tilted ball skips the shooter floor and drains instead of re-seating', () => {
+    const p = createPhysics()
+    place(p, LAUNCH.x, LAUNCH.y, 0, 300)
+    p.tilted = true
+    stepPhysics(p, 0.2, false, false)
+    expect(p.reseated).toBe(false)
+    expect(p.ball.active).toBe(false)
+    expect(events(p, EventType.Drain)).toBe(1)
+  })
+
+  test('input preview responds immediately without advancing actual angles, ball, clock or pending events', () => {
+    const p = createPhysics()
+    const ball = { ...p.ball }
+    p.contacts[0] = EventType.Spot
+    p.contacts[1] = 1
+    p.eventCount = 1
+    applyFlipperInput(p, true, true)
+    expect(p.leftAngle).toBe(FLIPPERS[0].rest)
+    expect(p.rightAngle).toBe(FLIPPERS[1].rest)
+    expect(p.visualLeftAngle).toBeCloseTo(FLIPPERS[0].rest - 30 * PHYSICS_STEP, 12)
+    expect(p.visualRightAngle).toBeCloseTo(FLIPPERS[1].rest + 30 * PHYSICS_STEP, 12)
+    expect(p.ball).toEqual(ball)
+    expect(p.time).toBe(0)
+    expect(events(p, EventType.Spot, 1)).toBe(1)
+    const preview = p.visualLeftAngle
+    applyFlipperInput(p, true, true)
+    expect(p.visualLeftAngle).toBe(preview)
+    p.eventCount = 0
+    stepPhysics(p, PHYSICS_STEP, true, true)
+    expect(p.leftAngle).toBe(preview)
+    expect(p.visualLeftAngle).toBe(p.leftAngle)
+    expect(p.visualRightAngle).toBe(p.rightAngle)
+  })
+
+  test('test drag sweeps every spot, engine and hazard target without wall response', () => {
+    for (let index = 0; index < 3; index++) {
+      for (const event of [EventType.Spot, EventType.Engine, EventType.LeftHazard, EventType.RightHazard, EventType.Drop]) {
+        const p = createPhysics()
+        const target = SEGMENTS.find(s => s.event === event && s.index === index)!
+        const x = (target.ax + target.bx) / 2
+        const y = (target.ay + target.by) / 2
+        const length = Math.hypot(target.bx - target.ax, target.by - target.ay)
+        const nx = (target.by - target.ay) / length
+        const ny = -(target.bx - target.ax) / length
+        place(p, x + nx * 25, y + ny * 25, 500, 500)
+        dragBall(p, x - nx * 25, y - ny * 25)
+        expect(events(p, event, index)).toBe(1)
+        expect(p.ball.x).toBeCloseTo(x - nx * 25, 10)
+        expect(p.ball.y).toBeCloseTo(y - ny * 25, 10)
+        expect(p.ball.vx).toBe(0)
+        expect(p.ball.vy).toBe(0)
+        expect(p.capturedBy).toBe(-1)
+        expect(p.time).toBe(0)
+      }
+    }
+  })
+
+  test('fast target-bank drag emits contacts in travel order and appends across pointer moves', () => {
+    for (const down of [true, false]) {
+      const p = createPhysics()
+      place(p, 42, down ? 150 : 225)
+      dragBall(p, 42, down ? 225 : 150)
+      const indices: number[] = []
+      for (let i = 0; i < p.eventCount; i++) if (p.contacts[i * 2] === EventType.Spot) indices.push(p.contacts[i * 2 + 1])
+      expect(indices).toEqual(down ? [0, 1, 2] : [2, 1, 0])
+      const count = p.eventCount
+      dragBall(p, 70, p.ball.y)
+      expect(p.eventCount).toBeGreaterThanOrEqual(count)
+      expect(events(p, EventType.Spot)).toBe(3)
+    }
+  })
+
+  test('dragged bumpers can repeatedly score by leaving and re-entering, without applying impulse', () => {
+    const p = createPhysics()
+    const c = CIRCLES.find(c => c.event === EventType.Bumper && c.index === 0)!
+    place(p, c.x - 30, c.y)
+    dragBall(p, c.x, c.y)
+    expect(events(p, EventType.Bumper, 0)).toBe(1)
+    dragBall(p, c.x + 1, c.y)
+    expect(events(p, EventType.Bumper, 0)).toBe(1)
+    dragBall(p, c.x - 30, c.y)
+    advanceDrag(p, 0.13, false, false)
+    dragBall(p, c.x, c.y)
+    expect(events(p, EventType.Bumper, 0)).toBe(2)
+    for (let hit = 2; hit < 8; hit++) {
+      dragBall(p, c.x - 30, c.y)
+      advanceDrag(p, 0.13, false, false)
+      dragBall(p, c.x, c.y)
+    }
+    expect(events(p, EventType.Bumper, 0)).toBe(8)
+    expect(p.ball.x).toBe(c.x)
+    expect(p.ball.y).toBe(c.y)
+    expect(p.ball.vx).toBe(0)
+    expect(p.ball.vy).toBe(0)
+  })
+
+  test('three dragged drop banks count nine targets after each completed bank is reset', () => {
+    const p = createPhysics()
+    place(p, 140, 270)
+    for (let bank = 0; bank < 3; bank++) {
+      p.dropTargets = 0
+      dragBall(p, 140, 250)
+      dragBall(p, 200, 250)
+      expect(p.dropTargets).toBe(7)
+      dragBall(p, 220, 270)
+      dragBall(p, 140, 270)
+      advanceDrag(p, 0.13, false, false)
+    }
+    expect(events(p, EventType.Drop)).toBe(9)
+    for (let index = 0; index < 3; index++) expect(events(p, EventType.Drop, index)).toBe(3)
+  })
+
+  test('seventy-five held-drag flag passes count seventy-five completed spinner revolutions', () => {
+    const p = createPhysics()
+    place(p, 325, 220)
+    for (let spin = 0; spin < 75; spin++) {
+      dragBall(p, 325, 240)
+      dragBall(p, 325, 220)
+      advanceDrag(p, 0.13, false, false)
+    }
+    expect(events(p, EventType.Spinner)).toBe(75)
+    expect(p.spinnerAngle).toBeCloseTo(75 * Math.PI * 2, 8)
+    expect(p.capturedBy).toBe(-1)
+    expect(p.ball.vx).toBe(0)
+    expect(p.ball.vy).toBe(0)
+  })
+
+  test('all kickout and wormhole drag crossings score but never capture or eject the held ball', () => {
+    for (const s of SENSORS) {
+      if (s.kind !== 'kicker') continue
+      const p = createPhysics()
+      place(p, Math.max(BALL_RADIUS, s.x - 30), s.y)
+      p.capturedBy = SENSORS.indexOf(s)
+      p.releaseAt = Infinity
+      dragBall(p, s.x + 30, s.y)
+      expect(events(p, s.event, s.index)).toBe(1)
+      expect(p.capturedBy).toBe(-1)
+      expect(p.releaseAt).toBe(0)
+      expect(p.ball.x).toBe(s.x + 30)
+      expect(p.ball.y).toBe(s.y)
+      expect(p.ball.vx).toBe(0)
+      expect(p.ball.vy).toBe(0)
+    }
+  })
+
+  test('dragged ramp mouth, apex and descending exit switch layers in swept travel order', () => {
+    const p = createPhysics()
+    place(p, RAMP.upX, RAMP.bottom + 20)
+    dragBall(p, RAMP.upX, RAMP.turn.y - 20)
+    expect(p.ball.layer).toBe(1)
+    expect(p.ball.height).toBe(1)
+    expect(events(p, EventType.Ramp)).toBe(1)
+    p.eventCount = 0
+    dragBall(p, RAMP.downX, RAMP.exitY + 20)
+    expect(p.ball.layer).toBe(0)
+    expect(p.ball.height).toBe(0)
+  })
+
+  test('incremental 2, 5, 10 and 40 px pointer drags enter the physical ramp mouth and score its apex', () => {
+    for (const increment of [2, 5, 10, 40]) {
+      const p = createPhysics()
+      place(p, RAMP.upX, 300)
+      let y = 300
+      while (y > RAMP.turn.y - 20) {
+        y = Math.max(RAMP.turn.y - 20, y - increment)
+        dragBall(p, RAMP.upX, y)
+        expect(p.ball.layer).toBe(y > RAMP.bottom ? 0 : 1)
+      }
+      expect(p.ball.height).toBe(1)
+      expect(events(p, EventType.Ramp, 0)).toBe(1)
+    }
+  })
+
+  test('leaving the raised ramp during the same drag immediately enables ground target hits', () => {
+    const p = createPhysics()
+    place(p, RAMP.upX, RAMP.bottom + 20)
+    dragBall(p, RAMP.upX, RAMP.bottom - 6)
+    expect(p.ball.layer).toBe(1)
+    p.eventCount = 0
+    dragBall(p, 42, 167)
+    expect(p.ball.layer).toBe(0)
+    expect(p.ball.height).toBe(0)
+    expect(events(p, EventType.Spot, 0)).toBe(1)
+    dragBall(p, 70, 189)
+    dragBall(p, 42, 189)
+    expect(events(p, EventType.Spot, 1)).toBe(1)
+  })
+
+  test('proper raised-ramp mouth, curved apex and down-lane remain raised until the exit', () => {
+    const p = createPhysics()
+    place(p, RAMP.upX, RAMP.bottom + 20)
+    dragBall(p, RAMP.upX, RAMP.turn.y)
+    expect(p.ball.layer).toBe(1)
+    dragBall(p, RAMP.upX, RAMP.turn.y - 20)
+    expect(p.ball.layer).toBe(1)
+    dragBall(p, RAMP.turn.x, RAMP.turn.y - 20)
+    expect(p.ball.layer).toBe(1)
+    expect(events(p, EventType.Ramp)).toBe(1)
+    dragBall(p, RAMP.downX, RAMP.turn.y)
+    expect(p.ball.layer).toBe(1)
+    dragBall(p, RAMP.downX, RAMP.exitY + 20)
+    expect(p.ball.layer).toBe(0)
+    expect(p.ball.height).toBe(0)
+  })
+
+  test('test drag clock uses fixed ticks and preserves ball position and the pending event queue', () => {
+    const p = createPhysics()
+    place(p, 70, 167)
+    dragBall(p, 42, 167)
+    const ball = { ...p.ball }
+    const count = p.eventCount
+    const contactPool = p.contacts
+    const sweepPool = p.dragTimes
+    const insidePool = p.dragInside
+    advanceDrag(p, PHYSICS_STEP / 2, true, false)
+    expect(p.time).toBe(0)
+    advanceDrag(p, PHYSICS_STEP / 2, true, false)
+    expect(p.time).toBe(PHYSICS_STEP)
+    expect(p.ball).toEqual(ball)
+    expect(p.eventCount).toBe(count)
+    expect(events(p, EventType.Spot, 0)).toBe(1)
+    expect(p.leftAngle).toBeCloseTo(FLIPPERS[0].rest - 30 * PHYSICS_STEP, 12)
+    advanceDrag(p, 8, true, false)
+    expect(p.ball).toEqual(ball)
+    expect(p.searchCount).toBe(0)
+    expect(p.eventCount).toBe(count)
+    expect(p.contacts).toBe(contactPool)
+    expect(p.dragTimes).toBe(sweepPool)
+    expect(p.dragInside).toBe(insidePool)
+  })
+
+  test('test drag remains radius-bounded and never triggers the decorative drain circle', () => {
+    const p = createPhysics()
+    place(p, 175, 220)
+    dragBall(p, -100, 1000)
+    expect(p.ball.x).toBe(BALL_RADIUS)
+    expect(p.ball.y).toBe(TABLE_HEIGHT - BALL_RADIUS)
+    expect(p.ball.active).toBe(true)
+    expect(events(p, EventType.Drain)).toBe(0)
+  })
+
   test('arbitrary caller frame sizes produce the same fixed ticks and ball trajectory', () => {
     const a = createPhysics()
     const b = createPhysics()
@@ -189,6 +461,19 @@ describe('pooled deterministic table simulation', () => {
     expect(p.ball.vx).toBeGreaterThan(0)
   })
 
+  test('rolling launch guide removes normal impact without damping tangential orbit speed', () => {
+    const p = createPhysics()
+    const angle = -0.7
+    const nx = Math.cos(angle)
+    const ny = Math.sin(angle)
+    const radius = ARCH.radius - BALL_RADIUS - 0.001
+    place(p, ARCH.x + nx * radius, ARCH.y + ny * radius, ny * 1000 + nx * 200, -nx * 1000 + ny * 200)
+    stepPhysics(p, PHYSICS_STEP, false, false)
+    expect(Math.hypot(p.ball.vx, p.ball.vy)).toBeGreaterThan(995)
+    expect(Math.hypot(p.ball.vx, p.ball.vy)).toBeLessThan(1005)
+    expect(Math.hypot(p.ball.x - ARCH.x, p.ball.y - ARCH.y)).toBeLessThanOrEqual(ARCH.radius - BALL_RADIUS + 0.001)
+  })
+
   test('bumpers emit indexed contacts and add outward impulse', () => {
     const p = createPhysics()
     const bumper = CIRCLES.find(c => c.event === EventType.Bumper && c.index === 0)!
@@ -207,8 +492,9 @@ describe('pooled deterministic table simulation', () => {
     const length = Math.hypot(sling.bx - sling.ax, sling.by - sling.ay)
     const nx = (sling.by - sling.ay) / length
     const ny = -(sling.bx - sling.ax) / length
-    const x = (sling.ax + sling.bx) / 2 + nx * (BALL_RADIUS + 1)
-    const y = (sling.ay + sling.by) / 2 + ny * (BALL_RADIUS + 1)
+    // Isolate the sling impulse from the nearby hazard end cap and green kickout hole.
+    const x = sling.ax + (sling.bx - sling.ax) * 0.85 + nx * (BALL_RADIUS + 1)
+    const y = sling.ay + (sling.by - sling.ay) * 0.85 + ny * (BALL_RADIUS + 1)
     place(p, x, y, -nx * 200, -ny * 200)
     stepPhysics(p, 1 / 60, false, false)
     expect(events(p, EventType.Rebound, 0)).toBe(1)
@@ -299,6 +585,57 @@ describe('pooled deterministic table simulation', () => {
     expect(Math.hypot(p.ball.vx, p.ball.vy)).toBeLessThan(100)
   })
 
+  test('bumper geometry has no closed three-circle island or sub-diameter Satellite/launch-guide gap', () => {
+    const lower = CIRCLES.find(c => c.event === EventType.Bumper && c.index === 2)!
+    for (let index = 0; index < 2; index++) {
+      const upper = CIRCLES.find(c => c.event === EventType.Bumper && c.index === index)!
+      expect(Math.hypot(lower.x - upper.x, lower.y - upper.y) - lower.radius - upper.radius).toBeGreaterThanOrEqual(19)
+    }
+    const satellite = CIRCLES.find(c => c.event === EventType.Satellite)!
+    const guide = ARCS.find(a => a.x === ARCH.x && a.y === ARCH.y && a.radius < ARCH.radius)!
+    expect(guide.radius - Math.hypot(satellite.x - guide.x, satellite.y - guide.y) - satellite.radius).toBeGreaterThanOrEqual(19)
+  })
+
+  test('held drag inside a solid sling stays put, then release projects to the nearest external face', () => {
+    for (const x of [68, 69, 281, 282]) {
+      const p = createPhysics()
+      place(p, x, 307)
+      dragBall(p, x, 307)
+      const held = { ...p.ball }
+      advanceDrag(p, 0.2, false, false)
+      expect(p.ball).toEqual(held)
+      stepPhysics(p, PHYSICS_STEP, false, false)
+      expect(Math.hypot(p.ball.x - x, p.ball.y - 307)).toBeGreaterThan(14)
+      for (const s of SLINGS) {
+        const ab = (s.b[0] - s.a[0]) * (p.ball.y - s.a[1]) - (s.b[1] - s.a[1]) * (p.ball.x - s.a[0])
+        const bc = (s.c[0] - s.b[0]) * (p.ball.y - s.b[1]) - (s.c[1] - s.b[1]) * (p.ball.x - s.b[0])
+        const ca = (s.a[0] - s.c[0]) * (p.ball.y - s.c[1]) - (s.a[1] - s.c[1]) * (p.ball.x - s.c[0])
+        expect(ab >= 0 && bc >= 0 && ca >= 0 || ab <= 0 && bc <= 0 && ca <= 0).toBe(false)
+      }
+    }
+  })
+
+  test('reported central, Satellite and plastic birth positions cannot freeze through the final three seconds', () => {
+    for (const [x, y] of [[226, 121], [283, 69], [283, 70], [68, 307], [69, 307], [281, 307], [282, 307]]) {
+      const p = createPhysics()
+      place(p, x, y)
+      let minX = Infinity
+      let maxX = -Infinity
+      let minY = Infinity
+      let maxY = -Infinity
+      for (let tick = 0; tick < 18 * 480 && p.ball.active; tick++) {
+        stepPhysics(p, PHYSICS_STEP, false, false)
+        if (tick >= 15 * 480 && p.capturedBy < 0) {
+          minX = Math.min(minX, p.ball.x)
+          maxX = Math.max(maxX, p.ball.x)
+          minY = Math.min(minY, p.ball.y)
+          maxY = Math.max(maxY, p.ball.y)
+        }
+      }
+      if (p.ball.active && p.capturedBy < 0) expect(Math.hypot(maxX - minX, maxY - minY)).toBeGreaterThan(1)
+    }
+  }, 30000)
+
   test('ramp entrance switches collision layer only on an upward shot', () => {
     const p = createPhysics()
     place(p, RAMP.upX, RAMP.bottom - 6, 0, -700)
@@ -336,6 +673,91 @@ describe('pooled deterministic table simulation', () => {
     expect(ground.ball.x).toBeLessThan(84)
     expect(raised.ball.x).toBeGreaterThanOrEqual(84 + BALL_RADIUS - 0.001)
   })
+
+  test('both complete in-lane channels have at least 19 px raw clearance including end caps', () => {
+    // Geometry intentionally preserves these guide/back segment slots.
+    for (const [guideIndex, backIndex] of [[5, 13], [9, 15]]) {
+      const g = SEGMENTS[guideIndex]
+      const b = SEGMENTS[backIndex]
+      let clearance = Math.min(
+        segmentDistance(g.ax, g.ay, b.ax, b.ay, b.bx, b.by),
+        segmentDistance(g.bx, g.by, b.ax, b.ay, b.bx, b.by),
+        segmentDistance(b.ax, b.ay, g.ax, g.ay, g.bx, g.by),
+        segmentDistance(b.bx, b.by, g.ax, g.ay, g.bx, g.by)
+      )
+      const gx = g.bx - g.ax
+      const gy = g.by - g.ay
+      const bx = b.bx - b.ax
+      const by = b.by - b.ay
+      const determinant = gx * by - gy * bx
+      if (determinant !== 0) {
+        const t = ((b.ax - g.ax) * by - (b.ay - g.ay) * bx) / determinant
+        const u = ((b.ax - g.ax) * gy - (b.ay - g.ay) * gx) / determinant
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) clearance = 0
+      }
+      expect(clearance).toBeGreaterThanOrEqual(19)
+      expect(clearance - 2 * BALL_RADIUS).toBeGreaterThanOrEqual(4)
+    }
+  })
+
+  test('reported mirrored pivot-notch positions escape during twelve seconds of periodic flips', () => {
+    for (const x of [112.8, 237.2]) {
+      const p = createPhysics()
+      place(p, x, 359.4)
+      let furthest = 0
+      for (let tick = 0; tick < 12 * 480 && p.ball.active; tick++) {
+        const raised = tick % 960 < 160
+        stepPhysics(p, PHYSICS_STEP, raised, raised)
+        furthest = Math.max(furthest, Math.hypot(p.ball.x - x, p.ball.y - 359.4))
+      }
+      expect(furthest).toBeGreaterThan(30)
+    }
+  })
+
+  test('rest drops through both in-lanes reach a flipper within two seconds', () => {
+    for (const x of [50, 300]) {
+      const p = createPhysics()
+      place(p, x, 300)
+      let reached = false
+      for (let tick = 0; tick < 2 * 480 && p.ball.active; tick++) {
+        stepPhysics(p, PHYSICS_STEP, false, false)
+        for (let side = 0; side < 2; side++) {
+          const f = FLIPPERS[side]
+          const angle = side === 0 ? p.leftAngle : p.rightAngle
+          const gap = segmentDistance(p.ball.x, p.ball.y, f.x, f.y,
+            f.x + Math.cos(angle) * f.length, f.y + Math.sin(angle) * f.length)
+          // Sampled contact may have already rebounded by at most one fixed tick.
+          if (gap <= f.radius + BALL_RADIUS + MAX_BALL_SPEED * PHYSICS_STEP) reached = true
+        }
+        if (reached) break
+      }
+      expect(reached).toBe(true)
+    }
+  })
+
+  test('a grid of unheld rest drops never remains frozen for more than eight seconds', () => {
+    for (const x of [50, 95, 135, 175, 215, 255, 300]) {
+      for (const y of [100, 150, 200, 250, 300, 340]) {
+        const p = createPhysics()
+        place(p, x, y)
+        let anchorX = x
+        let anchorY = y
+        let stationarySince = p.time
+        for (let tick = 0; tick < 10 * 480 && p.ball.active; tick++) {
+          stepPhysics(p, PHYSICS_STEP, false, false)
+          if (p.capturedBy >= 0 || Math.hypot(p.ball.x - anchorX, p.ball.y - anchorY) > 8) {
+            anchorX = p.ball.x
+            anchorY = p.ball.y
+            stationarySince = p.time
+          }
+          // Allow a few fixed ticks for the eight-second search impulse to physically move the ball.
+          if (p.ball.active && p.time - stationarySince > 8.05) {
+            throw new Error(`Frozen rest drop (${x},${y}) at (${p.ball.x},${p.ball.y})`)
+          }
+        }
+      }
+    }
+  }, 30000)
 
   test('every kicker captures, emits its event, and ejects after its hold', () => {
     for (let index = 0; index < SENSORS.length; index++) {
@@ -391,6 +813,37 @@ describe('pooled deterministic table simulation', () => {
     stepPhysics(p, PHYSICS_STEP, false, false)
     expect(p.searchCount).toBe(1)
     expect(p.ball.vy).toBeLessThan(-600)
+  })
+
+  test('stationary rest contacts cannot indefinitely postpone the eight-second ball search', () => {
+    const p = createPhysics()
+    place(p, 175, 172 - BALL_RADIUS)
+    stepPhysics(p, 8.1, false, false)
+    expect(events(p, EventType.Engine, 1)).toBeGreaterThan(1)
+    expect(p.searchCount).toBe(1)
+    expect(p.time - p.lastContactTime).toBeLessThan(0.25)
+    expect(p.ball.y).toBeLessThan(172 - BALL_RADIUS - 20)
+  })
+
+  test('holding a remote flipper does not disable search for a stationary ball elsewhere', () => {
+    for (const left of [true, false]) {
+      const p = createPhysics()
+      place(p, 175, 172 - BALL_RADIUS)
+      stepPhysics(p, 8.1, left, !left)
+      expect(events(p, EventType.Engine, 1)).toBeGreaterThan(1)
+      expect(p.searchCount).toBe(1)
+      expect(p.ball.y).toBeLessThan(172 - BALL_RADIUS - 20)
+    }
+  })
+
+  test('an intentionally held flipper cradle is not interrupted by stationary search', () => {
+    const p = createPhysics()
+    place(p, 120, 354)
+    p.leftAngle = FLIPPERS[0].raised
+    stepPhysics(p, 8.2, true, false)
+    expect(p.searchCount).toBe(0)
+    expect(p.ball.active).toBe(true)
+    expect(Math.hypot(p.ball.x - 120, p.ball.y - 354)).toBeLessThan(10)
   })
 
   test('drain occurs below the playfield, exactly once; middle-table balls remain live', () => {

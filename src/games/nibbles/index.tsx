@@ -1,26 +1,27 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { AppProps } from '../../os/apps'
 import {
-  AboutDialog, ChooseRemyDialog, civRemy, GameDialog, GameMenuBar, loadPalette, unlockAudio,
+  AboutDialog, ChooseRemyDialog, civRemy, GameDialog, GameHelpTabs, GameMenuBar, loadPalette, unlockAudio,
   useAnimationFrame, useCrispCanvas, useGamesMuted, useGamesPlayer, useWindowFit, useWindowState, type GameMenu,
 } from '../kit'
-import { createInput, editInput, nearestEga, playMml, type InputLine, type MmlPlayback } from '../qbasic'
+import { createInput, editInput, quantizeRemyPalette, playMml, type InputLine, type MmlPlayback } from '../qbasic'
 import {
   continueGame, createGame, DEATH, DOWN, EAT, GAME_OVER, LEFT, LEVEL, pauseGame, queueTurn, RIGHT, stepGame, stepInterval, UP,
   type Direction, type Game, type Options,
 } from './engine'
+import { beginGesture, clickContinues, moveGesture, touchForInput, type Gesture } from './gestures'
 import { icon } from './icon'
 import { EAT_NUMBER, END_GAME, LEVEL_START, LOSE_LIFE } from './music/phrases'
 import { createPainter, type HeadColors, type Painter } from './render'
-import { deathAnnouncement, eatAnnouncement, levelMessage, strings } from './strings'
+import { deathAnnouncement, eatAnnouncement, levelMessage, scoreLine, strings } from './strings'
 import './nibbles.css'
 
 type Screen = 'startup' | 'intro' | 'setup' | 'game'
-type Gesture = { id: number; x: number; y: number; player: number }
 type Session = {
   screen: Screen
   prompt: number
   input: InputLine
+  answers: string[]
   invalid: boolean
   elapsed: number
   frame: number
@@ -36,12 +37,12 @@ type Session = {
 }
 
 export default function Nibbles({ close }: AppProps) {
-  const { active, hidden } = useWindowState()
+  const { active, hidden, pocket } = useWindowState()
   const fitWindow = useWindowFit()
   const { muted, toggleMuted } = useGamesMuted()
   const { player } = useGamesPlayer()
   const [session] = useState<Session>(() => ({
-    screen: 'startup', prompt: 0, input: createInput(1), invalid: false, elapsed: 0, frame: 0, accumulated: 0,
+    screen: 'startup', prompt: 0, input: createInput(1), answers: [], invalid: false, elapsed: 0, frame: 0, accumulated: 0,
     options: { players: 1, skill: 50, increaseSpeed: true, monochrome: false }, game: null, painter: null,
     heads: [{ hair: 6, skin: 14 }, { hair: 0, skin: 12 }],
     gestures: [{ id: -1, x: 0, y: 0, player: 0 }, { id: -1, x: 0, y: 0, player: 0 }],
@@ -52,7 +53,11 @@ export default function Nibbles({ close }: AppProps) {
   const [dialog, setDialog] = useState<'help' | 'about' | 'choose' | null>(null)
   const [helpTab, setHelpTab] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [touch, setTouch] = useState(() => window.innerWidth < 720)
+  const [lastTouch, setLastTouch] = useState(false)
+  const touch = pocket || lastTouch
+  const touchState = useRef(touch)
+  touchState.current = touch
+  const inputMode = (input: string) => setLastTouch((previous) => touchForInput(previous, input, false))
   const surface = useRef<HTMLDivElement>(null)
   const controls = useRef<HTMLDivElement>(null)
   const sound = useRef<MmlPlayback | null>(null)
@@ -68,9 +73,9 @@ export default function Nibbles({ close }: AppProps) {
     const painter = session.painter
     if (!context || !painter || lifecycle.current.hidden) return
     if (session.screen === 'startup') painter.startup(context)
-    else if (session.screen === 'intro') painter.intro(context, session.frame, session.heads[0])
-    else if (session.screen === 'setup') painter.setup(context, session.prompt, session.input, session.elapsed, session.invalid)
-    else if (session.game) painter.game(context, session.game, session.heads, session.showLore)
+    else if (session.screen === 'intro') painter.intro(context, session.frame, session.heads[0], touchState.current)
+    else if (session.screen === 'setup') painter.setup(context, session.prompt, session.answers, session.input, session.elapsed, session.invalid)
+    else if (session.game) painter.game(context, session.game, session.heads, session.showLore, touchState.current)
   }
   redraw.current = draw
   const changed = () => {
@@ -118,6 +123,7 @@ export default function Nibbles({ close }: AppProps) {
     session.screen = 'setup'
     session.prompt = 0
     session.input = createInput(1)
+    session.answers.length = 0
     session.invalid = false
     session.elapsed = 0
     session.accumulated = 0
@@ -157,6 +163,7 @@ export default function Nibbles({ close }: AppProps) {
       changed()
       return
     }
+    session.answers[step] = value
     if (step === 3) return start()
     session.prompt++
     session.input = createInput(session.prompt === 1 ? 3 : 1)
@@ -207,25 +214,29 @@ export default function Nibbles({ close }: AppProps) {
   }, [canvas])
 
   useEffect(() => {
-    const update = () => fitWindow(640, 422 + (touch ? controls.current?.offsetHeight ?? 0 : 0))
+    const update = () => fitWindow(640, 422 + (touch && !pocket ? controls.current?.offsetHeight ?? 0 : 0))
     update()
     const observer = new ResizeObserver(update)
     if (controls.current) observer.observe(controls.current)
-    return () => observer.disconnect()
-  }, [fitWindow, touch, screen, phase, session.prompt])
+    window.addEventListener('resize', update)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [fitWindow, pocket, touch, screen, phase, session.prompt])
 
-  useEffect(() => {
-    const resize = () => { if (window.innerWidth < 720) setTouch(true) }
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [])
+  useEffect(() => { draw() }, [touch])
 
   useEffect(() => {
     let cancelled = false
+    session.heads[0].hair = 6
+    session.heads[0].skin = 14
+    draw()
     loadPalette(player.remy).then((palette) => {
       if (cancelled) return
-      session.heads[0].hair = nearestEga(palette.hair)
-      session.heads[0].skin = nearestEga(palette.skin)
+      const colors = quantizeRemyPalette(palette)
+      session.heads[0].hair = colors.hair
+      session.heads[0].skin = colors.skin
       draw()
     }).catch(() => {})
     return () => { cancelled = true }
@@ -235,8 +246,9 @@ export default function Nibbles({ close }: AppProps) {
     let cancelled = false
     civRemy(42).then((index) => loadPalette(index)).then((palette) => {
       if (cancelled) return
-      session.heads[1].hair = nearestEga(palette.hair)
-      session.heads[1].skin = nearestEga(palette.skin)
+      const colors = quantizeRemyPalette(palette)
+      session.heads[1].hair = colors.hair
+      session.heads[1].skin = colors.skin
       draw()
     }).catch(() => {})
     return () => { cancelled = true }
@@ -250,7 +262,7 @@ export default function Nibbles({ close }: AppProps) {
     }
     draw()
     if (!dialog && !menuOpen) surface.current?.focus({ preventScroll: true })
-  }, [active, hidden, dialog, menuOpen])
+  }, [active, hidden, dialog, menuOpen, screen, phase])
 
   useEffect(() => {
     const blur = () => pause()
@@ -312,14 +324,15 @@ export default function Nibbles({ close }: AppProps) {
       } else if (result & EAT) {
         announce(eatAnnouncement(game) + (result & LEVEL ? ` ${levelMessage(game.level)}` : ''))
         phrase(EAT_NUMBER, true)
-        if (result & LEVEL) changed()
+        changed()
       }
     }
     if (moved) draw()
   }, { paused: screen !== 'game' || phase !== 'playing' || !!dialog || menuOpen })
 
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!active || hidden || dialog || menuOpen || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (!active || hidden || dialog || menuOpen || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.target instanceof HTMLInputElement) return
     if (event.key === 'Tab' || event.key === 'F1' || event.key === 'F2' || event.key === 'F10') return
     if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return
     let handled = false
@@ -327,8 +340,8 @@ export default function Nibbles({ close }: AppProps) {
       proceed()
       handled = true
     } else if (session.screen === 'setup') {
-      const edited = editInput(session.input, event.key.toUpperCase() === event.key ? event.key : event.key.length === 1 ? event.key.toUpperCase() : event.key,
-        session.prompt <= 1 ? /[0-9]/ : /[A-Z]/)
+      const key = event.key.length === 1 ? event.key.toUpperCase() : event.key
+      const edited = editInput(session.input, key, session.prompt <= 1 ? /[0-9]/ : /[A-Z]/)
       if (edited.submitted) submit()
       else if (edited.handled) {
         session.input = edited.input
@@ -378,73 +391,63 @@ export default function Nibbles({ close }: AppProps) {
     if (handled) event.preventDefault()
   }
 
-  const pointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (event.pointerType === 'touch') setTouch(true)
+  const pointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!active || hidden || dialog || menuOpen) return
     event.preventDefault()
     surface.current?.focus({ preventScroll: true })
-    if (session.screen === 'startup' || session.screen === 'intro') return proceed()
+    if (clickContinues(session.screen)) return
     const game = session.game
-    if (!game || game.phase === 'over') return
-    if (game.phase !== 'playing') return proceed()
-    for (const gesture of session.gestures) {
-      if (gesture.id !== -1) continue
-      const rect = event.currentTarget.getBoundingClientRect()
-      gesture.id = event.pointerId
-      gesture.x = event.clientX
-      gesture.y = event.clientY
-      gesture.player = game.options.players === 2 && event.clientX < rect.left + rect.width / 2 ? 1 : 0
+    if (!game) return
+    const rect = canvas.current?.getBoundingClientRect()
+    if (!rect) return
+    if (beginGesture(game, session.gestures, event.pointerId, event.clientX, event.clientY, rect.left + rect.width / 2, proceed)) {
       event.currentTarget.setPointerCapture(event.pointerId)
-      break
     }
   }
-  const pointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
+  const pointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!active || hidden || dialog || menuOpen || !session.game) return
-    for (const gesture of session.gestures) {
-      if (gesture.id !== event.pointerId) continue
-      const dx = event.clientX - gesture.x
-      const dy = event.clientY - gesture.y
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return
-      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? RIGHT : LEFT) : (dy > 0 ? DOWN : UP)
-      queueTurn(session.game, gesture.player, direction)
-      gesture.x = event.clientX
-      gesture.y = event.clientY
-      event.preventDefault()
-      return
-    }
+    if (moveGesture(session.game, session.gestures, event.pointerId, event.clientX, event.clientY)) event.preventDefault()
   }
-  const pointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
+  const pointerUp = (event: PointerEvent<HTMLDivElement>) => {
     pointerMove(event)
     for (const gesture of session.gestures) if (gesture.id === event.pointerId) gesture.id = -1
   }
 
   const menus: GameMenu[] = [
     { label: strings.game, items: [
-      { label: strings.new, hotkey: 'F2', onClick: setup },
-      { label: strings.pause, hotkey: 'P', accel: false, checked: phase === 'paused', disabled: phase !== 'playing', onClick: pause },
+      { label: strings.new, hotkey: strings.newKey, onClick: setup },
+      { label: strings.pause, hotkey: strings.pauseKey, accel: false, checked: phase === 'paused',
+        disabled: phase !== 'playing' && phase !== 'paused', onClick: () => session.game?.phase === 'paused' ? proceed() : pause() },
       '-', { label: strings.sound, checked: !muted, onClick: toggleMuted }, '-', { label: strings.exit, onClick: close },
     ] },
     { label: strings.options, items: [{ label: strings.choose, onClick: () => showDialog('choose') }] },
     { label: strings.help, items: [
-      { label: strings.contents, hotkey: 'F1', onClick: () => showDialog('help') },
+      { label: strings.contents, hotkey: strings.helpKey, onClick: () => showDialog('help') },
       '-', { label: strings.about, onClick: () => showDialog('about') },
     ] },
   ]
 
   return (
-    <div className="qbasic-client nibbles-client" onPointerDownCapture={() => unlockAudio()} onKeyDownCapture={() => unlockAudio()}>
-      <GameMenuBar menus={menus} onOpenChange={(open) => {
+    <div className="qbasic-client nibbles-client" onKeyDown={keyDown}
+      onPointerDownCapture={(event) => { unlockAudio(); inputMode(event.pointerType) }}
+      onKeyDownCapture={() => { unlockAudio(); inputMode('keyboard') }}>
+      <GameMenuBar className="nibbles-menu" menus={menus} onOpenChange={(open) => {
         if (open) {
           pause()
           stopSound()
         }
         setMenuOpen(open)
       }} />
-      <div ref={surface} className="qbasic-letterbox" tabIndex={0} role="application" aria-label={strings.title} onKeyDown={keyDown}>
-        <canvas ref={canvas} width={640} height={400} aria-label={strings.description}
-          onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
-          onPointerCancel={(event) => { for (const gesture of session.gestures) if (gesture.id === event.pointerId) gesture.id = -1 }}
-          onContextMenu={(event) => event.preventDefault()} />
+      {touch && screen === 'game' && session.game && <div className="nibbles-phone-score" aria-label={strings.scoreLabel}>
+        {session.game.snakes.length === 2 && <span>{scoreLine(session.game, 1).trim()}</span>}
+        <span>{scoreLine(session.game, 0).trim()}</span>
+      </div>}
+      <div ref={surface} className="qbasic-letterbox" tabIndex={0} role="application" aria-label={strings.title}
+        onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
+        onClick={() => { if (active && !hidden && !dialog && !menuOpen && clickContinues(session.screen)) proceed() }}
+        onPointerCancel={(event) => { for (const gesture of session.gestures) if (gesture.id === event.pointerId) gesture.id = -1 }}
+        onContextMenu={(event) => event.preventDefault()}>
+        <canvas ref={canvas} width={640} height={400} aria-label={strings.description} />
       </div>
       {touch && <div ref={controls} className="qbasic-touch-controls nibbles-controls">
         {screen === 'setup' ? <form onSubmit={(event) => {
@@ -475,11 +478,9 @@ export default function Nibbles({ close }: AppProps) {
       {dialog === 'about' && <AboutDialog game={strings.title} icon={icon} version={strings.version}
         flavour={strings.flavour} lines={strings.aboutLines} onClose={() => setDialog(null)} />}
       {dialog === 'help' && <GameDialog title={strings.helpTitle} width={440} onClose={() => setDialog(null)}>
-        <div className="nibbles-help-tabs" role="tablist" aria-label={strings.helpTitle}>
-          {strings.helpTabs.map((label, index) => <button key={label} role="tab" aria-selected={index === helpTab}
-            id={`nibbles-help-tab-${index}`} aria-controls="nibbles-help-panel" onClick={() => setHelpTab(index)}>{label}</button>)}
-        </div>
-        <p id="nibbles-help-panel" role="tabpanel" aria-labelledby={`nibbles-help-tab-${helpTab}`}>{strings.helpSections[helpTab]}</p>
+        <GameHelpTabs tabs={strings.helpTabs} selected={helpTab} onChange={setHelpTab} label={strings.helpTitle}>
+          <p>{strings.helpSections[helpTab]}</p>
+        </GameHelpTabs>
       </GameDialog>}
     </div>
   )

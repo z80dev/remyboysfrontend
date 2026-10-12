@@ -1,5 +1,5 @@
 /* === Games === */
-/* Shared classic-games kit: XP menu bar, pull-down menus and in-window dialogs. Imported by menu.tsx and dialogs.tsx. */
+/* Shared classic-games kit: XP menus and viewport-clamped, game-owned dialogs. Imported by menu.tsx and dialogs.tsx. */
 
 /* --- Menu bar --------------------------------------------------------------- */
 
@@ -83,17 +83,14 @@
   margin-left: 24px;
 }
 
-/* --- In-window modal dialog --------------------------------------------------- */
+/* --- Game-owned, viewport-clamped modal dialog ------------------------------- */
 
-/* Portalled into the game's `.window`, under its title bar. */
+/* Only the owning window's client area is blocked; its dialog can extend outside that window. */
 .gk-modal {
   position: absolute;
   inset: 30px 0 0 0;
   z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
+  padding: 0;
   cursor: default;
 }
 
@@ -104,15 +101,17 @@
   z-index: 9000;
 }
 
-.pocket-window > .gk-modal {
+.pocket-window .gk-modal {
   inset: 0;
 }
 
 .window.gk-dialog {
-  flex: none;
-  width: min(320px, 100%);
-  min-width: min(260px, 100%);
-  max-width: 100%;
+  position: fixed;
+  box-sizing: border-box;
+  width: 320px;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
   font: 12px var(--font);
   margin: 0;
   border: 0;
@@ -120,11 +119,41 @@
 }
 
 .gk-dialog .window-body {
-  overflow: visible;
+  overflow: hidden;
+}
+
+.gk-dialog-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gk-dialog .dialog-buttons {
+  flex: none;
 }
 
 .gk-about {
   align-items: center;
+}
+
+.gk-about-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+.gk-about-icon svg,
+.gk-about-icon img {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.gk-about > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .gk-dialog .msg-body p {
@@ -154,10 +183,20 @@
   align-items: baseline;
 }
 
-.gk-scores-row > td:last-child {
+.gk-scores-row > td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.window.gk-best-scores.natural {
+  min-width: min(320px, calc(100vw - 16px));
+}
+
+.gk-scores-row > .gk-scores-name {
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .gk-scores-score {
@@ -168,6 +207,92 @@
   margin: 0 0 8px;
 }
 
+.gk-scores.names-first {
+  width: 100%;
+}
+
+.gk-scores.names-first .gk-scores-row {
+  grid-template-columns: 44px minmax(0, 1fr) 90px;
+}
+
+.gk-scores.detailed .gk-scores-row {
+  grid-template-columns: 54px 90px 60px minmax(0, 1fr);
+}
+
+.gk-scores.detailed.names-first .gk-scores-row {
+  grid-template-columns: 44px minmax(0, 1fr) 60px 90px;
+}
+
+.gk-scores th {
+  text-align: left;
+}
 .gk-name .input {
   width: 100%;
+}
+
+/* Native semantics and keyboard handling, with period-sized XP dialog controls. */
+.gk-dialog input[type="checkbox"],
+.gk-dialog input[type="radio"] {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  margin: 0 4px 0 0;
+  vertical-align: -2px;
+  border: 1px solid;
+  border-color: #808080 #fff #fff #808080;
+  background: linear-gradient(135deg, #ddd 0, #fff 65%);
+  box-shadow: inset 1px 1px #404040, inset -1px -1px #dfdfdf;
+  color: #000;
+  cursor: default;
+}
+
+.gk-dialog input[type="radio"] {
+  border-radius: 50%;
+}
+
+.gk-dialog input[type="checkbox"]::before,
+.gk-dialog input[type="radio"]::before {
+  content: "";
+  visibility: hidden;
+  background: currentColor;
+}
+
+.gk-dialog input[type="checkbox"]::before {
+  width: 7px;
+  height: 7px;
+  clip-path: polygon(0 29%, 29% 57%, 100% 0, 100% 43%, 29% 100%, 0 71%);
+}
+
+.gk-dialog input[type="radio"]::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.gk-dialog input[type="checkbox"]:checked::before,
+.gk-dialog input[type="radio"]:checked::before {
+  visibility: visible;
+}
+
+.gk-dialog input[type="checkbox"]:indeterminate::before {
+  visibility: visible;
+  height: 3px;
+  clip-path: none;
+}
+
+.gk-dialog input[type="checkbox"]:disabled,
+.gk-dialog input[type="radio"]:disabled {
+  background: var(--face, #ece9d8);
+  color: #808080;
+}
+
+.gk-dialog input[type="checkbox"]:focus-visible,
+.gk-dialog input[type="radio"]:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: 2px;
 }

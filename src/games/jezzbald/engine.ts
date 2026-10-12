@@ -39,6 +39,7 @@ export type Game = {
   vy: Float64Array
   bounceAt: Float64Array
   bounceAxis: Uint8Array
+  contact: Uint8Array
   atomCount: number
   cleared: number
   area: number
@@ -55,13 +56,15 @@ export type Game = {
 
 /** New levels allocate their pools once. Simulation, swept microsteps and flood fill allocate nothing.
  * Grid cells include completed walls in the original 760-cell area denominator. Each half owns its seed-cell
- * half; completion commits the cell, but never cancels its sibling. Floods run only after a half commits.
+ * half; completion only commits unoccupied cells, never embedding an atom or cancelling its sibling.
+ * A preallocated per-atom contact latch charges only one half/life per continuous contact episode. It resets only
+ * once the atom has left the union of both grown rectangles, including a destroyed half's last extent.
  * Four-millisecond simulation ticks are accumulated, making frame partitioning deterministic. Motion is further
  * subdivided to at most half a radius, including externally increased test velocities, so thin walls cannot tunnel.
  */
 export function createGame(level = 1, seed = 1992, fast = false, score = 0): Game {
   const n = Math.max(1, Math.trunc(level))
-  const count = n + 1
+  const count = Math.min(n + 1, 50)
   const rand = mulberry32(seed ^ Math.imul(n, 0x9e3779b9))
   const x = new Float64Array(count)
   const y = new Float64Array(count)
@@ -76,9 +79,11 @@ export function createGame(level = 1, seed = 1992, fast = false, score = 0): Gam
   }
   const half = (direction: number): Half => ({ active: false, completed: false, direction, length: 0, target: 0, clock: 0 })
   return {
-    level: n, seed, fast, phase: 'playing', lives: count, score, remaining: (20 * count + 40) * 1000, elapsed: 0, accumulator: 0,
+    level: n, seed, fast, phase: 'playing', lives: count, score, remaining: (20 * (n + 1) + 40) * 1000,
+    elapsed: 0, accumulator: 0,
     cells: new Uint8Array(CELLS), visited: new Uint8Array(CELLS), queue: new Int16Array(CELLS), x, y, vx, vy,
     bounceAt: new Float64Array(count).fill(-1000), bounceAxis: new Uint8Array(count), atomCount: count, cleared: 0, area: 0, revision: 0,
+    contact: new Uint8Array(count),
     wallX: 0, wallY: 0, orientation: 'vertical', halves: [half(-1), half(1)], starts: 0, completions: 0, losses: 0,
     tally: { area: 0, lives: 0, time: 0, total: 0 },
   }
@@ -89,10 +94,12 @@ export function wallBusy(g: Game): boolean {
 }
 
 export function startWall(g: Game, x: number, y: number, orientation: Orientation): boolean {
-  if (g.phase !== 'playing' || wallBusy(g) || !Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= COLS || y >= ROWS || g.cells[y * COLS + x]) return false
+  if (g.phase !== 'playing' || wallBusy(g) || !Number.isInteger(x) || !Number.isInteger(y) ||
+    x < 0 || y < 0 || x >= COLS || y >= ROWS || g.cells[y * COLS + x]) return false
   g.wallX = x
   g.wallY = y
   g.orientation = orientation
+  g.contact.fill(0)
   for (let i = 0; i < 2; i++) {
     const h = g.halves[i]
     h.active = true
@@ -133,28 +140,64 @@ function touchesSolid(g: Game, x: number, y: number): boolean {
 }
 
 function hitGrowing(g: Game, atom: number): void {
+  if (!wallBusy(g)) return
   const cx = g.wallX * CELL + CELL / 2
   const cy = g.wallY * CELL + CELL / 2
+  let touching = 0
+  let growing = 0
   for (let i = 0; i < 2; i++) {
     const h = g.halves[i]
-    if (!h.active) continue
+    if (h.length === 0) continue
     const a = h.direction < 0 ? -h.length : 0
     const b = h.direction > 0 ? h.length : 0
     const hit = g.orientation === 'horizontal'
       ? touchesRect(g.x[atom], g.y[atom], cx + a, cy - CELL / 2, cx + b, cy + CELL / 2)
       : touchesRect(g.x[atom], g.y[atom], cx - CELL / 2, cy + a, cx + CELL / 2, cy + b)
     if (hit) {
-      h.active = false
-      g.lives--
-      g.losses++
-      if (g.lives <= 0) {
-        g.phase = 'over'
-        g.halves[0].active = false
-        g.halves[1].active = false
-        return
-      }
+      touching |= 1 << i
+      if (h.active) growing |= 1 << i
     }
   }
+  if (touching === 0) {
+    g.contact[atom] = 0
+    return
+  }
+  if (g.contact[atom] || growing === 0) return
+  // A centre/seam overlap belongs to one side, never both. Exact-centre ties choose red deterministically.
+  const negative = g.orientation === 'horizontal' ? g.x[atom] <= cx : g.y[atom] <= cy
+  const side = growing === 3 ? (negative ? 0 : 1) : growing === 1 ? 0 : 1
+  g.contact[atom] = 1
+  g.halves[side].active = false
+  g.lives--
+  g.losses++
+  if (g.lives <= 0) {
+    g.phase = 'over'
+    g.halves[0].active = false
+    g.halves[1].active = false
+  }
+}
+
+/** A legacy embedded atom still owns its nearest open region. Use cell-centre distance to choose its side
+ * of a wall deterministically, without relocating the atom or allocating another flood queue.
+ */
+function atomSeed(g: Game, atom: number): number {
+  const x = Math.max(0, Math.min(COLS - 1, Math.floor(g.x[atom] / CELL)))
+  const y = Math.max(0, Math.min(ROWS - 1, Math.floor(g.y[atom] / CELL)))
+  const cell = y * COLS + x
+  if (!g.cells[cell]) return cell
+  let nearest = -1
+  let distance = Infinity
+  for (let p = 0; p < CELLS; p++) {
+    if (g.cells[p]) continue
+    const dx = (p % COLS + 0.5) * CELL - g.x[atom]
+    const dy = (Math.floor(p / COLS) + 0.5) * CELL - g.y[atom]
+    const d = dx * dx + dy * dy
+    if (d < distance) {
+      distance = d
+      nearest = p
+    }
+  }
+  return nearest
 }
 
 /** Multi-source cardinal flood from every atom; all unreachable open cells are sealed.
@@ -165,10 +208,8 @@ export function fillRegions(g: Game): number {
   let read = 0
   let end = 0
   for (let i = 0; i < g.atomCount; i++) {
-    const x = Math.max(0, Math.min(COLS - 1, Math.floor(g.x[i] / CELL)))
-    const y = Math.max(0, Math.min(ROWS - 1, Math.floor(g.y[i] / CELL)))
-    const p = y * COLS + x
-    if (!g.cells[p] && !g.visited[p]) {
+    const p = atomSeed(g, i)
+    if (p >= 0 && !g.visited[p]) {
       g.visited[p] = 1
       g.queue[end++] = p
     }
@@ -214,7 +255,16 @@ function completeHalf(g: Game, h: Half): void {
   let y = g.wallY
   const count = Math.round((h.target - CELL / 2) / CELL) + 1
   for (let i = 0; i < count; i++) {
-    g.cells[y * COLS + x] = 1
+    // The sibling can finish while an atom is still in its destroyed half's seed. A contact latch
+    // protects that continuous collision from charging twice, not from remaining a live flood source.
+    let occupied = false
+    for (let atom = 0; atom < g.atomCount; atom++) {
+      if (touchesRect(g.x[atom], g.y[atom], x * CELL, y * CELL, (x + 1) * CELL, (y + 1) * CELL)) {
+        occupied = true
+        break
+      }
+    }
+    if (!occupied) g.cells[y * COLS + x] = 1
     if (g.orientation === 'horizontal') x += h.direction
     else y += h.direction
   }
@@ -287,6 +337,6 @@ export function advance(g: Game, ms: number): void {
   }
 }
 
-export function nextLevel(g: Game): Game {
-  return createGame(g.level + 1, g.seed, g.fast, g.score)
+export function nextLevel(g: Game, fast = g.fast): Game {
+  return createGame(g.level + 1, g.seed, fast, g.score)
 }

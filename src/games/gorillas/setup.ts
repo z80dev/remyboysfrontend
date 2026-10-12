@@ -19,12 +19,12 @@ export function submitSetup(setup: Setup, value: string): string {
     setup.values.push(setup.names[side])
   } else if (setup.step === 2) {
     const target = entered === '' ? 3 : Number(entered)
-    if (!Number.isInteger(target) || target < 1 || target > 99) return S.invalidTarget
+    if (!Number.isSafeInteger(target) || target < 1) return S.invalidTarget
     setup.target = target
     setup.values.push(String(target))
   } else if (setup.step === 3) {
     const gravity = entered === '' ? 9.8 : Number(entered)
-    if (!Number.isFinite(gravity) || gravity < 0.1 || gravity > 100) return S.invalidGravity
+    if (!Number.isFinite(gravity) || gravity <= 0) return S.invalidGravity
     setup.gravity = gravity
     setup.values.push(String(gravity))
   }

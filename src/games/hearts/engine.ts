@@ -25,12 +25,39 @@ export function deal(seed: number, hand = 0, totals = [0, 0, 0, 0], rows: ScoreR
     trick: [], lastTrick: [], lastWinner: null, played: [], broken: false, tricks: 0, points: [0, 0, 0, 0], totals, rows, moon: null }
 }
 export function aiPass(hand: readonly Card[]): number[] {
-  const counts = (suit: Suit) => hand.filter(c => c.suit === suit).length
-  return [...hand].sort((a, b) => {
-    const value = (c: Card) => (c.suit === 'spades' && high(c) >= 12 && counts('spades') <= 4 ? 100 + high(c) :
-      c.suit === 'hearts' ? 50 + high(c) : counts(c.suit) <= 3 && !(c.suit === 'clubs' && c.rank === 2) ? 35 + high(c) : high(c))
-    return value(b) - value(a)
-  }).slice(0, 3).map(c => c.id)
+  const counts = order.map(suit => hand.filter(c => c.suit === suit).length)
+  const protection = hand.filter(c => c.suit === 'spades' && high(c) < 12).length
+  const alternatives = hand.filter(c => c.suit !== 'hearts' || high(c) > 8)
+  const candidates = [...(alternatives.length >= 3 ? alternatives : hand)].sort((a, b) => a.id - b.id)
+  const value = (c: Card) => {
+    if (c.suit === 'spades' && high(c) >= 12) {
+      if (protection < 3) return (c.rank === 12 ? 180 : 140) + high(c)
+      return c.rank === 12 ? -80 : high(c)
+    }
+    if (c.suit === 'hearts') return high(c) >= 11 ? 100 + high(c) : high(c) <= 8 ? -100 + high(c) : high(c)
+    return high(c)
+  }
+  let best: Card[] = []
+  let bestValue = -Infinity
+  // Score complete three-card passes: a two-card void has value only when both cards leave.
+  for (let a = 0; a < candidates.length - 2; a++) {
+    for (let b = a + 1; b < candidates.length - 1; b++) {
+      for (let c = b + 1; c < candidates.length; c++) {
+        const pick = [candidates[a], candidates[b], candidates[c]]
+        let score = pick.reduce((sum, card) => sum + value(card), 0)
+        for (const suit of ['clubs', 'diamonds'] as const) {
+          const count = counts[order.indexOf(suit)]
+          if (count >= 1 && count <= 2 && pick.filter(card => card.suit === suit).length === count &&
+            !hand.some(card => card.suit === suit && card.rank === 2 && suit === 'clubs')) score += 150
+        }
+        if (score > bestValue) {
+          bestValue = score
+          best = pick
+        }
+      }
+    }
+  }
+  return best.map(c => c.id)
 }
 export function passCards(state: HeartsState, selections: readonly number[][]): HeartsState {
   if (state.phase !== 'pass' || selections.length !== 4 || selections.some((ids, seat) =>
@@ -90,15 +117,37 @@ export function playCard(state: HeartsState, id: number): HeartsState {
 }
 export const nextHand = (state: HeartsState) => deal(state.seed, state.hand + 1, state.totals, state.rows)
 
+/** Only completed public tricks establish a threat; a lone queen is not a moon attempt. */
+export function visibleMoonThreat(state: HeartsState, excludingSeat?: Seat): Seat | null {
+  if (state.tricks < 6) return null
+  const hearts = [0, 0, 0, 0]
+  const queens = [false, false, false, false]
+  const completedCards = Math.min(state.tricks * 4, state.played.length - state.trick.length)
+  for (let i = 0; i + 3 < completedCards; i += 4) {
+    const trick = state.played.slice(i, i + 4)
+    const winner = trickWinner(trick)
+    for (const { card } of trick) {
+      if (card.suit === 'hearts') hearts[winner]++
+      else if (card.suit === 'spades' && card.rank === 12) queens[winner] = true
+    }
+  }
+  const capturers = hearts.flatMap((count, seat) => count || queens[seat] ? [seat as Seat] : [])
+  if (capturers.length !== 1) return null
+  const seat = capturers[0]
+  return seat !== excludingSeat && hearts[seat] >= (queens[seat] ? 8 : 5) ? seat : null
+}
+
 /** Standard AI consults only its hand, the current trick and exposed history. It never bypasses legalCards. */
 export function aiPlay(state: HeartsState): Card {
   const legal = legalCards(state)
   const hand = state.hands[state.turn]
-  const hearts = hand.filter(c => c.suit === 'hearts')
-  const moon = hearts.length >= 9 && hearts.some(c => high(c) === 14) && hand.filter(c => high(c) >= 13).length >= 3
-  const visibleShooter = state.points.findIndex((p, seat) => seat !== state.turn && p >= 8 && state.points.every((v, other) => other === seat || v === 0))
+  const original = [...hand, ...state.played.filter(p => p.seat === state.turn).map(p => p.card)]
+  const hearts = original.filter(c => c.suit === 'hearts')
+  const moon = hearts.length >= 9 && hearts.some(c => high(c) === 14) && original.filter(c => high(c) >= 13).length >= 3 &&
+    state.points.every((p, seat) => seat === state.turn || p === 0)
+  const visibleShooter = visibleMoonThreat(state, state.turn)
   const led = state.trick[0]?.card.suit
-  const sorted = [...legal].sort((a, b) => high(a) - high(b))
+  const sorted = [...legal].sort((a, b) => high(a) - high(b) || a.id - b.id)
   if (!led) {
     if (moon) return sorted[sorted.length - 1]
     // Prefer a low card whose higher ranks are still unseen: a safe duck lead, using exposed-card memory.
@@ -108,13 +157,21 @@ export function aiPlay(state: HeartsState): Card {
     })[0]
   }
   if (!legal.some(c => c.suit === led)) {
+    if (moon) return [...legal].sort((a, b) => penalty(a) * 20 + high(a) - penalty(b) * 20 - high(b))[0]
     return [...legal].sort((a, b) => penalty(b) * 20 + high(b) - penalty(a) * 20 - high(a))[0]
   }
   const top = Math.max(...state.trick.filter(p => p.card.suit === led).map(p => high(p.card)))
   const winning = sorted.filter(c => high(c) > top)
   const hasHeart = state.trick.some(p => p.card.suit === 'hearts')
-  if ((moon || (visibleShooter >= 0 && hasHeart)) && winning.length) return winning[winning.length - 1]
+  const safeWinners = winning.filter(c => !(c.suit === 'spades' && c.rank === 12))
+  const highestWinner = safeWinners[safeWinners.length - 1] ?? winning[winning.length - 1]
+  if ((moon || (visibleShooter !== null && hasHeart && trickWinner(state.trick) === visibleShooter)) && winning.length) return highestWinner
+  // With the last word on a point-free trick, shed control without introducing our own queen.
+  if (state.trick.length === 3 && state.trick.every(p => penalty(p.card) === 0)) {
+    const safe = sorted.filter(c => !(c.suit === 'spades' && c.rank === 12))
+    if (safe.length) return safe[safe.length - 1]
+  }
   const ducks = sorted.filter(c => high(c) < top)
   if (ducks.length) return ducks[ducks.length - 1]
-  return sorted[0]
+  return highestWinner
 }

@@ -2,12 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import {
   BALL_SAVE_SECONDS, FLAG_SPINS, HYPERSPACE_WINDOW, MAX_SCORE, POINTS, POST_SECONDS, RANKS,
   availableMissions, createGame, drainBall, enableTestMode, highScoreCandidates, hit, launchRules,
-  missionGoal, missionName, nudgeRules, qualifiesHighScore, recordHighScore, rotateReentry,
+  missionGoal, missionName, nudgeRules, qualifiesHighScore, recordHighScore, replayGame, reseatBall, rotateReentry,
   sanitizeHighScores, selectMission, tickRules
 } from '../../src/games/pinball/rules'
 import type { Game, HighScore, MissionId, TableEvent } from '../../src/games/pinball/rules'
 import { CONTROL_ACTIONS, DEFAULT_CONTROLS, controlForKey, normalizeKey, validControls } from '../../src/games/pinball/controls'
 import type { Controls } from '../../src/games/pinball/controls'
+import { missionGoal as goalText } from '../../src/games/pinball/strings'
 
 const MISSION_RANK: Record<MissionId, number> = {
   launch: 0, bridge: 0, gas: 0, mint: 0,
@@ -99,6 +100,34 @@ describe('rank selection and all seventeen missions', () => {
         expect(missionGoal(game)).not.toContain('0 more')
       }
     }
+  })
+
+  test('mission countdown nouns are singular for one and plural for two', () => {
+    const cases = [
+      ['mint', 0, 'Hit 1 more Drop Target', 'Hit 2 more Drop Targets'],
+      ['bug', 0, 'Hit 1 more Target', 'Hit 2 more Targets'],
+      ['airdrop', 0, 'Light 1 more Right Hazard Light', 'Light 2 more Right Hazard Lights'],
+      ['spike', 0, 'Light 1 more Left Hazard Light', 'Light 2 more Left Hazard Lights'],
+      ['recon', 0, 'Pass 1 more Lane', 'Pass 2 more Lanes'],
+      ['cabald', 0, 'Hit 1 more Drop Target', 'Hit 2 more Drop Targets'],
+      ['cabald', 1, 'Hit 1 more Spot Target', 'Hit 2 more Spot Targets'],
+      ['cabald', 2, 'Pass 1 more Lane', 'Pass 2 more Lanes']
+    ] as const
+    for (const [id, stage, singular, plural] of cases) {
+      expect(goalText(id, stage, 1)).toBe(singular)
+      expect(goalText(id, stage, 2)).toBe(plural)
+    }
+  })
+
+  test('Recovery exposes the remaining spin countdown without changing its upgrade stage', () => {
+    expect(goalText('recovery', 0, 75)).toBe('Upgrade the Flags: 75 spins left')
+    expect(goalText('recovery', 0, 2)).toBe('Upgrade the Flags: 2 spins left')
+    expect(goalText('recovery', 0, 1)).toBe('Upgrade the Flags: 1 spin left')
+    expect(goalText('recovery', 1, 1)).toBe('Enter the Hyperspace Kicker')
+    const game = startMission('recovery')
+    repeat(game, 'spinner', FLAG_SPINS - 1)
+    expect(missionGoal(game)).toBe('Upgrade the Flags: 1 spin left')
+    expect(game.mission?.stage).toBe(0)
   })
 
   test('rejects invalid selection and does not replace an accepted mission', () => {
@@ -568,6 +597,144 @@ describe('field awards, upgrades, fuel and bonuses', () => {
 })
 
 describe('ball saver, tilt, hyperspace, extra balls and replays', () => {
+  test('test-mode drains redeploy indefinitely without consuming lives, missions, score or bonus', () => {
+    const game = createGame(2)
+    launchRules(game)
+    selectMission(game, 1)
+    hit(game, 'ramp')
+    completeMission(game, 'bridge')
+    selectMission(game, 2)
+    hit(game, 'ramp')
+    hit(game, 'bumper')
+    hit(game, 'lane')
+    game.multiplier = 3
+    game.replays = 2
+    enableTestMode(game)
+    const mission = game.mission
+    const player = game.player
+    const score = player.score
+    const lanes = game.laneCount
+    const launch = game.launchedAt
+    for (let drain = 0; drain < 5; drain++) {
+      tickRules(game, 11)
+      expect(drainBall(game)).toBe(true)
+      expect(game.phase).toBe('ready')
+      expect(game.currentPlayer).toBe(0)
+      expect(game.ball).toBe(1)
+      expect(game.player).toBe(player)
+      expect(game.players.every(pilot => pilot.ballsPlayed === 0)).toBe(true)
+      expect(game.mission).toBe(mission)
+      expect(game.mission?.progress).toBe(1)
+      expect(player.score).toBe(score)
+      expect(game.laneCount).toBe(lanes)
+      expect(game.missionCount).toBe(1)
+      expect(game.multiplier).toBe(3)
+      expect(game.lastBonus).toBe(0)
+      expect(game.ballSaveUsed).toBe(false)
+      expect(game.launchedAt).toBe(launch)
+      expect(game.replays).toBe(2)
+      expect(game.testMode).toBe(true)
+      expect(launchRules(game)).toBe(true)
+      expect(game.phase).toBe('playing')
+      expect(game.messageId).toBe('saved')
+      expect(game.message).toBe('Ball Saved')
+    }
+    repeat(game, 'bumper', 7)
+    expect(game.mission).toBeNull()
+    expect(game.player.completedMissions).toBe(2)
+  })
+
+  test('a tilted test-mode drain forfeits bonus and resets the ball without consuming or rotating the turn', () => {
+    const game = createGame(2)
+    loseBall(game)
+    selectMission(game, 2)
+    launchRules(game)
+    hit(game, 'ramp')
+    hit(game, 'bumper')
+    hit(game, 'lane')
+    game.multiplier = 4
+    game.player.extraBalls = 2
+    game.replays = 3
+    enableTestMode(game)
+    const player = game.player
+    const score = player.score
+    for (let nudge = 0; nudge < 4; nudge++) nudgeRules(game, game.time)
+    expect(game.tilted).toBe(true)
+    const frozenScore = game.player.score
+    hit(game, 'bumper')
+    expect(game.player.score).toBe(frozenScore)
+    expect(drainBall(game)).toBe(true)
+    expect(game.currentPlayer).toBe(1)
+    expect(game.player).toBe(player)
+    expect(player.ballsPlayed).toBe(0)
+    expect(player.extraBalls).toBe(2)
+    expect(player.score).toBe(score)
+    expect(game.ball).toBe(1)
+    expect(game.lastBonus).toBe(0)
+    expect(game.laneCount).toBe(0)
+    expect(game.missionCount).toBe(0)
+    expect(game.mission).toBeNull()
+    expect(game.multiplier).toBe(1)
+    expect(game.tilted).toBe(false)
+    expect(game.nudgeCount).toBe(0)
+    expect(game.testMode).toBe(true)
+    expect(game.replays).toBe(3)
+    expect(game.phase).toBe('ready')
+    expect(launchRules(game)).toBe(true)
+    hit(game, 'bumper')
+    expect(player.score).toBe(score + POINTS.bumper)
+  })
+
+  test('a weak launch reseats the same ball without draining, resetting progress or extending its saver', () => {
+    const game = startMission('gas')
+    hit(game, 'bumper')
+    hit(game, 'lane')
+    game.multiplier = 3
+    tickRules(game, 4)
+    const mission = game.mission
+    const player = game.player
+    const score = player.score
+    expect(reseatBall(game)).toBe(true)
+    expect(game.phase).toBe('ready')
+    expect(game.mission).toBe(mission)
+    expect(game.mission?.progress).toBe(1)
+    expect(game.player).toBe(player)
+    expect(player.score).toBe(score)
+    expect(player.ballsPlayed).toBe(0)
+    expect(game.ball).toBe(1)
+    expect(game.multiplier).toBe(3)
+    expect(game.laneCount).toBe(1)
+    expect(game.fuel).toBe(96)
+    expect(game.lastBonus).toBe(0)
+    expect(game.ballSaveUsed).toBe(false)
+    expect(game.launchedAt).toBe(0)
+    tickRules(game, 20)
+    expect(game.time).toBe(4)
+    expect(launchRules(game)).toBe(true)
+    expect(game.launchedAt).toBe(0)
+    tickRules(game, 7)
+    expect(drainBall(game)).toBe(false)
+    expect(player.ballsPlayed).toBe(1)
+  })
+
+  test('reseating cannot restore a used saver and rejects ready, tilted or finished balls', () => {
+    const game = createGame()
+    expect(reseatBall(game)).toBe(false)
+    launchRules(game)
+    expect(drainBall(game)).toBe(true)
+    launchRules(game)
+    expect(reseatBall(game)).toBe(true)
+    expect(game.ballSaveUsed).toBe(true)
+    launchRules(game)
+    expect(drainBall(game)).toBe(false)
+    launchRules(game)
+    for (let i = 0; i < 4; i++) nudgeRules(game, game.time)
+    expect(game.tilted).toBe(true)
+    expect(reseatBall(game)).toBe(false)
+    game.phase = 'over'
+    expect(reseatBall(game)).toBe(false)
+  })
+
   test('saves once at the inclusive ten-second boundary and preserves the ball and mission', () => {
     const game = startMission('gas')
     hit(game, 'bumper')
@@ -581,8 +748,13 @@ describe('ball saver, tilt, hyperspace, extra balls and replays', () => {
     expect(game.lastBonus).toBe(0)
     expect(game.player.ballsPlayed).toBe(0)
     expect(game.message).toBe('Ball Saved')
+    const savedSerial = game.messageSerial
     launchRules(game)
     expect(game.launchedAt).toBe(0)
+    expect(game.phase).toBe('playing')
+    expect(game.messageId).toBe('saved')
+    expect(game.message).toBe('Ball Saved')
+    expect(game.messageSerial).toBe(savedSerial)
     expect(drainBall(game)).toBe(false)
     expect(game.player.ballsPlayed).toBe(1)
     expect(game.ballSaveUsed).toBe(false)
@@ -719,24 +891,85 @@ describe('ball saver, tilt, hyperspace, extra balls and replays', () => {
     expect(game.players[0].ballsPlayed).toBe(1)
   })
 
-  test('wormhole colour matching awards replay credits, not extra balls, and warp rotates colours', () => {
+  test('wormholes start unlit, nonmatches only score, and one match consumes its light', () => {
     const game = createGame()
     launchRules(game)
-    hit(game, 'wormhole', 1)
-    expect(game.player.replays).toBe(0)
+    expect(game.wormholeColor).toBe(-1)
     hit(game, 'wormhole', 0)
-    expect(game.player.replays).toBe(1)
+    expect(game.replays).toBe(0)
+    hit(game, 'warp')
+    expect(game.wormholeColor).toBe(0)
+    const before = game.player.score
+    hit(game, 'wormhole', 1)
+    expect(game.player.score - before).toBe(POINTS.wormhole)
+    expect(game.replays).toBe(0)
+    expect(game.wormholeColor).toBe(0)
+    hit(game, 'wormhole', 0)
+    expect(game.replays).toBe(1)
+    expect(game.wormholeColor).toBe(-1)
     expect(game.message).toBe('Replay Awarded')
     expect(game.phase).toBe('playing')
     expect(game.player.extraBalls).toBe(0)
+    hit(game, 'wormhole', 0)
+    expect(game.replays).toBe(1)
+  })
+
+  test('warp-match cycles advance yellow, red, green independently of the extinguished light, without a cap', () => {
+    const game = createGame()
+    launchRules(game)
+    for (let credit = 0; credit < 6; credit++) {
+      const color = credit % 3
+      hit(game, 'warp')
+      expect(game.wormholeColor).toBe(color)
+      hit(game, 'wormhole', color)
+      expect(game.wormholeColor).toBe(-1)
+      expect(game.replays).toBe(credit + 1)
+      if (credit > 0) expect(game.message).toBe(`Replay Awarded (${credit + 1})`)
+    }
+    expect(game.wormholeNextColor).toBe(0)
+  })
+
+  test('replay credits are shared across players while wormhole light and cursor reset per ball', () => {
+    const game = createGame(2)
+    launchRules(game)
+    hit(game, 'warp')
+    hit(game, 'wormhole', 0)
     hit(game, 'warp')
     expect(game.wormholeColor).toBe(1)
-    hit(game, 'wormhole', 1)
-    expect(game.player.replays).toBe(2)
+    tickRules(game, 11)
+    drainBall(game)
+    expect(game.currentPlayer).toBe(1)
+    expect(game.replays).toBe(1)
+    expect(game.wormholeColor).toBe(-1)
+    expect(game.wormholeNextColor).toBe(0)
+    launchRules(game)
+    hit(game, 'warp')
+    hit(game, 'wormhole', 0)
+    expect(game.replays).toBe(2)
     expect(game.message).toBe('Replay Awarded (2)')
-    hit(game, 'warp')
-    hit(game, 'warp')
-    expect(game.wormholeColor).toBe(0)
+  })
+
+  test('replayGame spends one shared credit on a fully fresh game for the same number of players', () => {
+    const game = createGame(3)
+    expect(replayGame(game)).toBeNull()
+    game.replays = 2
+    game.players[0].score = 100_000
+    game.players[0].rank = 4
+    game.players[0].ballsPlayed = 3
+    game.phase = 'over'
+    const replay = replayGame(game)!
+    expect(replay).not.toBe(game)
+    expect(replay.players).toHaveLength(3)
+    expect(replay.replays).toBe(1)
+    expect(replay.phase).toBe('ready')
+    expect(replay.ball).toBe(1)
+    expect(replay.currentPlayer).toBe(0)
+    expect(replay.players.every(player => player.score === 0 && player.rank === 0 && player.ballsPlayed === 0)).toBe(true)
+    expect(replay.mission).toBeNull()
+    expect(replay.fuel).toBe(100)
+    expect(replay.wormholeColor).toBe(-1)
+    expect(replayGame(replay)!.replays).toBe(0)
+    expect(replayGame(replayGame(replay)!)).toBeNull()
   })
 })
 
@@ -779,13 +1012,14 @@ describe('one to four players and high-score persistence helpers', () => {
   test('bonus and per-ball table state reset while rank, score, missions and replay credits persist', () => {
     const game = startMission('gas')
     completeMission(game, 'gas')
+    hit(game, 'warp')
     hit(game, 'wormhole', 0)
     repeat(game, 'reentry', 3, true)
     tickRules(game, 11)
     drainBall(game)
     expect(game.player.completedMissions).toBe(1)
     expect(game.player.promotionProgress).toBe(1)
-    expect(game.player.replays).toBe(1)
+    expect(game.replays).toBe(1)
     expect(game.bumperLevel).toBe(1)
     expect(game.fuel).toBe(100)
     expect(game.mission).toBeNull()
@@ -839,7 +1073,8 @@ describe('one to four players and high-score persistence helpers', () => {
     game.players[1].score = 1_000
     enableTestMode(game)
     expect(game.message).toBe('Test Mode')
-    for (let i = 0; i < 6; i++) loseBall(game)
+    // Test mode cannot exhaust lives; exclusion still applies if a session is explicitly ended.
+    game.phase = 'over'
     expect(game.phase).toBe('over')
     expect(game.testMode).toBe(true)
     expect(highScoreCandidates(game)).toEqual([])

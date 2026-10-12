@@ -71,7 +71,7 @@ export function drawHalfCells(ctx: CanvasRenderingContext2D, cells: ArrayLike<nu
   }
 }
 
-export function drawSparkles(ctx: CanvasRenderingContext2D, frame: number, rows = 25, fg = 14, bg = 1): void {
+export function drawSparkles(ctx: CanvasRenderingContext2D, frame: number, rows = 25, fg = 14, bg = 1, spacing = 4): void {
   const perimeter = 2 * 80 + 2 * (rows - 2)
   for (let i = 0; i < perimeter; i++) {
     let col: number, row: number
@@ -79,7 +79,7 @@ export function drawSparkles(ctx: CanvasRenderingContext2D, frame: number, rows 
     else if (i < 80 + rows - 2) { col = 79; row = i - 79 }
     else if (i < 160 + rows - 2) { col = 159 + rows - 2 - i; row = rows - 1 }
     else { col = 0; row = perimeter - i }
-    drawChar(ctx, (i + frame) % 4 === 0 ? '*' : ' ', col * 8, row * 16, fg, bg)
+    drawChar(ctx, (i + frame) % spacing === 0 ? '*' : ' ', col * 8, row * 16, fg, bg)
   }
 }
 
@@ -123,4 +123,53 @@ export function nearestEga(hex: string): number {
     if (d < distance) { distance = d; best = i }
   }
   return best
+}
+
+/** Preserve a portrait's colour family when the sparse EGA palette would otherwise flatten it into grey. */
+export function nearestEgaChromatic(hex: string): number {
+  const value = Number.parseInt(hex.replace('#', ''), 16)
+  const r = (value >> 16) / 255
+  const g = ((value >> 8) & 255) / 255
+  const b = (value & 255) / 255
+  const maximum = Math.max(r, g, b)
+  const minimum = Math.min(r, g, b)
+  const range = maximum - minimum
+  const light = (maximum + minimum) / 2
+  const saturation = range === 0 ? 0 : range / (1 - Math.abs(2 * light - 1))
+  if (saturation <= 0.15) return nearestEga(hex)
+  let hue = maximum === r ? (g - b) / range : maximum === g ? 2 + (b - r) / range : 4 + (r - g) / range
+  hue = (hue * 60 + 360) % 360
+  let best = 1, distance = Infinity
+  for (let i = 1; i < 15; i++) {
+    if (i === 7 || i === 8) continue
+    const color = Number.parseInt(EGA[i].slice(1), 16)
+    const cr = (color >> 16) / 255
+    const cg = ((color >> 8) & 255) / 255
+    const cb = (color & 255) / 255
+    const max = Math.max(cr, cg, cb)
+    const min = Math.min(cr, cg, cb)
+    const delta = max - min
+    let ch = max === cr ? (cg - cb) / delta : max === cg ? 2 + (cb - cr) / delta : 4 + (cr - cg) / delta
+    ch = (ch * 60 + 360) % 360
+    const difference = Math.abs(hue - ch)
+    const hueDistance = Math.min(difference, 360 - difference) / 180
+    const lightDistance = light - (max + min) / 2
+    const d = hueDistance * hueDistance * 4 + lightDistance * lightDistance
+    if (d < distance) { distance = d; best = i }
+  }
+  return best
+}
+
+export type EgaRemyPalette = { skin: number; hair: number; shirt: number }
+
+/** Skin tones and dark/bright contrast remain readable at two-pixel sprite resolution. */
+export function quantizeRemyPalette(palette: { skin: string; hair: string; shirt: string }): EgaRemyPalette {
+  const skinRgb = Number.parseInt(palette.skin.replace('#', ''), 16)
+  const light = ((skinRgb >> 16) * 0.2126 + ((skinRgb >> 8) & 255) * 0.7152 + (skinRgb & 255) * 0.0722) / 255
+  const skin = light >= 0.62 ? 14 : light >= 0.38 ? 12 : 6
+  let hair = nearestEgaChromatic(palette.hair)
+  let shirt = nearestEgaChromatic(palette.shirt)
+  if (hair === skin) hair = hair >= 8 ? hair - 8 : hair + 8
+  if (shirt === skin) shirt = shirt >= 8 ? shirt - 8 : shirt + 8
+  return { skin, hair, shirt }
 }

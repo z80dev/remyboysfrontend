@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { FONT, glyph } from '../../src/games/qbasic/font'
-import { EGA, createInput, cursorVisible, editInput, nearestEga } from '../../src/games/qbasic/screen'
+import { EGA, createInput, cursorVisible, editInput, nearestEga, nearestEgaChromatic, quantizeRemyPalette } from '../../src/games/qbasic/screen'
 import { parseMml } from '../../src/games/qbasic/mml'
 
 describe('original QBasic bitmap screen', () => {
@@ -9,6 +9,53 @@ describe('original QBasic bitmap screen', () => {
     for (const char of '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬╒╕╘╛╓╖╙╜╞╡╟╢╤╧╥╨╪╫█▀▄±↑↓←→♥☺') expect(FONT[char]?.length).toBe(16)
     expect(glyph('☃')).toBe(FONT['?'])
     expect(FONT.a).not.toEqual(FONT.A)
+  })
+  test('visible letters, digits and punctuation use authored scanlines rather than doubled 8-row art', () => {
+    for (const char of 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.,:;+-=*±↑↓←→♥☺') {
+      const rows = glyph(char)
+      expect(Array.from({ length: 8 }, (_, i) => rows[i * 2] !== rows[i * 2 + 1]).some(Boolean)).toBe(true)
+    }
+    for (const char of 'BEFHTZ') {
+      const rows = glyph(char)
+      const bars = [...rows].flatMap((row, i) => row === 0x7e || row === 0x7c || row === 0x78 ? [i] : [])
+      expect(bars.length).toBeGreaterThan(0)
+      for (const y of bars) {
+        expect(rows[y - 1] ?? 0).not.toBe(rows[y])
+        expect(rows[y + 1] ?? 0).not.toBe(rows[y])
+      }
+    }
+  })
+  test('case, fourteen-row caps and lowercase descenders share a sensible baseline', () => {
+    for (const char of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+      expect(glyph(char)[0]).not.toBe(0)
+      expect(glyph(char)[13]).not.toBe(0)
+      expect(glyph(char)[15]).toBe(0)
+      expect(glyph(char.toLowerCase())).not.toEqual(glyph(char))
+    }
+    for (const char of 'acemnorsuvwxz') {
+      expect([...glyph(char).slice(0, 4)]).toEqual([0, 0, 0, 0])
+      expect(glyph(char)[13]).not.toBe(0)
+      expect(glyph(char)[14]).toBe(0)
+      expect(glyph(char)[15]).toBe(0)
+    }
+    for (const char of 'gjpqy') expect(glyph(char)[15]).not.toBe(0)
+  })
+  test('horizontal arrows have full directional heads and two-pixel shafts, not plus signs', () => {
+    const reverse = (byte: number) => {
+      let mirrored = 0
+      for (let bit = 0; bit < 8; bit++) mirrored |= ((byte >> bit) & 1) << (7 - bit)
+      return mirrored
+    }
+    expect([...glyph('→')]).toEqual([...glyph('←')].map(reverse))
+    expect([...glyph('↓')].slice(2, 13)).toEqual([...glyph('↑')].slice(2, 13).reverse())
+    expect([...glyph('←')].slice(3, 7)).toEqual([0x10, 0x30, 0x60, 0xc0])
+    expect([...glyph('←')].slice(7, 9)).toEqual([0xff, 0xff])
+    expect([...glyph('←')].slice(9, 13)).toEqual([0xc0, 0x60, 0x30, 0x10])
+    for (const char of '↑↓') {
+      expect([...glyph(char)].filter((row) => row === 0x18).length).toBeGreaterThanOrEqual(6)
+      expect([...glyph(char)]).toContain(0x7e)
+      expect([...glyph(char)]).toContain(0xdb)
+    }
   })
   test('single, double and mixed box lines meet adjacent cell edges', () => {
     expect(FONT['─'][7]).toBe(255)
@@ -28,6 +75,18 @@ describe('original QBasic bitmap screen', () => {
     expect(EGA.length).toBe(16)
     expect(nearestEga('#ffff55')).toBe(14)
     expect(nearestEga('#0000a8')).toBe(1)
+  })
+  test('small portrait colours remain distinguishable instead of becoming a grey silhouette', () => {
+    const palette = quantizeRemyPalette({ hair: '#6b81c1', shirt: '#889e87', skin: '#d0bdb2' })
+    expect(palette.skin).toBe(14)
+    expect(palette.hair).toBe(9)
+    expect(palette.hair).not.toBe(palette.skin)
+    expect(palette.shirt).not.toBe(palette.skin)
+    expect(nearestEgaChromatic('#aaaaaa')).toBe(7)
+    expect(nearestEgaChromatic('#55ffff')).toBe(11)
+    const golden = quantizeRemyPalette({ skin: '#d0bdb2', hair: '#ffff55', shirt: '#ffff55' })
+    expect(golden.hair).toBe(6)
+    expect(golden.shirt).toBe(6)
   })
   test('INPUT preserves empty defaults, limits, erases and cancels', () => {
     let input = createInput(2)

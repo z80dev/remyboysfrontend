@@ -20,7 +20,7 @@ npm run build   # tsc + vite build → dist (Cloudflare Pages)
 - Winamp (`#/winamp`, lightning-bolt icon): classic Winamp 2.x (main window, equalizer, playlist editor, all three windowshades, docking/snapping, double size, Win32 menus, Z/X/C/V/B keys) in `src/winamp/`. It is a `skinned` + `persistent` app (`src/os/apps.ts`): no Luna frame (`ChromeContext` in `src/os/Window.tsx` hands it focus/minimize), and it stays mounted while minimized — on the desktop and behind the Pocket Today screen — so music keeps playing; closing it stops playback.
   - Skin: `skin/sprites.ts` is the .wsz sheet geometry (from Webamp, MIT). The default skin is our own procedural repaint of the 2.91 base skin (`skin/base.ts` + `skin/paint/`, ~30 ms, no bitmaps shipped). Dropping a real `.wsz` on the player, or Skins ▸ Load skin…, loads it (`skin/wsz.ts`: ZIP via `DecompressionStream`, BMPs, VISCOLOR/PLEDIT.TXT; missing sheets fall back to the default).
   - Player (`player/player.ts`, a module singleton outside React; `player/types.ts` is the UI contract): source → preamp → 10 peaking filters (Winamp bands, `presets.ts` = winamp.q1 presets) → balance → volume → analyser. Built-in songs are Song data rendered by the Remy Quest engine (`renderOffline`) in 8 s segments ahead of the playhead (`synth.ts`; intro + loops ≈ 2.5 min + 8 s fade, 16-bit LRU cache capped at 96 MB), so seeking anywhere works. Visitor files/URLs play through an `<audio>` element (titles from ID3/filename, `probe.ts`). Settings: `localStorage['remyamp.settings.v1']`; window layout: `remyamp.layout.v1`.
-  - Playlist (`player/library.ts`): Remy Whippin' Intro; the top 10 of the Billboard Hot 100 (week of Oct 10, 2026) plus the 2012 year-end top 5, as 16-bit remakes in `src/winamp/songs/` (one original composition per chart hit — patientzero, choosintexas, cleveland, babylon, pinkclouding, boston, beenbynow, hatethat, stupidsong, dracula; somebody, callmemaybe, weareyoung, payphone, lights); three Winamp-era originals (demoscene, eurodance, lo-fi); five public-domain classics remixes (Grieg, Beethoven ×2, Pachelbel, Rimsky-Korsakov; melodies from the original scores); then the 12 Remy Quest tracks and Night of the Cabald.
+  - Playlist (`player/library.ts`): Remy Whippin' Intro; the top 10 of the Billboard Hot 100 (week of Oct 10, 2026) plus the 2012 year-end top 5, as 16-bit tracks in `src/winamp/songs/` (one original composition per chart hit — patientzero, choosintexas, cleveland, babylon, pinkclouding, boston, beenbynow, hatethat, stupidsong, dracula; somebody, callmemaybe, weareyoung, payphone, lights). The 2012 top 3 carry their own titles: somebody is "Two-Chord Goodbye", callmemaybe "Pocket Dial Crush", weareyoung "Light Up the Rooftops". Then three Winamp-era originals (demoscene, eurodance, lo-fi); five public-domain classics remixes (Grieg, Beethoven ×2, Pachelbel, Rimsky-Korsakov; melodies from the original scores); then the 12 Remy Quest tracks and Night of the Cabald.
 - Remy Trader (`#/trader`): fREMY/ETH market from the shared Alchemy event index (`workers/remy-data`, `/api/data/snapshot`), order ticket via RemyRouter `buyFloor`/`sellFloor`, and a Uniswap v4 market-maker desk via PositionManager action scripts. The desk (`src/apps/TraderRange.tsx`, model in `src/lib/liquidityRange.ts`) places any range the pool's ticks allow, from one step to 0–∞, on a draggable liquidity chart; edges at the market stay anchored to it so asks stay fREMY-only and bids ETH-only. v4 math (TickMath, SqrtPriceMath, LiquidityAmounts) is ported to bigint in `src/lib/v4math.ts`.
 - Wallpaper: `public/wallpaper/remy-bliss.svg` (the Remy kite is inline SVG in `src/os/Desktop.tsx`).
 - Halloween: Display Properties offers the **Halloween** colour scheme (purple Luna, pumpkin Start button and tray) and the **Haunted Remys** wallpaper: a Halloween Remy full-bleed under a vignette, drifting fog and bats (`HauntedSky` in `src/os/Halloween.tsx`), a different one each visit unless one is pinned (desktop right-click → Summon a Halloween Remy). Through October, visitors without saved display prefs get both by default (`loadPrefs` in `src/os/shell.ts`). The free-mint flyer cross-fades six Halloween Remys.
@@ -28,6 +28,47 @@ npm run build   # tsc + vite build → dist (Cloudflare Pages)
 - Art: the art index is the last path segment of `tokenURI` (re-mints keep the original art); pictures come from `/media/remy/…` (see below).
 - Recovery: one RemyReclaim per Payment Processor v2 theft wave (`RECLAIMS` in `src/config.ts`, read through `src/lib/reclaim.ts`): wave 1 (2026-09-26, 120 Remys, `data/owed.json`) and wave 2 (2026-09-28/29, 52 Remys from 17 wallets, `data/owed-2.json`). Wave 2 deploys from `remy-boys-recovery` with `OWED=data/owed-2.json forge script script/Deploy.s.sol --rpc-url base --broadcast` through the CREATE2 factory, so its address (`0xacDF…4DE6`) is fixed before deploy and anyone can broadcast it; until it has code the site treats wave 2 as not deployed. The collection owner then enables claims per wave (Launch Control or the Recovery Center owner row).
 - Participant snapshot: `python3 scripts/participants.py [--min-hold-days 7] [--tiers 10,5,3,2]` scans every Transfer of the collection and rbREMY/rbREMYLS/wREMY/REMY/fREMY since the collection's deploy block (via `mainnet.base.org`) and writes `.cache/participants/remy-participants-<block>.csv`: every wallet holding Remy equivalents now (wallet balances, live fREMY/ETH v4 LP positions, and stolen NFTs RemyReclaim still owes) that held ≥ N days in one stretch, tiered 1–5 by Remys held now (`--tiers` are the floors of tiers 1–4). Wrapping, staking (rbREMYLS), LP adds/removes and the theft/re-mint don't break a streak. It drops wallets holding nothing now (full dumpers), snipers, protocol/marketplace contracts, and the attacker. Logs are cached per 20k blocks, so reruns only fetch new blocks.
+
+## Classic Games
+
+Open the **Games** folder (`/#/games`) or **Start → All Programs → Games**. All fifteen games work as a guest; no wallet or NFT ownership is required. Each game is lazy-loaded and has its own Game/Help menus, rules, keyboard controls and touch layout.
+
+| Game / route | Classic inspiration | Remy spin |
+| --- | --- | --- |
+| Solitaire — `/#/solitaire` | Windows Klondike | Remy court cards and thirteen shared deck backs |
+| FreeCell — `/#/freecell` | Windows FreeCell | Numbered deals with the Remy deck |
+| Spider Solitaire — `/#/spider` | Windows Spider | One-, two- and four-suit Remy decks |
+| The Remy Hearts Network — `/#/hearts` | Microsoft Hearts | Remy opponents; dodge the Rug Lord |
+| Minesweeper — `/#/minesweeper` | Windows Minesweeper | Find the sleeping Cabald |
+| Reversi — `/#/reversi` | Windows Reversi | Hair versus bald, flip for flip |
+| Base Cadet — `/#/pinball` | 3D Pinball: Space Cadet | Seventeen missions and nine ranks on Base |
+| SkiFree — `/#/skifree` | SkiFree | Mempool Mountain and a hungry bald pursuer |
+| JezzBald — `/#/jezzbald` | JezzBall | Box in the Cabald and clear 75% |
+| Remy's Revenge — `/#/remys-revenge` | Rodent's Revenge | Trap the Cabald's cats and collect cheese |
+| Remy's Challenge — `/#/remys-challenge` | Chip's Challenge | Forty original chip-collecting puzzle levels |
+| Taipei — `/#/taipei` | Taipei / Mahjong solitaire | Remy tile art and solvable deals |
+| Pipe Dream — `/#/pipe-dream` | Pipe Dream | Route the liquidity before it flows |
+| Remy Gorillas — `/#/gorillas` | QBasic GORILLA.BAS | Rooftop banana artillery with Remy characters |
+| Remy Nibbles — `/#/nibbles` | QBasic NIBBLES.BAS | One- or two-player number-eating snakes |
+
+`F1` opens Help and `F2` starts a new game where the game's menu permits it. Game-specific keys, scoring and touch gestures are documented inside Help. Pinball uses `Z` and `/` for flippers, hold/release `Space` to launch, and `X`, `.`, or `Up` to nudge; its controls can be remapped. The QBasic games retain their DOS-style setup screens and supply touch controls. Short Pocket landscape layouts may scroll rather than reduce board touch targets.
+
+### Implementation
+
+- `src/games/registry.ts` owns the roster, routes, icons and lazy imports. `src/apps/Games.tsx` provides the folder; the OS registers the same roster for windows and the Start submenu.
+- Each game's pure rule engine is separate from its React/canvas presentation. `tests/games/` covers rules, scoring, deal invariants, transitions and physics. Pinball uses pooled continuous-collision physics at 1/480-second steps; Remy's Challenge keeps authored level data and replayable solution routes.
+- `src/games/kit/` supplies XP menus/dialogs, Help tabs, crisp canvas sizing, window lifecycle hooks, guarded local storage, Remy art and synthesized sound. Gameplay pauses when inactive/hidden; settings and scores remain local to the browser. Games use the kit mute setting rather than private audio contexts. Browser-level muting can silence the whole site, including Winamp and the existing Quest/Halloween games.
+- `src/games/cards/` is the shared Cards.dll-style renderer and input layer for the four card games: 71×96 logical cards, Remy courts, thirteen deck backs, shared deck preference, accessible labels, movement tweens and keyboard/touch selection. Rule engines import its pure card model, not the renderer.
+- `src/games/qbasic/` supplies the original-authored bitmap DOS font, sixteen-colour palette, text/half-cell renderer, INPUT editing and PLAY/MML speaker synthesis. Gorillas uses 640×350 graphics and 640×400 setup screens; Nibbles uses an 80×25 text screen.
+- Remy portraits reuse the immutable Quest art pipeline. The canonical art catalogue decides civilian versus bald/Cabald identity; games do not infer it from appearance or token ownership.
+
+```sh
+bun test tests/games
+npx tsc --noEmit -p .
+npm run build
+```
+
+For UI changes, also play the affected game in desktop and Pocket portrait/landscape modes. Engine tests do not establish pointer, focus, dialog or audio quality. Automated review browsers should use isolated profiles and `--headless=new --mute-audio`.
 
 ## Art delivery (`/media/*`, R2)
 

@@ -1,4 +1,4 @@
-import { EGA, clearScreen, drawInput, drawSparkles, drawText, nearestEga } from '../qbasic'
+import { EGA, clearScreen, cursorVisible, drawInput, drawSparkles, drawText, quantizeRemyPalette } from '../qbasic'
 import type { InputLine } from '../qbasic'
 import type { RemyPalette } from '../kit'
 import { HEIGHT, WIDTH, SUN_X, SUN_Y, SUN_RADIUS, type Match, type Round } from './engine'
@@ -8,20 +8,25 @@ export type ChibiPalette = { skin: number; hair: number; shirt: number; trousers
 export const HERO_PALETTE: ChibiPalette = { skin: 14, hair: 6, shirt: 10, trousers: 8 }
 export const CIVILIAN_PALETTE: ChibiPalette = { skin: 12, hair: 0, shirt: 11, trousers: 8 }
 export const CABALD_PALETTE: ChibiPalette = { skin: 14, hair: 14, shirt: 8, trousers: 0 }
-const BANANA_POINTS = [[-3, -1], [-3, 0], [-2, 1], [-1, 2], [0, 2], [1, 2], [2, 1], [3, 0], [3, -1]] as const
+const BANANA_POINTS = [
+  [-3, -2], [-3, -1], [3, -2], [3, -1], [-3, 0], [-2, 0], [2, 0], [3, 0],
+  [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1], [-2, 2], [-1, 2], [0, 2], [1, 2], [2, 2],
+] as const
 const EXPLOSION_COLORS = [12, 14, 4] as const
-export type Screen = 'dos' | 'intro' | 'setup' | 'menu' | 'preview' | 'play'
+const SETUP_COLUMNS = [13, 14, 17, 17] as const
+export type Screen = 'dos' | 'intro' | 'setup' | 'menu' | 'preview' | 'play' | 'over'
+export function screenHeight(screen: Screen): number {
+  return screen === 'play' ? HEIGHT : 400
+}
 export type RenderView = {
   screen: Screen; clock: number; input: InputLine; setupStep: number; setupValues: string[]; names: [string, string]
   prompt: 'angle' | 'velocity'; angle: string; error: string; paused: boolean; cpu: boolean; cabaldMessage: boolean
-  match: Match; palettes: [ChibiPalette, ChibiPalette]; skyline: HTMLCanvasElement | null
+  match: Match; palettes: [ChibiPalette, ChibiPalette]; skyline: HTMLCanvasElement | null; sunGaspAt: number
 }
 
 export function quantizePalette(palette: RemyPalette): ChibiPalette {
-  let skin = nearestEga(palette.skin)
-  if (![6, 7, 12, 14, 15].includes(skin)) skin = 12
-  const shirt = nearestEga(palette.shirt)
-  return { skin, hair: nearestEga(palette.hair), shirt, trousers: shirt === 8 || shirt === 7 ? 0 : 8 }
+  const { skin, hair, shirt } = quantizeRemyPalette(palette)
+  return { skin, hair, shirt, trousers: shirt === 8 || shirt === 7 ? 0 : 8 }
 }
 
 export function createSkylineLayer(round: Round): HTMLCanvasElement {
@@ -58,7 +63,8 @@ export function drawRemySprite(ctx: CanvasRenderingContext2D, x: number, y: numb
   y = Math.round(y)
   if (bald) {
     ctx.fillStyle = EGA[4]
-    for (let row = 6; row < 15; row++) ctx.fillRect(x + 2, y + row * 2, 26, row === 14 ? 1 : 2)
+    ctx.fillRect(x + 2, y + 12, 26, 16)
+    for (let col = 1; col < 14; col += 2) ctx.fillRect(x + col * 2, y + 28, 2, 2)
   }
   for (let row = 0; row < 15; row++) {
     for (let col = 0; col < 15; col++) {
@@ -78,7 +84,7 @@ export function drawRemySprite(ctx: CanvasRenderingContext2D, x: number, y: numb
   }
 }
 
-export function drawSun(ctx: CanvasRenderingContext2D, gasp: boolean): void {
+export function drawSun(ctx: CanvasRenderingContext2D, gasp: boolean, pop = 22): void {
   disc(ctx, SUN_X, SUN_Y, SUN_RADIUS, 14)
   ctx.fillStyle = EGA[14]
   ctx.fillRect(SUN_X - 1, SUN_Y - 21, 2, 6)
@@ -91,7 +97,7 @@ export function drawSun(ctx: CanvasRenderingContext2D, gasp: boolean): void {
     ctx.fillRect(SUN_X - 12 - i, SUN_Y + 12 + i, 2, 2)
     ctx.fillRect(SUN_X + 12 + i, SUN_Y + 12 + i, 2, 2)
   }
-  const shadesY = SUN_Y - 3 - (gasp ? 6 : 0)
+  const shadesY = SUN_Y - 3 - (gasp ? Math.min(22, Math.floor(pop)) : 0)
   ctx.fillStyle = EGA[0]
   ctx.fillRect(SUN_X - 9, shadesY, 18, 2)
   ctx.fillRect(SUN_X - 8, shadesY, 6, 4)
@@ -100,8 +106,11 @@ export function drawSun(ctx: CanvasRenderingContext2D, gasp: boolean): void {
   ctx.fillRect(SUN_X - 7, shadesY + 1, 1, 1)
   ctx.fillRect(SUN_X + 3, shadesY + 1, 1, 1)
   if (gasp) {
-    disc(ctx, SUN_X, SUN_Y + 5, 3, 0)
-    disc(ctx, SUN_X, SUN_Y + 5, 1, 14)
+    ctx.fillStyle = EGA[0]
+    ctx.fillRect(SUN_X - 1, SUN_Y + 3, 3, 1)
+    ctx.fillRect(SUN_X - 2, SUN_Y + 4, 1, 4)
+    ctx.fillRect(SUN_X + 2, SUN_Y + 4, 1, 4)
+    ctx.fillRect(SUN_X - 1, SUN_Y + 8, 3, 1)
   } else {
     ctx.fillStyle = EGA[0]
     ctx.fillRect(SUN_X - 4, SUN_Y + 5, 1, 2)
@@ -125,60 +134,97 @@ function drawBanana(ctx: CanvasRenderingContext2D, x: number, y: number, frame: 
     Math.round(y) + (frame === 0 ? -2 : frame === 2 ? 2 : frame === 1 ? -3 : 3), 1, 1)
 }
 
-export function drawScreen(ctx: CanvasRenderingContext2D, view: RenderView): void {
+export function drawScreen(ctx: CanvasRenderingContext2D, view: RenderView, touch: boolean): void {
   const { screen, clock, input, match } = view
-  clearScreen(ctx, screen === 'dos' ? 0 : 1, WIDTH, HEIGHT)
+  clearScreen(ctx, screen === 'play' ? 1 : 0, WIDTH, screenHeight(screen))
   if (screen === 'dos') {
     drawText(ctx, S.dos, 8, 16, 7)
     drawInput(ctx, input, 1, 4, clock, 7, 0)
     return
   }
   if (screen === 'intro') {
-    drawSparkles(ctx, Math.floor(clock / 100), 21)
-    drawText(ctx, S.introTitle, (WIDTH - S.introTitle.length * 8) / 2, 64, 14)
-    for (let i = 0; i < S.introLines.length; i++) drawText(ctx, S.introLines[i], 80, 120 + i * 16)
-    drawText(ctx, S.continue, 208, 272, 14)
-    return
-  }
-  if (screen === 'setup') {
-    drawText(ctx, S.setupTitle, 280, 32, 14)
-    for (let i = 0; i <= view.setupStep; i++) {
-      drawText(ctx, S.setupPrompts[i], 24, 72 + i * 56)
-      if (i < view.setupStep) drawText(ctx, view.setupValues[i], 24, 88 + i * 56, 14)
+    drawSparkles(ctx, Math.floor(clock / 100), 22, 12, 0, 5)
+    drawText(ctx, S.introTitle, (WIDTH - S.introTitle.length * 8) / 2, 64, 15)
+    for (let i = 0; i < S.introLines.length; i++) {
+      const line = S.introLines[i]
+      drawText(ctx, line, (WIDTH - line.length * 8) / 2, 120 + i * 16, 7)
     }
-    drawInput(ctx, input, 4, 7 + view.setupStep * 3.5, clock, 14)
-    if (view.setupStep === 1) drawText(ctx, S.cpuHint, 24, 304, 7)
-    if (view.error) drawText(ctx, view.error, 24, 328, 12)
+    const continueText = touch ? S.touchContinue : S.continue
+    drawText(ctx, continueText, (WIDTH - continueText.length * 8) / 2, 368, 7)
     return
   }
-  if (screen === 'menu' || screen === 'preview') {
-    drawText(ctx, S.introTitle, (WIDTH - S.introTitle.length * 8) / 2, 48, 14)
-    if (screen === 'menu') {
-      for (let i = 0; i < S.menuLines.length; i++) drawText(ctx, S.menuLines[i], 256, 128 + i * 32)
+  if (screen === 'setup' || screen === 'menu') {
+    const answered = screen === 'menu' ? S.setupPrompts.length : view.setupStep
+    for (let i = 0; i <= Math.min(answered, S.setupPrompts.length - 1); i++) {
+      const row = 5 + i * 2
+      const prompt = S.setupPrompts[i]
+      const x = (SETUP_COLUMNS[i] - 1) * 8
+      drawText(ctx, prompt, x, (row - 1) * 16, 7, 0)
+      const col = SETUP_COLUMNS[i] + prompt.length + 1
+      const answer = i < answered ? view.setupValues[i] ?? '' : input.value + (cursorVisible(clock) ? '_' : ' ')
+      const available = 81 - col
+      if (answer.length <= available) drawText(ctx, answer, (col - 1) * 8, (row - 1) * 16, 7, 0)
+      else {
+        drawText(ctx, answer.slice(0, available), (col - 1) * 8, (row - 1) * 16, 7, 0)
+        drawText(ctx, answer.slice(available), x, row * 16, 7, 0)
+      }
+    }
+    if (screen === 'setup') {
+      if (view.setupStep === 1) drawText(ctx, S.cpuHint, 104, 208, 7, 0)
+      if (view.error) drawText(ctx, view.error, 96, 256, 12, 0)
     } else {
-      drawText(ctx, S.preview, 200, 112)
-      drawRemySprite(ctx, 152, 208, view.palettes[0], Math.floor(clock / 180) % 4)
-      drawRemySprite(ctx, 456, 208, view.palettes[1], Math.floor(clock / 180) % 4, true, view.cpu)
-      drawText(ctx, S.continue, 208, 288, 14)
+      for (let i = 0; i < S.menuLines.length; i++) drawText(ctx, S.menuLines[i], 256, 208 + i * 32, 7, 0)
+      drawText(ctx, S.choice, 256, 320, 7, 0)
+      drawInput(ctx, input, 33 + S.choice.length + 1, 21, clock, 7, 0)
     }
+    return
+  }
+  if (screen === 'preview') {
+    drawText(ctx, S.introTitle, (WIDTH - S.introTitle.length * 8) / 2, 48, 15)
+    drawText(ctx, S.starring, (WIDTH - S.starring.length * 8) / 2, 112, 7)
+    const cast = S.previewCast(view.names[0], view.names[1])
+    drawText(ctx, cast, (WIDTH - cast.length * 8) / 2, 144, 7)
+    drawRemySprite(ctx, 152, 208, view.palettes[0], Math.floor(clock / 180) % 4)
+    drawRemySprite(ctx, 456, 208, view.palettes[1], Math.floor(clock / 180) % 4, true, view.cpu)
+    const continueText = touch ? S.touchContinue : S.continue
+    drawText(ctx, continueText, (WIDTH - continueText.length * 8) / 2, 368, 7)
+    return
+  }
+  if (screen === 'over') {
+    drawSparkles(ctx, Math.floor(clock / 100), 22, 12, 0, 5)
+    drawText(ctx, S.gameOver, (WIDTH - S.gameOver.length * 8) / 2, 80, 7)
+    drawText(ctx, S.score, 232, 128, 7)
+    for (let side = 0; side < 2; side++) {
+      drawText(ctx, view.names[side], 104, 160 + side * 32, 7)
+      drawText(ctx, String(match.scores[side]), 392, 160 + side * 32, 7)
+    }
+    const result = match.winner === -1 ? view.cpu ? S.cpuDraw : S.draw
+      : view.cpu ? match.winner === 1 ? view.cabaldMessage ? S.cpuWin : S.cpuWinOnly : S.humanWin
+        : S.matchWin(view.names[match.winner])
+    drawText(ctx, result, (WIDTH - result.length * 8) / 2, 256, 7)
+    const continueText = touch ? S.touchContinue : S.continue
+    drawText(ctx, continueText, (WIDTH - continueText.length * 8) / 2, 368, 7)
     return
   }
   const round = match.round
   if (view.skyline) ctx.drawImage(view.skyline, 0, 0)
-  drawSun(ctx, round.sunGasp)
+  drawSun(ctx, round.sunGasp, (view.clock - view.sunGaspAt) * 0.09)
   for (let i = 0; i < round.buildings.length; i++) {
     const b = round.buildings[i]
-    if (!b.tower) continue
+    const antennaX = b.x + Math.floor(b.width / 2)
+    if (!b.tower || round.pixels[b.y * WIDTH + antennaX] === 1) continue
     ctx.fillStyle = EGA[8]
-    ctx.fillRect(b.x + Math.floor(b.width / 2), b.y - 10, 2, 10)
-    ctx.fillStyle = EGA[12]
-    ctx.fillRect(b.x + Math.floor(b.width / 2), b.y - 12, 2, 2)
+    ctx.fillRect(antennaX, b.y - 10, 2, 10)
+    if (Math.floor(view.clock * 60 / 1000 / 32) % 2 === 0) {
+      ctx.fillStyle = EGA[14]
+      ctx.fillRect(antennaX, b.y - 12, 2, 2)
+    }
   }
   for (let side = 0; side < 2; side++) {
     const p = round.players[side]
-    if (!p.alive) continue
+    if (!p.alive && !(match.phase === 'explosion' && round.hit === 'player' && round.victim === side)) continue
     const frame = match.phase === 'dance' && match.winner === side ? match.danceBeat % 2 + 1
-      : match.phase === 'flight' && round.turn === side && round.shot.time < 0.3 ? 1 : 0
+      : match.phase === 'flight' && round.turn === side && round.shot.time < 0.3 ? side === 0 ? 1 : 2 : 0
     drawRemySprite(ctx, p.x, p.y, view.palettes[side], frame, side === 1, side === 1 && view.cpu)
   }
   if (match.phase === 'flight' && round.shot.y > -6) drawBanana(ctx, round.shot.x, round.shot.y, round.shot.frame)
@@ -203,26 +249,23 @@ export function drawScreen(ctx: CanvasRenderingContext2D, view: RenderView): voi
   drawText(ctx, view.names[0], 8, 0, 15, 1)
   drawText(ctx, view.names[1], WIDTH - 8 - view.names[1].length * 8, 0, 15, 1)
   if (match.phase === 'aim' || match.phase === 'flight' && round.turn === 1 && view.cpu) {
-    const x = round.turn === 0 ? 8 : 472
+    const x = round.turn === 0 ? 8 : 440
     drawText(ctx, S.angle, x, 16, 15, 1)
-    drawText(ctx, S.velocity, x, 32, 15, 1)
-    if (view.prompt === 'velocity') drawText(ctx, view.angle, x + 80, 16, 14, 1)
-    drawInput(ctx, input, x / 8 + 11, view.prompt === 'angle' ? 2 : 3, clock, 14)
-    if (view.error) drawText(ctx, view.error, 8, 48, 12, 1)
-  }
-  if (match.phase === 'over') {
-    ctx.fillStyle = EGA[1]
-    ctx.fillRect(48, 96, 544, 144)
-    drawText(ctx, S.gameOver, 280, 104, 14)
-    drawText(ctx, view.names[0] + ' ' + match.scores[0], 80, 136)
-    drawText(ctx, view.names[1] + ' ' + match.scores[1], 80, 152)
-    if (view.cpu && view.cabaldMessage) drawText(ctx, match.winner === 1 ? S.cpuWin : S.humanWin,
-      match.winner === 1 ? 128 : 224, 184, 14)
-    drawText(ctx, S.continue, 208, 216)
+    if (view.prompt === 'velocity') {
+      drawText(ctx, view.angle, x + (S.angle.length + 1) * 8, 16, 14, 1)
+      drawText(ctx, S.velocity, x, 32, 15, 1)
+    }
+    const prompt = view.prompt === 'angle' ? S.angle : S.velocity
+    drawInput(ctx, input, x / 8 + prompt.length + 2, view.prompt === 'angle' ? 2 : 3, clock, 14)
+    if (view.error) {
+      const errorX = round.turn === 0 ? 8 : WIDTH - 8 - view.error.length * 8
+      drawText(ctx, view.error, errorX, 48, 12, 1)
+    }
   }
   if (view.paused) {
     ctx.fillStyle = EGA[0]
     ctx.fillRect(112, 152, 416, 40)
-    drawText(ctx, S.paused, 144, 164, 14)
+    const message = S.paused(touch)
+    drawText(ctx, message, (WIDTH - message.length * 8) / 2, 164, 14)
   }
 }

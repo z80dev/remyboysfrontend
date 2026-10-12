@@ -36,6 +36,17 @@ describe('Cards.dll model', () => {
     expect(hitTestPiles([{ ...layout, cards: [] }], 20, 160)?.depth).toBe(-1)
     expect(hitTestPiles([layout, { ...layout, pile: 3 }], 20, 160)?.pile).toBe(3)
   })
+  test('Pocket card height extends only the top card and empty-cell boundary, not covered-card strips', () => {
+    const cards = makeDeck().slice(0, 3)
+    const layout = { pile: 0, x: 5, y: 10, cards, offset: 32, cardHeight: 160 }
+    expect(hitTestPiles([layout], 6, 41)?.depth).toBe(0)
+    expect(hitTestPiles([layout], 6, 42)?.depth).toBe(1)
+    expect(hitTestPiles([layout], 6, 233)?.depth).toBe(2)
+    expect(hitTestPiles([layout], 6, 234)).toBeNull()
+    expect(hitTestPiles([{ ...layout, cardHeight: CARD_H }], 6, 170)).toBeNull()
+    expect(hitTestPiles([{ ...layout, cards: [] }], 6, 169)?.depth).toBe(-1)
+    expect(hitTestPiles([{ ...layout, cards: [] }], 6, 170)).toBeNull()
+  })
   test('mixed face-down offsets follow the card being covered', () => {
     const cards = makeDeck().slice(0, 3)
     cards[0].faceUp = false

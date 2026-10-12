@@ -1,11 +1,33 @@
 import { makeDeck, shuffle, isRed, SUITS, type Card } from '../cards/model'
 
-export type Options = { draw: 1 | 3; scoring: 'standard' | 'vegas' | 'none'; timed: boolean; status: boolean; outline: boolean; keep: boolean }
+export type Options = {
+  draw: 1 | 3
+  scoring: 'standard' | 'vegas' | 'none'
+  timed: boolean
+  status: boolean
+  outline: boolean
+  keep: boolean
+}
 export const DEFAULT_OPTIONS: Options = { draw: 1, scoring: 'standard', timed: false, status: true, outline: false, keep: false }
-export type Snapshot = { stock: Card[]; waste: Card[]; homes: Card[][]; tableau: Card[][]; score: number; seconds: number; started: boolean; passes: number; won: boolean }
-export type State = Snapshot & { options: Options; undo: Snapshot | null }
-export type Source = { pile: number; depth: number }
-/** Piles 0 stock, 1 waste, 2..5 suit homes, 6..12 tableau. Stock top is its last card.
+export type Snapshot = {
+  stock: Card[]
+  waste: Card[]
+  homes: Card[][]
+  tableau: Card[][]
+  score: number
+  seconds: number
+  started: boolean
+  passes: number
+  won: boolean
+}
+export type State = Snapshot & { options: Options, undo: Snapshot | null }
+export type Source = { pile: number, depth: number }
+/** Standard/None retain the Vegas balance; turning off Keep score in Vegas discards it. */
+export function vegasBank(state: State, savedBank: number): number {
+  if (state.options.scoring !== 'vegas') return savedBank
+  return state.options.keep ? state.score : 0
+}
+/** Piles 0 stock, 1 waste, 2..5 physical homes, 6..12 tableau. Stock top is its last card.
  * No move flips an exposed card. A snapshot stores exactly one prior action, including its clock and score.
  * Vegas banks enter at deal time only when Keep score is selected; UI persists no board or clock. */
 export function deal(seed: number, options: Options = DEFAULT_OPTIONS, bank = 0): State {
@@ -14,12 +36,20 @@ export function deal(seed: number, options: Options = DEFAULT_OPTIONS, bank = 0)
   return { options: { ...options }, tableau, stock: cards.map(c => ({ ...c, faceUp: false })), waste: [], homes: [[], [], [], []],
     score: options.scoring === 'vegas' ? (options.keep ? bank : 0) - 52 : 0, seconds: 0, started: false, passes: 1, won: false, undo: null }
 }
-export function pile(state: Snapshot, p: number): Card[] { return p === 0 ? state.stock : p === 1 ? state.waste : p < 6 ? state.homes[p - 2] : state.tableau[p - 6] }
+export function pile(state: Snapshot, p: number): Card[] {
+  return p === 0 ? state.stock : p === 1 ? state.waste : p < 6 ? state.homes[p - 2] : state.tableau[p - 6]
+}
 function snapshot(s: State): Snapshot {
   return { stock: s.stock.slice(), waste: s.waste.slice(), homes: s.homes.map(p => p.slice()), tableau: s.tableau.map(p => p.slice()),
     score: s.score, seconds: s.seconds, started: s.started, passes: s.passes, won: s.won }
 }
-function begin(s: State): State { const undo = snapshot(s); return { ...s, ...snapshot(s), undo, started: true } }
+function begin(s: State): State {
+  const previous = {
+    stock: s.stock, waste: s.waste, homes: s.homes, tableau: s.tableau,
+    score: s.score, seconds: s.seconds, started: s.started, passes: s.passes, won: s.won
+  }
+  return { ...s, ...snapshot(s), undo: previous, started: true }
+}
 function points(s: State, standard: number, vegas = 0) {
   s.score = s.options.scoring === 'standard' ? Math.max(0, s.score + standard) : s.options.scoring === 'vegas' ? s.score + vegas : 0
 }
@@ -56,13 +86,16 @@ export function canMove(s: State, from: Source, to: number): boolean {
   const card = cards[from.depth]
   if (!card?.faceUp || from.depth < 0) return false
   if (from.pile < 6 && from.depth !== cards.length - 1) return false
-  const run = cards.slice(from.depth)
-  for (let i = 1; i < run.length; i++) {
-    if (!run[i].faceUp || run[i - 1].rank !== run[i].rank + 1 || isRed(run[i - 1]) === isRed(run[i])) return false
+  for (let i = from.depth + 1; i < cards.length; i++) {
+    if (!cards[i].faceUp || cards[i - 1].rank !== cards[i].rank + 1 || isRed(cards[i - 1]) === isRed(cards[i])) return false
   }
   const target = pile(s, to)
   const top = target[target.length - 1]
-  if (to < 6) return run.length === 1 && card.suit === SUITS[to - 2] && card.rank === target.length + 1
+  if (to < 6) {
+    if (from.depth !== cards.length - 1) return false
+    if (top) return card.suit === target[0].suit && card.rank === top.rank + 1
+    return card.rank === 1 && !s.homes.some((home, index) => index + 2 !== from.pile && home.length && home[0].suit === card.suit)
+  }
   return top ? top.faceUp && top.rank === card.rank + 1 && isRed(top) !== isRed(card) : card.rank === 13
 }
 export function winBonus(seconds: number): number { return seconds >= 30 ? Math.floor(700000 / seconds) : 0 }
@@ -70,8 +103,9 @@ export function move(s: State, from: Source, to: number): State {
   if (!canMove(s, from, to)) return s
   const n = begin(s)
   pile(n, to).push(...pile(n, from.pile).splice(from.depth))
-  points(n, to < 6 ? 10 : from.pile < 6 && from.pile >= 2 ? -15 : from.pile === 1 ? 5 : 0,
-    to < 6 ? 5 : from.pile >= 2 && from.pile < 6 ? -5 : 0)
+  const fromHome = from.pile >= 2 && from.pile < 6
+  points(n, to < 6 ? fromHome ? 0 : 10 : fromHome ? -15 : from.pile === 1 ? 5 : 0,
+    to < 6 ? fromHome ? 0 : 5 : fromHome ? -5 : 0)
   if (n.homes.every(p => p.length === 13)) {
     n.won = true
     if (n.options.scoring === 'standard' && n.options.timed) points(n, winBonus(n.seconds))
@@ -87,7 +121,10 @@ export function tick(s: State, seconds = 1): State {
 }
 export function home(s: State, from: Source): State {
   const card = pile(s, from.pile)[from.depth]
-  return card ? move(s, from, 2 + SUITS.indexOf(card.suit)) : s
+  if (!card) return s
+  const bound = s.homes.findIndex(home => home.length && home[0].suit === card.suit)
+  const target = bound >= 0 ? bound : s.homes.findIndex(home => !home.length)
+  return target >= 0 ? move(s, from, target + 2) : s
 }
 /** Auto-home deliberately re-evaluates all exposed tops after each single move; undo remains single-step. */
 export function autoHome(s: State): State {
@@ -104,8 +141,15 @@ export function autoHome(s: State): State {
 }
 export function cheatWin(s: State): State {
   const n = begin(s)
-  n.stock = []; n.waste = []; n.tableau = [[], [], [], [], [], [], []]
-  n.homes = SUITS.map(suit => makeDeck().filter(c => c.suit === suit))
+  n.stock = []
+  n.waste = []
+  n.tableau = [[], [], [], [], [], [], []]
+  const cards = makeDeck()
+  const remaining = SUITS.filter(suit => !s.homes.some(home => home.length && home[0].suit === suit))
+  n.homes = s.homes.map(home => {
+    const suit = home.length ? home[0].suit : remaining.shift()!
+    return cards.filter(card => card.suit === suit)
+  })
   if (n.options.scoring === 'vegas') n.score += (52 - s.homes.reduce((sum, p) => sum + p.length, 0)) * 5
   if (n.options.scoring === 'standard' && n.options.timed) points(n, winBonus(n.seconds))
   n.won = true

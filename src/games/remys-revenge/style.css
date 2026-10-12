@@ -1,0 +1,116 @@
+.revenge-app {
+  --revenge-board: 368px;
+  --revenge-frame-padding: 16px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #c0c0c0;
+  font: 11px var(--font);
+  color: #000;
+}
+.revenge-app > .gk-menubar { flex-shrink: 0; }
+.revenge-surface { display: flex; flex-direction: column; flex: 1; min-height: 0; outline: none; }
+.revenge-surface:focus-visible { outline: 1px dotted #000; outline-offset: -1px; }
+.revenge-header-wrap { position: relative; flex-shrink: 0; width: min(400px, 100%); height: 48px; margin: 0 auto; }
+.revenge-header { display: block; width: 100%; height: 48px; image-rendering: pixelated; }
+.revenge-flash {
+  position: absolute;
+  inset: 0 37% 0 19%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 13px;
+  pointer-events: none;
+}
+.revenge-status { flex-shrink: 0; padding: 3px 8px; text-align: center; line-height: 14px; border-bottom: 1px solid #808080; }
+.revenge-playfield { display: grid; grid-template-rows: 1fr auto; flex: 1; min-height: 0; min-width: 0; }
+.revenge-frame {
+  position: relative;
+  box-sizing: content-box;
+  width: var(--revenge-board);
+  height: var(--revenge-board);
+  padding: var(--revenge-frame-padding);
+  justify-self: center;
+  align-self: start;
+  background: #c0c0c0;
+  box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+}
+.revenge-board {
+  display: block;
+  width: var(--revenge-board);
+  height: var(--revenge-board);
+  image-rendering: pixelated;
+  touch-action: none;
+  box-shadow: -1px -1px #808080, 1px 1px #fff;
+}
+.revenge-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(280px, calc(var(--revenge-board) - 16px));
+  max-height: calc(var(--revenge-board) - 16px);
+  overflow: auto;
+  background: #c0c0c0;
+  border: 2px outset #fff;
+  padding: 12px;
+  min-height: 44px;
+  font: 11px / 1.35 var(--font);
+}
+.revenge-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 4px;
+  justify-self: center;
+  align-self: end;
+  margin: 8px;
+  touch-action: none;
+}
+.revenge-pad button {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  color: #202020;
+  background: #c0c0c0;
+  border: 2px outset #fff;
+  touch-action: none;
+}
+.revenge-pad button:active { border-style: inset; }
+.revenge-pad button:focus-visible { outline: 1px dotted #000; outline-offset: -5px; }
+.revenge-pad svg { width: 28px; height: 28px; }
+.revenge-landscape .revenge-playfield { grid-template-columns: 1fr 192px; grid-template-rows: 1fr; }
+.revenge-landscape .revenge-frame { align-self: center; }
+.revenge-landscape .revenge-pad { justify-self: end; }
+.revenge-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+/* Pocket dialogs default to screen width in the kit; this compact Help must keep its requested width. */
+.revenge-help-pocket { width: min(380px, calc(100vw - 16px)) !important; }
+.revenge-help .window-body { padding: 10px; }
+.revenge-help p { margin: 0; min-height: 140px; line-height: 1.5; user-select: text; }
+.revenge-score-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 8px; }
+.revenge-score-tabs button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 2px outset #fff;
+  background: #c0c0c0;
+  font: 11px var(--font);
+}
+.revenge-score-tabs button[aria-pressed='true'] { background: #fff; border-style: inset; }

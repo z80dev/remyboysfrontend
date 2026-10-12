@@ -1,5 +1,7 @@
 import type { Course } from './types'
 
+const styleAnnouncement = (score: number) => `Style: ${score.toLocaleString('en-US')} points.`
+
 /** Every SkiFree string, reviewed in one place: menus, dialogs, help, signs, balloons and announcements. */
 export const STRINGS = {
   title: 'SkiFree',
@@ -22,10 +24,10 @@ export const STRINGS = {
     },
     {
       title: 'Scoring',
-      text: 'The status box shows elapsed time, distance in meters, speed in meters per second, and style points.\n'
+      text: 'The status box shows elapsed time, your deepest downhill distance in meters, speed in meters per second, and style points.\n'
         + 'Slalom and Tree Slalom are scored by time. Each missed gate adds 5 seconds.\n'
         + 'Freestyle is scored by style. Jumps and tricks landed cleanly add points; crashing takes them away.\n'
-        + 'Free skiing records your longest distance. SkiFree keeps the best of each.\n'
+        + 'The distance record is your deepest descent. After a course finishes, its clock stops and you may keep skiing.\n'
         + 'Records are kept on this computer. Not on chain. Nowhere near a chain.',
     },
     {
@@ -62,7 +64,6 @@ export const STRINGS = {
     burp: '*burp* Plausible deniability.',
   },
   status: { time: 'Time:', dist: 'Dist:', speed: 'Speed:', style: 'Style:', meters: 'm', speedUnit: 'm/s' },
-  paused: 'Paused. Click or press a key to resume.',
   gameOver: 'You were eaten by something that does not exist. Press F2 to ski again.',
   courseNames: { free: 'Free Ski', slalom: 'Slalom', tree: 'Tree Slalom', freestyle: 'Freestyle' } as Record<Course, string>,
   scoreNames: { slalom: 'Slalom', tree: 'Tree Slalom', freestyle: 'Freestyle', distance: 'Distance' },
@@ -71,6 +72,7 @@ export const STRINGS = {
     newGameKey: 'F2',
     pauseKey: 'F3',
     helpKey: 'F1',
+    gameOverTitle: 'Game Over',
     optionsMenu: '&Options',
     helpMenu: '&Help',
     newGame: '&New Game',
@@ -82,26 +84,17 @@ export const STRINGS = {
     snowboarder: 'Snow&boarder',
     contents: '&Contents',
     about: '&About SkiFree\u2026',
-    newGameTitle: 'New Game',
-    coursePrompt: 'Where would you like to start?',
-    start: 'Start',
-    cancel: 'Cancel',
     resume: 'Resume',
-    continueSkiing: 'Keep Skiing',
-    newGameHint: 'Press F2 to start a new game.',
     pausedHint: 'Click or press any key to resume.',
+    touchPausedHint: 'Tap Resume to continue.',
     frameStep: 'Press T to advance one frame.',
     fast: 'F',
     jump: 'Jump',
-    courseComplete: 'Course complete.',
-    newRecord: 'New record.',
     nameTitle: 'Best Score',
     nameMessage: 'You set a SkiFree record. Please enter your name.',
     bestTitle: 'Best Scores',
     bestHeading: 'SkiFree records',
     ok: 'OK',
-    close: 'Close',
-    timeUnit: 's',
     distanceUnit: 'm',
     styleUnit: 'points',
     helpTabsAria: 'Help topics',
@@ -109,22 +102,21 @@ export const STRINGS = {
     controlsAria: 'Touch controls',
     pauseButton: 'Pause',
     fastButton: 'Fast',
-    courseResult: (course: string, result: string) => `${course}: ${result}`,
-    penaltyNote: (seconds: number) => `includes ${seconds} s in missed-gate penalties`,
   },
   announcements: {
     pause: 'Paused.',
     resume: 'Resumed.',
     courseStart: 'Course started.',
-    courseFinish: 'Course finished.',
+    courseFinish: (course: string, result: string, penalties: number) => `Course finished. ${course}: ${result}.${penalties > 0 ? ` Includes ${penalties} s in missed-gate penalties.` : ''}`,
     gameOver: 'Eaten. Game over.',
     gatePass: 'Gate passed.',
     gateMiss: 'Gate missed. Plus 5 seconds.',
-    crash: 'Crashed.',
+    land: (score: number) => `Landed. ${styleAnnouncement(score)}`,
+    crash: (score: number, includeStyle: boolean) => includeStyle ? `Crashed. ${styleAnnouncement(score)}` : 'Crashed.',
     fastOn: 'Fast mode on.',
     fastOff: 'Fast mode off.',
     jump: 'Jump.',
-    trick: 'Trick landed.',
+    trick: 'Trick completed.',
     newGame: 'New game.',
     monster: 'Something large and bald is approaching.',
   },

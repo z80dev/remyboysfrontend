@@ -96,7 +96,12 @@ export function chooseMove(input: Board, side: Side, skill: Skill, options: Sear
       if (n > max) { max = n; best.length = 0 }
       if (n === max) best.push(move)
     }
-    return { move: best.length ? best[((options.seed ?? 0) >>> 0) % best.length] : null,
+    // A fresh deterministic Mulberry32 draw for each move, not a fixed per-game tie index.
+    let random = ((options.seed ?? 0) ^ (empty << 8) ^ side) + 0x6d2b79f5 | 0
+    random = Math.imul(random ^ random >>> 15, random | 1)
+    random ^= random + Math.imul(random ^ random >>> 7, random | 61)
+    const fraction = ((random ^ random >>> 14) >>> 0) / 4294967296
+    return { move: best.length ? best[Math.floor(fraction * best.length)] : null,
       score: max, depth: 1, exact: false, nodes: rootMoves.length }
   }
   const exact = skill === 'master' && empty <= 12

@@ -1,4 +1,4 @@
-import { getGamesAudio, isGamesMuted, noise, sweep, tone } from '../kit'
+import { getGamesAudio, isGamesMuted, noise, stopSounds, sweep, tone } from '../kit'
 import type { GameEvent } from './types'
 
 export type SkiAudio = {
@@ -60,51 +60,60 @@ export function createSkiAudio(): SkiAudio {
     last[name] = now
     switch (name) {
       case 'jump':
-        sweep(260, 680, 0.16, { type: 'sine', vol: 0.085 })
+        sweep(260, 680, 0.16, { type: 'sine', vol: 0.085, owner: 'skifree' })
         break
       case 'land':
-        noise(0.08, { filter: 'lowpass', freq: 850, vol: 0.055 })
+        noise(0.08, { filter: 'lowpass', freq: 850, vol: 0.055, owner: 'skifree' })
         break
       case 'trick':
-        sweep(780, 330, 0.2, { type: 'triangle', vol: 0.07 })
+        sweep(780, 330, 0.2, { type: 'triangle', vol: 0.07, owner: 'skifree' })
         break
       case 'crash':
-        noise(0.19, { filter: 'lowpass', freq: 340, to: 110, vol: 0.12 })
-        sweep(100, 38, 0.13, { type: 'sine', vol: 0.08 })
+        noise(0.19, { filter: 'lowpass', freq: 340, to: 110, vol: 0.12, owner: 'skifree' })
+        sweep(100, 38, 0.13, { type: 'sine', vol: 0.08, owner: 'skifree' })
         break
       case 'dog':
-        sweep(1050, 620, 0.09, { type: 'triangle', vol: 0.075 })
-        sweep(1100, 680, 0.08, { type: 'triangle', vol: 0.055, delay: 0.1 })
+        sweep(1050, 620, 0.09, { type: 'triangle', vol: 0.075, owner: 'skifree' })
+        sweep(1100, 680, 0.08, { type: 'triangle', vol: 0.055, delay: 0.1, owner: 'skifree' })
         break
       case 'roar':
-        noise(0.65, { filter: 'bandpass', freq: 540, to: 280, q: 3, vol: 0.13, attack: 0.04 })
-        noise(0.5, { filter: 'bandpass', freq: 1250, to: 760, q: 4, vol: 0.065, attack: 0.04 })
-        sweep(115, 52, 0.64, { type: 'sawtooth', vol: 0.04, attack: 0.04 })
+        noise(0.65, { filter: 'bandpass', freq: 540, to: 280, q: 3, vol: 0.13, attack: 0.04, owner: 'skifree' })
+        noise(0.5, { filter: 'bandpass', freq: 1250, to: 760, q: 4, vol: 0.065, attack: 0.04, owner: 'skifree' })
+        sweep(115, 52, 0.64, { type: 'sawtooth', vol: 0.04, attack: 0.04, owner: 'skifree' })
         break
       case 'gobble':
-        noise(0.09, { filter: 'lowpass', freq: 420, vol: 0.09 })
-        sweep(165, 64, 0.12, { type: 'triangle', vol: 0.09 })
+        for (let chomp = 0; chomp < 4; chomp++) {
+          noise(0.09, { filter: 'lowpass', freq: 420, vol: 0.075, delay: chomp * 0.3, owner: 'skifree' })
+          sweep(165, 64, 0.12, { type: 'triangle', vol: 0.075, delay: chomp * 0.3, owner: 'skifree' })
+        }
         break
       case 'burp':
-        sweep(105, 42, 0.28, { type: 'sawtooth', vol: 0.045 })
-        noise(0.2, { filter: 'bandpass', freq: 280, q: 2, vol: 0.07 })
+        sweep(105, 42, 0.28, { type: 'sawtooth', vol: 0.045, owner: 'skifree' })
+        noise(0.2, { filter: 'bandpass', freq: 280, q: 2, vol: 0.07, owner: 'skifree' })
         break
       case 'fast':
-        noise(0.35, { filter: 'bandpass', freq: 700, to: 2800, vol: 0.075 })
+        noise(0.35, { filter: 'bandpass', freq: 700, to: 2800, vol: 0.075, owner: 'skifree' })
         break
       case 'gate-pass':
-        tone(660, 0.045, { type: 'sine', vol: 0.025 })
+        tone(660, 0.045, { type: 'sine', vol: 0.025, owner: 'skifree' })
         break
       case 'gate-miss':
-        tone(160, 0.1, { type: 'triangle', vol: 0.045 })
+        tone(160, 0.1, { type: 'triangle', vol: 0.045, owner: 'skifree' })
         break
       case 'course-finish':
-        tone(523, 0.12, { type: 'triangle', vol: 0.055 })
-        tone(659, 0.12, { type: 'triangle', vol: 0.055, delay: 0.12 })
-        tone(784, 0.24, { type: 'triangle', vol: 0.055, delay: 0.24 })
+        tone(523, 0.12, { type: 'triangle', vol: 0.055, owner: 'skifree' })
+        tone(659, 0.12, { type: 'triangle', vol: 0.055, delay: 0.12, owner: 'skifree' })
+        tone(784, 0.24, { type: 'triangle', vol: 0.055, delay: 0.24, owner: 'skifree' })
         break
     }
   }
 
-  return { event, update, dispose: stopHiss }
+  return {
+    event,
+    update,
+    dispose: () => {
+      stopHiss()
+      stopSounds('skifree')
+    },
+  }
 }
