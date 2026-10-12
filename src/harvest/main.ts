@@ -7,12 +7,14 @@ import './style.css'
 import { load, save } from '../haunt/store'
 import { type Art, loadArt } from './art'
 import { audio } from './audio'
+import { type Entry, type SubmitError, fetchTop, nameKey, submitScore } from './board'
 import { FIELD_H, Game, PER_LEVEL } from './game'
 import { Renderer } from './render'
 
 const SITE = 'https://basedremyboys.club'
 const PAGE = `${SITE}/harvest/`
 const BEST_KEY = 'harvest.best'
+const NAME_KEY = 'harvest.name'
 /** Narrowest field (units); tall phones get a little less corn at the edges rather than letterbox bands. */
 const MIN_W = 340
 
@@ -85,6 +87,8 @@ function setKeys() {
   if (game.keyDir) game.target = null
 }
 window.addEventListener('keydown', (e) => {
+  // Typing a leaderboard name: keys are text, not controls.
+  if (e.target instanceof HTMLInputElement) return
   const k = e.key.toLowerCase()
   if (k === 'arrowleft' || k === 'a') keys.left = true
   else if (k === 'arrowright' || k === 'd') keys.right = true
@@ -108,9 +112,42 @@ pauseBtn.addEventListener('click', () => (state === 'play' ? pause() : resume())
 
 // ---------------------------------------------------------------- screens
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const fmt = (n: number) => n.toLocaleString('en-US')
 const muteLabel = () => (audio.muted ? '🔇' : '🔊')
+const SUBMIT_ERRORS: Record<SubmitError, string> = {
+  name_rejected: 'That name isn’t allowed on the board. Try another.',
+  slow_down: 'Easy there! Wait a few seconds and try again.',
+  invalid: 'Names are 2–16 letters, numbers, spaces or _ . \' -',
+  unavailable: 'The leaderboard is busy. Try again in a moment.',
+  network: 'Couldn’t reach the leaderboard. Check your connection.',
+}
+
+/** Top-10 list; `mine` (a name key) is highlighted. */
+function boardHtml(top: Entry[], mine = '') {
+  if (!top.length) return '<p class="empty">No harvests yet. Be the first!</p>'
+  return `<ol class="board">${top
+    .map(
+      (e) =>
+        `<li class="${nameKey(e.name) === mine ? 'me' : ''}"><span class="rank">${e.rank}</span><span class="who">${esc(e.name)}</span><span class="pts">${fmt(e.score)}</span></li>`,
+    )
+    .join('')}</ol>`
+}
+
+async function showBoard() {
+  ui.innerHTML = `
+    ${chrome()}
+    <div class="panel lead">
+      <h2>🏆 LEADERBOARD</h2>
+      <div class="slot"><p class="empty">Loading…</p></div>
+      <button class="back">BACK</button>
+    </div>`
+  ui.querySelector('.mute')?.addEventListener('click', toggleMute)
+  ui.querySelector('.back')?.addEventListener('click', showTitle)
+  const top = await fetchTop()
+  const slot = ui.querySelector('.lead .slot')
+  if (slot) slot.innerHTML = top ? boardHtml(top, nameKey(load(NAME_KEY) ?? '')) : '<p class="empty">Couldn’t load the leaderboard.</p>'
+}
 
 function toggleMute() {
   audio.toggleMute()
@@ -133,11 +170,13 @@ function showTitle() {
     <div class="title">
       ${ch ? `<p class="dare">A friend harvested <b>${fmt(ch.score)}</b> pts${ch.corn ? ` (${fmt(ch.corn)} corn)` : ''}. Beat it!</p>` : ''}
       <button class="play">PLAY</button>
+      <button class="lb">🏆 LEADERBOARD</button>
       <p class="keys">${touch ? 'DRAG TO MOVE REMY' : '← → / A D OR MOUSE TO MOVE'} · CATCH CORN · DODGE THE CABALD</p>
       <p class="foot">${best ? `BEST ${fmt(best)} · ` : ''}<a href="${SITE}" target="_blank" rel="noopener">BASEDREMYBOYS.CLUB</a></p>
     </div>`
   ui.querySelector('.mute')?.addEventListener('click', toggleMute)
   ui.querySelector('.play')?.addEventListener('click', start)
+  ui.querySelector('.lb')?.addEventListener('click', () => void showBoard())
 }
 
 function start() {
@@ -220,12 +259,43 @@ function showOver(g: Game) {
         <div><dt>STREAK</dt><dd>${g.bestStreak}</dd></div>
         <div><dt>SISTERS</dt><dd>${g.sistersDone}</dd></div>
       </dl>
-      <a class="share" href="${esc(intent)}" target="_blank" rel="noopener">POST YOUR SCORE ON 𝕏</a>
-      <button class="play">PLAY AGAIN</button>
+      <form class="submit">
+        <input class="name" maxlength="16" placeholder="YOUR NAME" autocomplete="nickname" enterkeyhint="send" aria-label="Name for the leaderboard" value="${esc(load(NAME_KEY) ?? '')}">
+        <button type="submit">SUBMIT</button>
+      </form>
+      <p class="msg" role="status"></p>
+      <div class="slot"></div>
+      <div class="row"><a class="share" href="${esc(intent)}" target="_blank" rel="noopener">POST ON 𝕏</a><button class="play">PLAY AGAIN</button></div>
       <p class="fact">The Three Sisters (corn, beans and squash) have been planted together by Indigenous farmers for centuries: the corn holds up the beans, the beans feed the soil, the squash shades it.</p>
     </div>`
   ui.querySelector('.mute')?.addEventListener('click', toggleMute)
   ui.querySelector('.play')?.addEventListener('click', start)
+  const form = ui.querySelector<HTMLFormElement>('form.submit')
+  const input = ui.querySelector<HTMLInputElement>('input.name')
+  const msg = ui.querySelector<HTMLElement>('.over .msg')
+  const slot = ui.querySelector<HTMLElement>('.over .slot')
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    if (!input || !msg || !slot) return
+    const name = input.value.trim().replace(/\s+/g, ' ')
+    if (!/^[\p{L}\p{N} _.'-]{2,16}$/u.test(name)) {
+      msg.textContent = SUBMIT_ERRORS.invalid
+      return
+    }
+    form.classList.add('busy')
+    msg.textContent = 'Checking your name…'
+    const res = await submitScore({ name, score: g.score, caught: g.caught, level: g.level, sisters: g.sistersDone })
+    form.classList.remove('busy')
+    if (!res.ok) {
+      msg.textContent = SUBMIT_ERRORS[res.error]
+      if (res.error === 'name_rejected') input.select()
+      return
+    }
+    save(NAME_KEY, name)
+    form.remove()
+    msg.textContent = res.best > g.score ? `Your best ${fmt(res.best)} is #${res.rank}` : `You’re #${res.rank} on the leaderboard!`
+    slot.innerHTML = boardHtml(res.top, nameKey(name))
+  })
 }
 
 // ---------------------------------------------------------------- boot + frame loop

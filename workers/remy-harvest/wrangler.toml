@@ -1,0 +1,21 @@
+name = "remy-harvest"
+main = "src/worker.ts"
+compatibility_date = "2026-10-05"
+workers_dev = false
+routes = [{ pattern = "basedremyboys.club/api/harvest/*", zone_name = "basedremyboys.club" }]
+
+# One global leaderboard: a SQLite-backed Durable Object serializes submissions and the per-IP cooldown.
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Leaderboard"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Leaderboard"]
+
+# Workers AI: @cf/cloudflare/clef-flash screens player names.
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true

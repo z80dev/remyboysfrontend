@@ -35,6 +35,7 @@ export default defineConfig(async () => ({
   server: {
     proxy: {
       '/api/remix': 'http://127.0.0.1:8788',
+      '/api/harvest': 'http://127.0.0.1:8789',
     },
   },
   build: {
