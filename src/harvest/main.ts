@@ -118,7 +118,7 @@ const muteLabel = () => (audio.muted ? '🔇' : '🔊')
 const SUBMIT_ERRORS: Record<SubmitError, string> = {
   name_rejected: 'That name isn’t allowed on the board. Try another.',
   slow_down: 'Easy there! Wait a few seconds and try again.',
-  invalid: 'Names are 2–16 letters, numbers, spaces or _ . \' -',
+  invalid: 'This run can’t go on the leaderboard.',
   unavailable: 'The leaderboard is busy. Try again in a moment.',
   network: 'Couldn’t reach the leaderboard. Check your connection.',
 }
@@ -259,11 +259,15 @@ function showOver(g: Game) {
         <div><dt>STREAK</dt><dd>${g.bestStreak}</dd></div>
         <div><dt>SISTERS</dt><dd>${g.sistersDone}</dd></div>
       </dl>
-      <form class="submit">
+      ${
+        g.score > 0
+          ? `<form class="submit">
         <input class="name" maxlength="16" placeholder="YOUR NAME" autocomplete="nickname" enterkeyhint="send" aria-label="Name for the leaderboard" value="${esc(load(NAME_KEY) ?? '')}">
         <button type="submit">SUBMIT</button>
-      </form>
-      <p class="msg" role="status"></p>
+      </form>`
+          : ''
+      }
+      <p class="msg" role="status">${g.score > 0 ? '' : 'Catch some corn to get on the leaderboard!'}</p>
       <div class="slot"></div>
       <div class="row"><a class="share" href="${esc(intent)}" target="_blank" rel="noopener">POST ON 𝕏</a><button class="play">PLAY AGAIN</button></div>
       <p class="fact">The Three Sisters (corn, beans and squash) have been planted together by Indigenous farmers for centuries: the corn holds up the beans, the beans feed the soil, the squash shades it.</p>
@@ -279,7 +283,7 @@ function showOver(g: Game) {
     if (!input || !msg || !slot) return
     const name = input.value.trim().replace(/\s+/g, ' ')
     if (!/^[\p{L}\p{N} _.'-]{2,16}$/u.test(name)) {
-      msg.textContent = SUBMIT_ERRORS.invalid
+      msg.textContent = 'Names are 2–16 letters, numbers, spaces or _ . \' -'
       return
     }
     form.classList.add('busy')
