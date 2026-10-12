@@ -334,6 +334,21 @@ const icons: Record<string, ReactNode> = {
       <path d="m9.4 16 3.4-4.2 2.8 4.2zm7 0 2.8-4.2 3.4 4.2zM8 20.4c3.2 4.6 12.8 4.6 16 0l-2 1-1.6 2-2-1.4-1.6 2-1.6-2-1.6 2-2-1.6-1.6 1.4z" fill="#ffe36b" />
     </>
   ),
+  /* Ear of corn in its husks: Remy's Harvest. */
+  corn: (
+    <>
+      <Shadow />
+      <ellipse cx="16" cy="13.4" rx="5.4" ry="10.4" fill="#ffc21a" stroke="#a36a06" strokeWidth=".6" transform="rotate(18 16 13.4)" />
+      <path
+        d="M12.6 7.6 20.6 10M11.6 11.4l8 2.4m-8.8 1.4 8 2.4M14.6 4.4l-3 14.8m6-13.8-3 14.8m6-12.4-3 13.2"
+        stroke="#d98f06"
+        strokeWidth=".7"
+        transform="rotate(4 16 13.4)"
+      />
+      <path d="M9 28.6c-1-6.4 0-11 2.4-14.4.2 4.6 1.6 8.6 4.4 12.2z" fill="#5f9a2a" stroke="#2f5a14" strokeWidth=".6" />
+      <path d="M10.4 29c4.6-1.4 9.8-4.6 12.6-10.8-3.6 2.4-7 3.6-10.6 4.2z" fill="#7dbb3a" stroke="#2f5a14" strokeWidth=".6" />
+    </>
+  ),
   /* Leather wallet with a card peeking out. */
   wallet: (
     <>

@@ -5,6 +5,7 @@ import { Approvals } from '../apps/Approvals'
 import { DisplayProperties } from '../apps/DisplayProperties'
 import { Gallery } from '../apps/Gallery'
 import { Haunt } from '../apps/Haunt'
+import { Harvest } from '../apps/Harvest'
 import { LaunchControl } from '../apps/LaunchControl'
 import { Legacy } from '../apps/Legacy'
 import { Quest } from '../apps/Quest'
@@ -112,6 +113,15 @@ export const APPS: AppDef[] = [
     icon: 'pumpkin',
     size: [860, 640],
     Component: Haunt,
+  },
+  {
+    id: 'harvest',
+    title: "Remy's Harvest",
+    short: "Remy's Harvest",
+    desc: "Indigenous Peoples' Day: catch the corn",
+    icon: 'corn',
+    size: [640, 680],
+    Component: Harvest,
   },
   {
     id: 'launch',

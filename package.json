@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.4.0",
+    "@fontsource/lilita-one": "^5.3.0",
     "@fontsource/noto-sans-symbols": "^5.3.0",
     "@fontsource/noto-sans-symbols-2": "^5.3.0",
     "@fontsource/pixelify-sans": "^5.3.0",
