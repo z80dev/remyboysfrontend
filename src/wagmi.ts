@@ -19,6 +19,8 @@ export const config = createConfig({
         url: 'https://basedremyboys.club',
         icons: ['https://basedremyboys.club/media/remy/v1/128/0.webp'],
       },
+      // The log-on screen (.logon) is z-index 10000; AppKit's default 999 opened the QR modal behind it.
+      qrModalOptions: { themeVariables: { '--wcm-z-index': '10001' } },
     }),
   ],
   transports: { [chain.id]: http(RPC_URL, { retryCount: 1, timeout: 15_000 }) },
