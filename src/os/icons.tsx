@@ -349,6 +349,30 @@ const icons: Record<string, ReactNode> = {
       <path d="M10.4 29c4.6-1.4 9.8-4.6 12.6-10.8-3.6 2.4-7 3.6-10.6 4.2z" fill="#7dbb3a" stroke="#2f5a14" strokeWidth=".6" />
     </>
   ),
+  /* Pink keychain pet with a little Remy face on its screen: Remygotchi. */
+  pet: (
+    <>
+      <defs>
+        <radialGradient id="xi-pet-shell" cx=".35" cy=".3" r=".8">
+          <stop offset="0" stopColor="#ffe3f1" />
+          <stop offset=".5" stopColor="#ff8fc8" />
+          <stop offset="1" stopColor="#d6337f" />
+        </radialGradient>
+      </defs>
+      <Shadow />
+      <circle cx="16" cy="3.6" r="2" fill="none" stroke="#b9b3c9" strokeWidth="1.2" />
+      <path d="M16 4.8c6.8 0 11 5.6 11 12.2 0 6.4-4.6 11-11 11S5 23.4 5 17C5 10.4 9.2 4.8 16 4.8z" fill="url(#xi-pet-shell)" stroke="#8a1f55" strokeWidth=".8" />
+      <rect x="9.4" y="9.6" width="13.2" height="10.4" rx="2.4" fill="#2b2140" />
+      <rect x="10.6" y="10.8" width="10.8" height="8" rx="1.4" fill="#bfeedd" />
+      <path d="M13.2 13.2h5.6v1.2h1v3.8h-7.6v-3.8h1z" fill="#6b3f1f" />
+      <path d="M13.6 14.6h4.8v3.2h-4.8z" fill="#f2c79c" />
+      <path d="M14.4 15.4h.8v.8h-.8zm2.4 0h.8v.8h-.8z" fill="#2b2140" />
+      <circle cx="11.8" cy="23.4" r="1.6" fill="#ffb02e" stroke="#9a5a00" strokeWidth=".5" />
+      <circle cx="16" cy="24.4" r="1.6" fill="#39c6ff" stroke="#155f8a" strokeWidth=".5" />
+      <circle cx="20.2" cy="23.4" r="1.6" fill="#3fd6a4" stroke="#1a7a5a" strokeWidth=".5" />
+      <ellipse cx="11.4" cy="8.4" rx="2.6" ry="1.4" fill="#fff" opacity=".6" transform="rotate(-30 11.4 8.4)" />
+    </>
+  ),
   /* Leather wallet with a card peeking out. */
   wallet: (
     <>
@@ -627,6 +651,20 @@ const icons: Record<string, ReactNode> = {
       <rect x="6.6" y="5.6" width="18.8" height="18.8" rx="3.6" transform="rotate(-12 16 15)" fill="none" stroke="#a9adc8" strokeOpacity=".55" strokeWidth=".7" />
       <path d="M19.6 4.2 9.2 16.4h6.2l-3.6 11.4 11.4-14h-6.4z" fill="url(#xi-wa-bolt)" stroke="#5a3204" strokeWidth=".9" strokeLinejoin="round" />
       <path d="m18 7.4-6.2 7.6h3" fill="none" stroke="#fffbe0" strokeWidth=".8" strokeLinecap="round" opacity=".8" />
+    </>
+  ),
+  /* The RemyFlix brand tile (public/remyflix/app-icon.svg) in a rounded frame: RemyFlix. */
+  remyflix: (
+    <>
+      <defs>
+        <clipPath id="xi-rf-clip">
+          <rect x="3.5" y="3.5" width="25" height="25" rx="5" />
+        </clipPath>
+      </defs>
+      <Shadow />
+      <image href="/remyflix/app-icon.svg" x="3.5" y="3.5" width="25" height="25" clipPath="url(#xi-rf-clip)" preserveAspectRatio="xMidYMid slice" />
+      <rect x="3.5" y="3.5" width="25" height="25" rx="5" fill="none" stroke="#000" strokeOpacity=".55" strokeWidth=".8" />
+      <path d="M7 5.6h18" stroke="#fff" strokeOpacity=".35" strokeWidth=".8" strokeLinecap="round" />
     </>
   ),
   /* Folder holding a playing card and a joystick: the Games folder. */

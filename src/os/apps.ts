@@ -17,10 +17,13 @@ import { Trader } from '../apps/Trader'
 import { Vault } from '../apps/Vault'
 import { Welcome } from '../apps/Welcome'
 import { Winamp } from '../apps/Winamp'
+import { REMYFLIX_URL } from '../config'
 import GamesFolder from '../games/folder'
 import { GAMES } from '../games/registry'
 import { teamRole } from '../lib/launch'
 import { Loading } from './ui'
+
+const Remygotchi = lazy(() => import('../pet'))
 
 export type AppProps = { param?: string; navigate: (hash: string) => void; close: () => void }
 
@@ -91,6 +94,15 @@ export const APPS: AppDef[] = [
   },
   { id: 'send', title: 'Send fREMY', short: 'Send fREMY', desc: 'Transfer fREMY to any wallet', icon: 'coin', size: [520, 460], Component: Send },
   { id: 'gallery', title: 'Remy Gallery', short: 'Gallery', desc: 'Browse all 4,490 Remys', icon: 'gallery', size: [800, 600], Component: Gallery },
+  {
+    id: 'pet',
+    title: 'Remygotchi',
+    short: 'Remygotchi',
+    desc: 'Raise your Remy, keep the daily streak',
+    icon: 'pet',
+    size: [900, 690],
+    Component: (props) => createElement(Suspense, { fallback: createElement(Loading, null, 'Hatching…') }, createElement(Remygotchi, props)),
+  },
   { id: 'remix', title: 'Remy Remix Studio', short: 'Remix Studio', desc: 'Reimagine original Remy art', icon: 'remix', size: [980, 720], Component: Remix },
   { id: 'textedit', title: 'Remy TextEdit', short: 'TextEdit', desc: 'A word processor in Wingdings', icon: 'textedit', size: [640, 480], Component: TextEdit },
   {
@@ -172,11 +184,28 @@ export const APPS: AppDef[] = [
 
 export const appById = (id: string) => APPS.find((a) => a.id === id)
 
+/** What the desktop, Start menu and Today screen list: a window app or an external-site launcher. */
+export type Launcher = Pick<AppDef, 'id' | 'title' | 'short' | 'desc' | 'icon'>
+
+/** A launcher that opens another site in a new tab instead of a Remy OS window. Never a hash route. */
+export type LinkDef = Launcher & { href: string; /** Listed right after this app id. */ after: string }
+
+export const LINK_APPS: LinkDef[] = [
+  { id: 'remyflix', title: 'RemyFlix', short: 'RemyFlix', desc: 'Stream the Remy films', icon: 'remyflix', href: REMYFLIX_URL, after: 'winamp' },
+]
+
+export const linkById = (id: string) => LINK_APPS.find((l) => l.id === id)
+
 export const isTeam = (address?: Address) => teamRole(address) !== undefined
 
-/** Apps listed on the desktop, Start menu and Today screen for the connected wallet. */
+/** Launchers listed on the desktop, Start menu and Today screen for the connected wallet. */
 export function useVisibleApps() {
   const { address } = useAccount()
   const team = isTeam(address)
-  return APPS.filter((a) => !a.hidden && !a.game && (!a.team || team))
+  const listed: Launcher[] = APPS.filter((a) => !a.hidden && !a.game && (!a.team || team))
+  for (const l of LINK_APPS) {
+    const at = listed.findIndex((a) => a.id === l.after)
+    listed.splice(at < 0 ? listed.length : at + 1, 0, l)
+  }
+  return listed
 }

@@ -76,5 +76,8 @@ export const LINKS = [
   { label: 'Telegram', href: 'https://t.me/+0he27MlVgxU2OTQx' },
 ] as const
 
+/** RemyFlix, the Remy film streaming site. The shell launcher opens it in a new tab. */
+export const REMYFLIX_URL = 'https://remyflix.watch'
+
 /** Halloween Remys: free mint for Remy holders on JPEG Markets. */
 export const HALLOWEEN_MINT = 'https://jpeg.markets/collections/halloween-remys'

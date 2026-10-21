@@ -7,10 +7,11 @@ import { Pocket } from './os/Pocket'
 import { Session, type SessionStage, TurnOffDialog } from './os/Session'
 import { Taskbar } from './os/Taskbar'
 import { TASKBAR_H, type WinGeom, Window, focusActiveWindow } from './os/Window'
-import { type AppDef, type AppProps, appById, isTeam } from './os/apps'
+import { type AppDef, type AppProps, appById, isTeam, linkById } from './os/apps'
 import { IconDefs } from './os/icons'
 import { MobileContext, useShell } from './os/shell'
 import { TeamPrompt, useSecurityBalloons } from './os/system'
+import { usePetBalloon } from './pet/save'
 
 type Win = { id: string; geom: WinGeom; z: number; min: boolean; max: boolean; title?: string; closeGuard?: () => void }
 
@@ -68,6 +69,7 @@ export default function App() {
   const zRef = useRef(10)
 
   useSecurityBalloons(session === null)
+  usePetBalloon(session === null)
 
   const active = wins.filter((w) => !w.min).sort((a, b) => b.z - a.z)[0]?.id
 
@@ -94,6 +96,11 @@ export default function App() {
 
   const navigate = useCallback(
     (hash: string) => {
+      const link = linkById(hash)
+      if (link) {
+        window.open(link.href, '_blank', 'noopener')
+        return
+      }
       const target = hash.startsWith('#') ? hash : `#/${hash}`
       if (window.location.hash === target) openFromHash()
       else window.location.hash = target
